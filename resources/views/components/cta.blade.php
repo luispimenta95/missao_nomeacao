@@ -1,0 +1,9 @@
+<div id="garanta" class="text-center">
+    <div class="max-w-3xl mx-auto bg-primary text-white p-8 rounded-3xl card-shadow" data-aos="zoom-in">
+        <h2 class="text-2xl font-bold">Pronto para dar o próximo passo?</h2>
+        <p class="mt-2">Vagas limitadas. Garanta sua inscrição e acelere sua preparação com quem entrega resultados.</p>
+        <div class="mt-6">
+            <a href="#" class="inline-block bg-accent text-white px-8 py-4 rounded-2xl font-semibold hover:scale-105 transform transition">Quero garantir minha vaga</a>
+        </div>
+    </div>
+</div>

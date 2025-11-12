@@ -24,13 +24,23 @@ class LeadController extends Controller
 
     // Normalize consent to boolean
     $data['consent'] = isset($data['consent']) ? true : false;
+        // Force utm_source to 'site' (fixed value)
+        $data['utm_source'] = 'site';
 
+        // If a file identifier was sent, keep it to build PDF URL
+        $file = $request->input('file');
 
-    Lead::create($data);
+        Lead::create($data);
 
-        // Download/redirect URL (the user asked to add utm_source=site to this URL)
-        $downloadBase = 'https://pay.plataformatutory.com.br/checkout/19235f0f-222d-49a3-b9e0-f8cb71ee182a';
-        $redirectUrl = $downloadBase . (strpos($downloadBase, '?') !== false ? '&' : '?') . http_build_query(['utm_source' => 'site']);
+        if ($file) {
+            // map file slug to a public PDF asset (place PDFs in public/pdfs/)
+            $pdfUrl = asset("pdfs/{$file}.pdf");
+            $redirectUrl = $pdfUrl . (strpos($pdfUrl, '?') !== false ? '&' : '?') . http_build_query(['utm_source' => 'site']);
+        } else {
+            // Fallback: original pay URL with utm_source=site
+            $downloadBase = 'https://pay.plataformatutory.com.br/checkout/19235f0f-222d-49a3-b9e0-f8cb71ee182a';
+            $redirectUrl = $downloadBase . (strpos($downloadBase, '?') !== false ? '&' : '?') . http_build_query(['utm_source' => 'site']);
+        }
 
         return response()->json([
             'success' => true,
