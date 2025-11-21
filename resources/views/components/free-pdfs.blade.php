@@ -6,45 +6,27 @@
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <article class="p-6 rounded-2xl card-shadow hover:scale-105 transition transform bg-white" data-file="guia-estudo" data-aos="zoom-in">
-                <div class="text-accent">
-                    <!-- book svg -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
-                        <path d="M4 4.5A2.5 2.5 0 016.5 7H20v12" />
-                    </svg>
-                </div>
-                <h3 class="mt-4 font-semibold">Guia de Estudos</h3>
-                <p class="mt-2 text-sm text-gray-600">Checklist e cronograma prático para 90 dias.</p>
-                <button class="mt-4 inline-block px-4 py-2 bg-primary text-white rounded-lg btn-open-pdf">Baixar PDF</button>
-            </article>
-
-            <article class="p-6 rounded-2xl card-shadow hover:scale-105 transition transform bg-white" data-file="simulados" data-aos="zoom-in" data-aos-delay="100">
-                <div class="text-accent">
-                    <!-- clipboard svg -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M9 2h6a2 2 0 012 2v2H7V4a2 2 0 012-2z" />
-                        <path d="M7 8h10v11a2 2 0 01-2 2H9a2 2 0 01-2-2V8z" />
-                    </svg>
-                </div>
-                <h3 class="mt-4 font-semibold">Simulados Comentados</h3>
-                <p class="mt-2 text-sm text-gray-600">Resumos e resoluções comentadas.</p>
-                <button class="mt-4 inline-block px-4 py-2 bg-primary text-white rounded-lg btn-open-pdf">Baixar PDF</button>
-            </article>
-
-            <article class="p-6 rounded-2xl card-shadow hover:scale-105 transition transform bg-white" data-file="estrategias" data-aos="zoom-in" data-aos-delay="200">
-                <div class="text-accent">
-                    <!-- search svg -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <circle cx="11" cy="11" r="6" />
-                        <path d="M21 21l-4.35-4.35" />
-                    </svg>
-                </div>
-                <h3 class="mt-4 font-semibold">Estratégias de Prova</h3>
-                <p class="mt-2 text-sm text-gray-600">Táticas para otimizar tempo e assertividade.</p>
-                <button class="mt-4 inline-block px-4 py-2 bg-primary text-white rounded-lg btn-open-pdf">Baixar PDF</button>
-            </article>
-        </div>
+                @if(isset($materials) && $materials->count())
+                    @foreach($materials as $material)
+                        <article class="p-6 rounded-2xl card-shadow hover:scale-105 transition transform bg-white" data-id="{{ $material->id }}" data-aos="zoom-in">
+                            <div class="text-accent">
+                                <!-- book svg -->
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+                                    <path d="M4 4.5A2.5 2.5 0 016.5 7H20v12" />
+                                </svg>
+                            </div>
+                            <h3 class="mt-4 font-semibold">{{ $material->title }}</h3>
+                            <p class="mt-2 text-sm text-gray-600">{{ $material->description }}</p>
+                            <button class="mt-4 inline-block px-4 py-2 bg-primary text-white rounded-lg btn-open-pdf">Baixar PDF</button>
+                        </article>
+                    @endforeach
+                @else
+                    <div class="col-span-1 sm:col-span-3 p-6 rounded-2xl card-shadow bg-white text-center">
+                        <p class="text-gray-600">Nenhum material disponível no momento. Em breve teremos conteúdos gratuitos.</p>
+                    </div>
+                @endif
+            </div>
 
         <!-- Modal - simple Tailwind modal -->
         <div id="pdfModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
@@ -54,8 +36,8 @@
                     <button id="closePdfModal" class="text-gray-500 hover:text-gray-800">✕</button>
                 </div>
 
-                <form id="pdfForm" class="mt-4">
-                    <input type="hidden" name="file" id="pdf_file" value="">
+                <form id="pdfForm" class="mt-4" novalidate>
+                    <input type="hidden" name="material_id" id="pdf_file" value="">
                     <input type="hidden" name="utm_source" id="pdf_utm_source" value="site">
                     <input type="hidden" name="utm_medium" id="pdf_utm_medium" value="">
                     <input type="hidden" name="utm_campaign" id="pdf_utm_campaign" value="">
@@ -63,12 +45,12 @@
                     <div class="grid grid-cols-1 gap-3">
                         <label class="block">
                             <span class="text-sm text-gray-600">Nome completo</span>
-                            <input type="text" name="name" id="pdf_name" required class="mt-1 w-full rounded-lg border-gray-200 shadow-sm focus:ring-primary focus:border-primary">
+                            <input type="text" name="name" id="pdf_name" class="mt-1 w-full rounded-lg border-gray-200 shadow-sm focus:ring-primary focus:border-primary">
                         </label>
 
                         <label class="block">
                             <span class="text-sm text-gray-600">Email</span>
-                            <input type="email" name="email" id="pdf_email" required class="mt-1 w-full rounded-lg border-gray-200 shadow-sm focus:ring-primary focus:border-primary">
+                            <input type="email" name="email" id="pdf_email" class="mt-1 w-full rounded-lg border-gray-200 shadow-sm focus:ring-primary focus:border-primary">
                         </label>
 
                         <label class="block">
@@ -77,7 +59,7 @@
                         </label>
 
                         <label class="inline-flex items-center gap-2 mt-2">
-                            <input type="checkbox" name="consent" id="pdf_consent" required class="rounded border-gray-300 text-primary focus:ring-primary">
+                            <input type="checkbox" name="consent" id="pdf_consent" class="rounded border-gray-300 text-primary focus:ring-primary">
                             <span class="text-sm text-gray-600">Concordo com o uso dos meus dados</span>
                         </label>
 
@@ -113,8 +95,8 @@
         document.querySelectorAll('.btn-open-pdf').forEach(btn => {
             btn.addEventListener('click', e => {
                 const article = e.target.closest('article');
-                const file = article.getAttribute('data-file');
-                pdfFileInput.value = file;
+                const id = article.getAttribute('data-id');
+                pdfFileInput.value = id;
 
                 const utm = getUtmParams();
                 document.getElementById('pdf_utm_source').value = 'site'; // fixed
@@ -128,18 +110,104 @@
         document.getElementById('closePdfModal').addEventListener('click', ()=> modal.classList.add('hidden'));
         document.getElementById('cancelPdf').addEventListener('click', ()=> modal.classList.add('hidden'));
 
-        // Submit form via fetch to /leads
+        // Phone mask: (xx) xxxxx-xxxx while typing
+        const phoneInput = document.getElementById('pdf_phone');
+        if(phoneInput){
+            let isDeleting = false;
+            phoneInput.addEventListener('keydown', function(e){
+                isDeleting = (e.key === 'Backspace' || e.key === 'Delete');
+            });
+
+            phoneInput.addEventListener('input', function(e){
+                // If user is deleting, allow the deletion to proceed without aggressive reformat
+                if(isDeleting){
+                    isDeleting = false;
+                    return;
+                }
+
+                let v = e.target.value.replace(/\D/g, '').slice(0,11);
+                let formatted = '';
+                if(v.length > 0){
+                    formatted += '(' + v.slice(0, Math.min(2, v.length)) + ')';
+                }
+                if(v.length > 2){
+                    formatted += ' ';
+                    // if 11 digits, mask as 5-4, else 4-4
+                    if(v.length > 6){
+                        formatted += v.slice(2, 7) + (v.length > 7 ? '-' + v.slice(7) : '');
+                    } else {
+                        formatted += v.slice(2);
+                    }
+                }
+                e.target.value = formatted;
+            });
+
+            // handle paste: format pasted numbers
+            phoneInput.addEventListener('paste', function(e){
+                const paste = (e.clipboardData || window.clipboardData).getData('text');
+                const digits = paste.replace(/\D/g,'').slice(0,11);
+                if(digits){
+                    e.preventDefault();
+                    let formatted = '';
+                    if(digits.length > 0) formatted += '(' + digits.slice(0, Math.min(2, digits.length)) + ')';
+                    if(digits.length > 2){
+                        formatted += ' ';
+                        if(digits.length > 6){
+                            formatted += digits.slice(2,7) + (digits.length > 7 ? '-' + digits.slice(7) : '');
+                        } else {
+                            formatted += digits.slice(2);
+                        }
+                    }
+                    e.target.value = formatted;
+                }
+            });
+
+            // also format on blur to clean trailing chars
+            phoneInput.addEventListener('blur', function(e){
+                let v = e.target.value.replace(/\D/g, '').slice(0,11);
+                if(!v) return;
+                if(v.length === 10){
+                    e.target.value = '(' + v.slice(0,2) + ') ' + v.slice(2,6) + '-' + v.slice(6);
+                } else if(v.length === 11){
+                    e.target.value = '(' + v.slice(0,2) + ') ' + v.slice(2,7) + '-' + v.slice(7);
+                }
+            });
+        }
+
+        // Submit form via fetch to /leads with custom PT-BR validation
         document.getElementById('pdfForm').addEventListener('submit', async function(e){
             e.preventDefault();
             const form = e.target;
-            const data = new FormData(form);
 
-            // explicit consent check
-            if(!document.getElementById('pdf_consent').checked){
+            // Custom client-side validation (Portuguese messages)
+            const name = document.getElementById('pdf_name').value.trim();
+            const email = document.getElementById('pdf_email').value.trim();
+            const phone = document.getElementById('pdf_phone').value.trim();
+
+            const consentChecked = document.getElementById('pdf_consent').checked;
+
+            if(!name){
+                showError('Por favor, informe seu nome.');
+                return;
+            }
+            if(!phone){
+                showError('Por favor, informe seu telefone celular.');
+                return;
+            }
+
+            // Simple email format check
+            const emailPattern = /^\S+@\S+\.\S+$/;
+            if(!email || !emailPattern.test(email)){
+                showError('Por favor, informe um e-mail válido.');
+                return;
+            }
+
+            if(!consentChecked){
                 showError('Você precisa concordar com o uso dos dados.');
                 return;
             }
 
+            const data = new FormData(form);
             const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
             try{

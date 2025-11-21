@@ -22,6 +22,8 @@ return new class extends Migration
             $table->string('utm_source')->nullable();
             $table->string('utm_medium')->nullable();
             $table->string('utm_campaign')->nullable();
+            $table->unsignedBigInteger('material_id')->nullable();
+            $table->foreign('material_id')->references('id')->on('materials')->nullOnDelete();
             $table->timestamps();
         });
     }
