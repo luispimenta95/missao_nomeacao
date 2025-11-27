@@ -18,7 +18,7 @@
                         <div class="text-sm text-gray-600">{{ $material->description }}</div>
                     </div>
                     <div class="flex items-center gap-3 justify-end">
-                        <a href="{{ route('materiais.download', $material) }}" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">Download</a>
+                        <a href="{{ $material->link }}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">Download</a>
                         <span class="text-xs text-gray-500">{{ $material->created_at->format('d/m/Y') }}</span>
                     </div>
                 </div>

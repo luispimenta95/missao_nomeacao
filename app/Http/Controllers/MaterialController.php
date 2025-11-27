@@ -25,6 +25,7 @@ class MaterialController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'file' => 'required|file|mimes:pdf|max:20480',
+            'link' => 'required|url|max:255',
         ]);
 
         $file = $request->file('file');
@@ -37,6 +38,7 @@ class MaterialController extends Controller
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             'file_path' => $path,
+            'link' => $data['link'],
         ]);
 
         return redirect()->route('materiais.index')->with('success', 'Material salvo com sucesso.');

@@ -13,5 +13,6 @@ class Material extends Model
         'title',
         'description',
         'file_path',
+        'link',
     ];
 }
