@@ -1,7 +1,7 @@
 <section id="materiais" class="py-16 bg-white">
     <div class="container mx-auto px-6 lg:px-24">
         <div class="text-center mb-8" data-aos="fade-up">
-            <h2 class="text-2xl font-bold text-primary">Materiais gratuitos em PDF</h2>
+            <h2 id="materiais" class="text-2xl font-bold text-primary">Materiais gratuitos em PDF</h2>
             <p class="mt-2 text-gray-600 max-w-2xl mx-auto">Baixe apostilas e roteiros práticos. Antes do download, pedimos alguns dados rápidos para envio e acompanhamento.</p>
         </div>
 

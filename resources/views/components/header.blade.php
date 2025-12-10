@@ -9,6 +9,8 @@
 
         <nav class="hidden md:flex items-center gap-8 text-sm">
             <a href="#beneficios" class="text-gray-600 hover:text-primary">Benefícios</a>
+            <a href="#materiais" class="text-gray-600 hover:text-primary">Materiais</a>
+
             <a href="#depoimentos" class="text-gray-600 hover:text-primary">Depoimentos</a>
             <a href="#mentor" class="text-gray-600 hover:text-primary">Sobre</a>
             <a href="#garanta" class="text-gray-600 hover:text-primary">Inscrição</a>
