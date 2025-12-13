@@ -6,7 +6,7 @@
             <p class="mt-6 text-white text-lg max-w-3xl mx-auto">Entre na Mentoria Missão Nomeação e viva um processo de 6 meses que vai te fazer sair do piloto automático, assumir o controle da sua preparação e se tornar o tipo de pessoa que o Diário Oficial chama pelo nome.</p>
 
             <div class="mt-8">
-                <a href="#materiais" class="inline-flex items-center gap-3 bg-white text-primary px-8 py-4 rounded-2xl font-bold text-lg shadow-lg hover:scale-105 transform transition">QUERO SABER MAIS</a>
+                <a href="https://wa.me/5511999999999?text=Ol%C3%A1%20quero%20saber%20mais" class="inline-flex items-center gap-3 bg-white text-primary px-8 py-4 rounded-2xl font-bold text-lg shadow-lg hover:scale-105 transform transition">QUERO SABER MAIS</a>
             </div>
         </div>
     </div>
