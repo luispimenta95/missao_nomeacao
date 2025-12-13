@@ -19,7 +19,6 @@
         <div class="flex items-center gap-3">
 
             <!-- Prominent admin button for creating materials -->
-            <a href="{{ route('materiais.create') }}" class="hidden md:inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow">Cadastrar Material</a>
 
             <button class="md:hidden p-2 rounded-lg bg-gray-100" aria-label="menu">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>

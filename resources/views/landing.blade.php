@@ -13,9 +13,11 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#0b2545', /* azul escuro */
-                        accent: '#c49a5d',  /* dourado */
-                        blush: '#f7e8ef'    /* tom feminino claro */
+                        primary: '#111184',     /* azul escuro profundo */
+                        'primary-light': '#2222a0',  /* azul escuro médio */
+                        accent: '#111184',      /* azul médio vibrante */
+                        'accent-light': '#2222a0',   /* azul claro */
+                        'bg-light': '#111184'   /* azul muito claro */
                     },
                     fontFamily: {
                         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif']
@@ -31,11 +33,14 @@
     <!-- AOS -->
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 
+    <!-- Theme Styles -->
+    <link href="{{ asset('css/theme.css') }}" rel="stylesheet">
+
     <style>
         /* Small tweaks */
-        .gradient-hero { background: linear-gradient(120deg,#f7e8ef 0%, rgba(196,154,93,0.06) 40%, #ffffff 100%); }
-        .card-shadow { box-shadow: 0 10px 30px rgba(11,37,69,0.08); }
-        .glass { background: rgba(255,255,255,0.6); backdrop-filter: blur(6px); }
+        .gradient-hero { background: linear-gradient(120deg, #111184 0%, rgba(17, 17, 132, 0.9) 40%, #1a1a95 100%); }
+        .card-shadow { box-shadow: 0 10px 30px rgba(17, 17, 132, 0.3); }
+        .glass { background: rgba(17, 17, 132, 0.4); backdrop-filter: blur(6px); }
     </style>
 
 </head>
@@ -74,6 +79,8 @@
 
     @include('components.neuroscience')
 
+    @include('components.turmas-carousel')
+
     @include('components.urgency')
 
     @include('components.faq')
@@ -86,6 +93,8 @@
 </main>
 
 @include('components.footer')
+
+@include('components.inscricao-modal')
 
 <!-- WhatsApp flutuante -->
 <a href="https://wa.me/5511999999999?text=Ol%C3%A1%20quero%20saber%20mais" target="_blank" rel="noopener" class="fixed bottom-6 right-6 z-50 bg-green-500 text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform" aria-label="WhatsApp">

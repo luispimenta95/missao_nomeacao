@@ -10,13 +10,14 @@ class MaterialController extends Controller
 {
     public function index()
     {
-        $materials = Material::orderBy('created_at', 'desc')->get();
-        return view('admin.materials.index', compact('materials'));
+        $materials = Material::with('turmas')->orderBy('created_at', 'desc')->get();
+        return view('admin.materiais.index', compact('materials'));
     }
 
     public function create()
     {
-        return view('admin.materials.create');
+        $turmas = \App\Models\Turma::orderBy('title')->get();
+        return view('admin.materiais.create', compact('turmas'));
     }
 
     public function store(Request $request)
@@ -26,6 +27,8 @@ class MaterialController extends Controller
             'description' => 'nullable|string',
             'file' => 'required|file|mimes:pdf|max:20480',
             'link' => 'nullable|url|max:255',
+            'turmas' => 'nullable|array',
+            'turmas.*' => 'exists:turmas,id',
         ]);
 
         $file = $request->file('file');
@@ -41,6 +44,11 @@ class MaterialController extends Controller
             'link' => $data['link'] ?? null,
         ]);
 
+        // Attach turmas
+        if (!empty($data['turmas'])) {
+            $material->turmas()->attach($data['turmas']);
+        }
+
         return redirect()->route('materiais.index')->with('success', 'Material salvo com sucesso.');
     }
 
@@ -55,5 +63,55 @@ class MaterialController extends Controller
         return response()->download($storagePath, basename($material->file_path), [
             'Content-Type' => 'application/pdf',
         ]);
+    }
+
+    public function edit(Material $material)
+    {
+        $turmas = \App\Models\Turma::orderBy('title')->get();
+        return view('admin.materiais.edit', compact('material', 'turmas'));
+    }
+
+    public function update(Request $request, Material $material)
+    {
+        $data = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'file' => 'nullable|file|mimes:pdf|max:20480',
+            'link' => 'nullable|url|max:255',
+            'turmas' => 'nullable|array',
+            'turmas.*' => 'exists:turmas,id',
+        ]);
+
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $filename = Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '-' . time() . '.pdf';
+            $path = $file->storeAs('materials', $filename, 'public');
+            $data['file_path'] = $path;
+        }
+
+        unset($data['file']);
+        unset($data['turmas']);
+        $material->update($data);
+
+        // Sync turmas
+        if (isset($request->turmas)) {
+            $material->turmas()->sync($request->turmas);
+        } else {
+            $material->turmas()->sync([]);
+        }
+
+        return redirect()->route('materiais.index')->with('success', 'Material atualizado com sucesso.');
+    }
+
+    public function destroy(Material $material)
+    {
+        // Delete the file if it exists
+        if ($material->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($material->file_path)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($material->file_path);
+        }
+
+        $material->delete();
+
+        return redirect()->route('materiais.index')->with('success', 'Material deletado com sucesso.');
     }
 }

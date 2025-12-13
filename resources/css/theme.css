@@ -1,0 +1,103 @@
+/**
+ * Theme Configuration - Missão Nomeação
+ * Centralized color and style definitions
+ * All colors use dark blue tones for consistency
+ */
+
+:root {
+    /* Primary Colors - Dark Blue Palette */
+    --color-primary: #111184;           /* Azul escuro profundo */
+    --color-primary-light: #2222a0;     /* Azul escuro médio */
+    --color-primary-lighter: #3333bb;   /* Azul escuro claro */
+    --color-primary-dark: #0a0a60;      /* Azul escuro mais profundo */
+    
+    /* Accent Colors - Blue Accent Tones */
+    --color-accent: #111184;            /* Azul médio vibrante */
+    --color-accent-light: #2222a0;      /* Azul claro */
+    --color-accent-dark: #0a0a60;       /* Azul escuro para contraste */
+    
+    /* Background Colors */
+    --color-bg-light: #111184;          /* Azul muito claro para fundos */
+    --color-bg-lighter: #1a1a95;        /* Quase branco com tom azul */
+    
+    /* Gradient */
+    --gradient-hero: linear-gradient(120deg, #111184 0%, rgba(17, 17, 132, 0.9) 40%, #1a1a95 100%);
+    
+    /* Shadows */
+    --shadow-card: 0 10px 30px rgba(17, 17, 132, 0.3);
+    --shadow-hover: 0 15px 40px rgba(17, 17, 132, 0.4);
+    
+    /* Glass Effect */
+    --glass-bg: rgba(255, 255, 255, 0.6);
+    --glass-blur: blur(6px);
+}
+
+/* Tailwind Custom Classes */
+.text-primary {
+    color: var(--color-primary) !important;
+}
+
+.bg-primary {
+    background-color: var(--color-primary) !important;
+}
+
+.border-primary {
+    border-color: var(--color-primary) !important;
+}
+
+.text-accent {
+    color: var(--color-accent) !important;
+}
+
+.bg-accent {
+    background-color: var(--color-accent) !important;
+}
+
+.hover\:bg-accent:hover {
+    background-color: var(--color-accent-dark) !important;
+}
+
+.hover\:bg-primary:hover {
+    background-color: var(--color-primary-light) !important;
+}
+
+/* Utility Classes */
+.gradient-hero {
+    background: var(--gradient-hero);
+}
+
+.card-shadow {
+    box-shadow: var(--shadow-card);
+}
+
+.card-shadow:hover {
+    box-shadow: var(--shadow-hover);
+}
+
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+}
+
+/* Button Styles */
+.btn-primary {
+    background-color: var(--color-primary);
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: var(--color-primary-light);
+    transform: scale(1.05);
+}
+
+.btn-accent {
+    background-color: var(--color-accent);
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.btn-accent:hover {
+    background-color: var(--color-accent-dark);
+    transform: scale(1.05);
+}

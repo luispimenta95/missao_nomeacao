@@ -15,4 +15,9 @@ class Material extends Model
         'file_path',
         'link',
     ];
+
+    public function turmas()
+    {
+        return $this->belongsToMany(Turma::class);
+    }
 }
