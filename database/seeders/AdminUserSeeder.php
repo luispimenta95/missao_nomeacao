@@ -16,19 +16,14 @@ class AdminUserSeeder extends Seeder
     {
         $users = [
             [
-                'name' => 'Administrador',
-                'email' => 'admin@missaonomeacao.com.br',
+                'name' => 'Nayara Oliveira',
+                'email' => 'nayara@missaonomeacao.com.br',
                 'password' => Hash::make('admin123'),
             ],
             [
                 'name' => 'Luis Pimenta',
                 'email' => 'luis@missaonomeacao.com.br',
                 'password' => Hash::make('senha123'),
-            ],
-            [
-                'name' => 'Gestor',
-                'email' => 'gestor@missaonomeacao.com.br',
-                'password' => Hash::make('gestor123'),
             ],
         ];
 
