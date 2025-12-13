@@ -27,8 +27,11 @@ class MaterialController extends Controller
             'description' => 'nullable|string',
             'file' => 'required|file|mimes:pdf|max:20480',
             'link' => 'nullable|url|max:255',
-            'turmas' => 'nullable|array',
+            'turmas' => 'required|array|min:1',
             'turmas.*' => 'exists:turmas,id',
+        ], [
+            'turmas.required' => 'Você deve selecionar pelo menos uma turma.',
+            'turmas.min' => 'Você deve selecionar pelo menos uma turma.',
         ]);
 
         $file = $request->file('file');
@@ -78,8 +81,11 @@ class MaterialController extends Controller
             'description' => 'nullable|string',
             'file' => 'nullable|file|mimes:pdf|max:20480',
             'link' => 'nullable|url|max:255',
-            'turmas' => 'nullable|array',
+            'turmas' => 'required|array|min:1',
             'turmas.*' => 'exists:turmas,id',
+        ], [
+            'turmas.required' => 'Você deve selecionar pelo menos uma turma.',
+            'turmas.min' => 'Você deve selecionar pelo menos uma turma.',
         ]);
 
         if ($request->hasFile('file')) {
