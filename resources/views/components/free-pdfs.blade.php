@@ -217,10 +217,13 @@
             }
 
             const data = new FormData(form);
-            const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const tokenEl = document.querySelector('meta[name="csrf-token"]');
+            const token = tokenEl ? tokenEl.getAttribute('content') : null;
 
             try{
-                const res = await fetch('/leads', { method: 'POST', headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' }, body: data });
+                const headers = { 'Accept': 'application/json' };
+                if(token){ headers['X-CSRF-TOKEN'] = token; }
+                const res = await fetch('/leads', { method: 'POST', headers, body: data });
                 const json = await res.json();
                 if(res.ok && json.success){
                     // redirect to download (server will return proper url)
@@ -228,10 +231,20 @@
                 } else {
                     const msg = (json && json.errors) ? Object.values(json.errors).flat()[0] : 'Erro ao enviar.';
                     showError(msg);
+                    // Fallback direto para download interno se material_id presente
+                    const materialId = document.getElementById('pdf_file').value;
+                    if(materialId){
+                        window.location.href = '/materiais/' + materialId + '/download';
+                    }
                 }
             } catch(err){
                 showError('Erro de rede. Tente novamente.');
                 console.error(err);
+                // Fallback direto para download interno se material_id presente
+                const materialId = document.getElementById('pdf_file').value;
+                if(materialId){
+                    window.location.href = '/materiais/' + materialId + '/download';
+                }
             }
         });
 
