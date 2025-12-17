@@ -13,7 +13,6 @@
                 </div>
             </div>
 
-            <!-- Conteúdo da Mentora -->
             <div class="lg:col-span-2" data-aos="fade-left">
 <div id="mentor" class="max-w-4xl mx-auto">
     <h3 class="text-3xl font-bold text-yellow-600 text-center mb-8" data-aos="fade-up">Sobre a mentora</h3>
