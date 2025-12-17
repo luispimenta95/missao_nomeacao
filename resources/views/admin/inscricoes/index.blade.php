@@ -36,7 +36,7 @@
 
         <!-- Card: Turma com Mais Inscritos -->
         @if($turmaComMaisInscritos)
-            <div class="mb-6 p-6 bg-gradient-to-r from-primary to-blue-700 rounded shadow-lg text-white">
+            <div class="mb-6 p-6 bg-gradient-to-r from-primary to-black rounded shadow-lg text-white">
                 <p class="text-sm font-semibold opacity-90">Turma com Mais Inscritos</p>
                 <div class="flex items-center justify-between mt-2">
                     <div>

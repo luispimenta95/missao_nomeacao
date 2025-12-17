@@ -3,7 +3,7 @@
         <h2 class="text-3xl font-bold text-yellow-600 text-center mb-12">FAQ / Perguntas e respostas</h2>
 
         <div class="max-w-4xl mx-auto space-y-3">
-            <div class="bg-gray-900 rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-1">
                     <span class="font-bold text-lg text-yellow-600">"E se eu aplicar tudo e mesmo assim não der certo?"</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -13,7 +13,7 @@
                 </div>
             </div>
 
-            <div class="bg-gray-900 rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-2">
                     <span class="font-bold text-lg text-yellow-600">"Não tenho dinheiro pra investir agora."</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -23,7 +23,7 @@
                 </div>
             </div>
 
-            <div class="bg-gray-900 rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-3">
                     <span class="font-bold text-lg text-yellow-600">"Não sei se sou capaz de manter o ritmo."</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -33,7 +33,7 @@
                 </div>
             </div>
 
-            <div class="bg-gray-900 rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-4">
                     <span class="font-bold text-lg text-yellow-600">"E se eu tiver vergonha de tentar de novo e falhar?"</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -43,23 +43,23 @@
                 </div>
             </div>
 
-            <div class="bg-gray-900 rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-5">
                     <span class="font-bold text-lg text-yellow-600">"Não tenho tempo pra uma mentoria agora."</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                 </button>
                 <div id="faq-5" class="px-6 pb-6 hidden">
-                    <p class="text-gray-700 leading-relaxed">Justamente por isso você precisa dela. A Mentoria Missão Nomeação foi feita para encaixar na sua rotina, não para sobrecarregar. Em vez de estudar por horas sem direção, você vai estudar menos e render mais, com foco, método e estratégia. O problema nunca é falta de tempo. É falta de prioridade e clareza.</p>
+                    <p class="text-gray-400 leading-relaxed">Justamente por isso você precisa dela. A Mentoria Missão Nomeação foi feita para encaixar na sua rotina, não para sobrecarregar. Em vez de estudar por horas sem direção, você vai estudar menos e render mais, com foco, método e estratégia. O problema nunca é falta de tempo. É falta de prioridade e clareza.</p>
                 </div>
             </div>
 
-            <div class="bg-gray-50 rounded-2xl card-shadow overflow-hidden">
+            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-6">
-                    <span class="font-bold text-lg text-primary">"Como funciona na prática?"</span>
-                    <svg class="w-5 h-5 text-primary transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    <span class="font-bold text-lg text-yellow-600">"Como funciona na prática?"</span>
+                    <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                 </button>
                 <div id="faq-6" class="px-6 pb-6 hidden">
-                    <p class="text-gray-700 leading-relaxed">Assim que entrar, você preenche um formulário com seus dados, rotina e histórico de estudos. A partir disso, criamos seu plano personalizado e você já recebe acesso ao grupo e ao suporte individual. Quinzenalmente, fazemos análise de desempenho, ajustes de rotina e encontros estratégicos. É acompanhamento real, não um curso gravado.</p>
+                    <p class="text-gray-400 leading-relaxed">Assim que entrar, você preenche um formulário com seus dados, rotina e histórico de estudos. A partir disso, criamos seu plano personalizado e você já recebe acesso ao grupo e ao suporte individual. Quinzenalmente, fazemos análise de desempenho, ajustes de rotina e encontros estratégicos. É acompanhamento real, não um curso gravado.</p>
                 </div>
             </div>
         </div>

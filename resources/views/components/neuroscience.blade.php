@@ -2,7 +2,15 @@
     <div class="container mx-auto px-6 lg:px-24" data-aos="fade-up">
         <h2 class="text-3xl font-bold text-yellow-600 text-center mb-8">O diferencial: Neurociência aplicada</h2>
 
-        <div class="max-w-4xl mx-auto text-justify space-y-4">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start max-w-6xl mx-auto">
+            <div class="flex justify-center lg:justify-start">
+                <div class="w-full max-w-md">
+                    <!-- Imagem de destaque ao lado do texto -->
+                    <img src="{{ asset('img/neuroscience.png') }}" alt="Neurociência" class="w-full rounded-lg shadow-lg object-cover border-2 border-yellow-600">
+                </div>
+            </div>
+
+            <div class="text-justify space-y-4">
             <p class="text-lg leading-relaxed text-white">Você já reparou como todo mundo te ensina o que fazer, mas ninguém explica por que você não consegue fazer?</p>
 
             <p class="text-lg leading-relaxed text-yellow-600 font-semibold">"Monte um cronograma." Ok, você monta. "Faça revisões espaçadas." Você até tenta. "Use mapas mentais." Comprou canetas coloridas e tudo.</p>
@@ -26,6 +34,7 @@
             <p class="text-lg leading-relaxed">Muda quando você finalmente entende o seu padrão e constrói o seu caminho com alguém que te acompanha de perto no meio do processo.</p>
 
             <p class="text-lg leading-relaxed font-bold text-yellow-600">É isso que a Missão Nomeação faz.</p>
+            </div>
         </div>
     </div>
 </section>

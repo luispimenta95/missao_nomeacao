@@ -97,7 +97,7 @@
 @include('components.inscricao-modal')
 
 <!-- WhatsApp flutuante -->
-<a href="https://wa.me/5511999999999?text=Ol%C3%A1%20quero%20saber%20mais" target="_blank" rel="noopener" class="fixed bottom-6 right-6 z-50 bg-green-500 text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform" aria-label="WhatsApp">
+<a href="https://wa.me/message/I53LOYY2D7CNI1?text=Ol%C3%A1%20quero%20saber%20mais" target="_blank" rel="noopener" class="fixed bottom-6 right-6 z-50 bg-green-500 text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform" aria-label="WhatsApp">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M20.52 3.48A11.93 11.93 0 0012 0C5.373 0 .001 5.373 0 12c0 2.115.55 4.165 1.59 5.98L0 24l6.21-1.61A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12 0-3.2-1.25-6.15-3.48-8.52zM12 21.5c-1.64 0-3.25-.43-4.63-1.24l-.33-.19-3.69.96.98-3.6-.21-.37A9.5 9.5 0 012.5 12 9.5 9.5 0 1112 21.5z"></path><path d="M17.4 14.1c-.3-.15-1.78-.88-2.05-.98-.28-.1-.48-.15-.68.15-.19.28-.74.98-.91 1.18-.17.19-.34.22-.64.07-.3-.15-1.27-.47-2.42-1.48-.9-.8-1.5-1.79-1.67-2.09-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.28.3-.47.1-.19.05-.36-.02-.51-.07-.15-.68-1.64-.93-2.25-.24-.59-.49-.51-.68-.52l-.58-.01c-.2 0-.52.07-.8.36-.28.29-1.07 1.05-1.07 2.56 0 1.51 1.1 2.97 1.25 3.18.15.21 2.16 3.44 5.24 4.82 3.08 1.38 3.08.92 3.64.86.56-.06 1.8-.73 2.05-1.44.25-.71.25-1.32.17-1.44-.08-.12-.29-.19-.59-.34z"></path></svg>
 </a>
 

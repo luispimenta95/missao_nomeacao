@@ -33,11 +33,20 @@
 
         <h4 class="text-2xl font-bold text-yellow-600 mt-8 mb-4">O que descobri pelo caminho:</h4>
 
-        <p class="text-lg leading-relaxed text-gray-400">Trabalhei nos bastidores de grandes cursinhos e com alguns dos professores mais renomados do país. E foi lá, vendo tudo por dentro, que comecei a desenvolver materiais estratégicos que entregavam resultado real: alunos enviavam mensagens dizendo "professor, que material bom, graças a ele eu consegui a aprovação". E, na verdade, quem construía toda a base desses materiais era eu.</p>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mt-6">
+            <div class="flex justify-center lg:justify-start">
+                <div class="w-full max-w-xs rounded-lg shadow-lg overflow-hidden border-2 border-yellow-600">
+                    <img src="{{ asset('img/descobri.png') }}" alt="Descoberta" class="w-full h-auto object-cover">
+                </div>
+            </div>
+            <div class="space-y-4">
+                <p class="text-lg leading-relaxed text-gray-400">Trabalhei nos bastidores de grandes cursinhos e com alguns dos professores mais renomados do país. E foi lá, vendo tudo por dentro, que comecei a desenvolver materiais estratégicos que entregavam resultado real: alunos enviavam mensagens dizendo "professor, que material bom, graças a ele eu consegui a aprovação". E, na verdade, quem construía toda a base desses materiais era eu.</p>
 
-        <p class="text-lg leading-relaxed text-yellow-600 font-semibold">Estar no mesmo ambiente e conversar diariamente com grandes professores me fez entender os padrões de mentalidade vencedora e, principalmente, as tendências de mercado que os cursinhos tradicionais não conseguem acompanhar.</p>
+                <p class="text-lg leading-relaxed text-yellow-600 font-semibold">Estar no mesmo ambiente e conversar diariamente com grandes professores me fez entender os padrões de mentalidade vencedora e, principalmente, as tendências de mercado que os cursinhos tradicionais não conseguem acompanhar.</p>
 
-        <p class="text-lg leading-relaxed text-gray-400">Foi aí que retomei o projeto Missão Nomeação e tudo ganhou mais propósito.</p>
+                <p class="text-lg leading-relaxed text-gray-400">Foi aí que retomei o projeto Missão Nomeação e tudo ganhou mais propósito.</p>
+            </div>
+        </div>
     </div>
             </div>
         </div>
