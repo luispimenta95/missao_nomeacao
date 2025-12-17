@@ -1,19 +1,159 @@
 @import 'tailwindcss';
 @import './theme.css';
 
+/* =========================
+   TAILWIND SOURCES (LARAVEL)
+========================= */
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
+/* =========================
+   TAILWIND THEME
+========================= */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
-    
-    /* Custom Color Palette - Dark Blue Theme */
-    --color-primary: #111184;
-    --color-primary-light: #2222a0;
-    --color-accent: #111184;
-    --color-accent-light: #2222a0;
-    --color-bg-light: #111184;
+    /* Fonte padrão */
+    --font-sans: 'Instrument Sans',
+        ui-sans-serif,
+        system-ui,
+        sans-serif,
+        'Apple Color Emoji',
+        'Segoe UI Emoji',
+        'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    /* =========================
+       PALETA PRINCIPAL
+       (alinhada com theme.css)
+    ========================= */
+    --color-primary: #BF8F00;        /* Dourado */
+    --color-primary-light: #D4A574;  /* Dourado claro */
+    --color-accent: #000000;         /* Fundo principal - Preto */
+    --color-accent-light: #0a0a0a;   /* Fundo mais escuro */
+    --color-bg-light: #000000;        /* Fundo global */
+
+    /* Detalhes */
+    --color-detail: #FFFFFF;          /* Branco puro */
+}
+
+/* =========================
+   RESET GLOBAL (ANTI-TRAÇO)
+========================= */
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+    background-color: var(--color-accent);
+    color: var(--color-detail);
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* Remove linhas indesejadas */
+hr {
+    display: none;
+}
+
+/* =========================
+   ESTRUTURA GLOBAL
+========================= */
+main,
+section,
+header,
+footer,
+.hero,
+.layout,
+.app,
+.wrapper {
+    background-color: var(--color-accent);
+}
+
+/* Footer blindado */
+footer,
+footer * {
+    border: none !important;
+    box-shadow: none !important;
+    background-color: var(--color-accent) !important;
+}
+
+/* =========================
+   TIPOGRAFIA PADRÃO
+========================= */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--color-detail);
+}
+
+p,
+span,
+small,
+li {
+    color: var(--color-detail);
+}
+
+a {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+a:hover {
+    color: var(--color-primary-light);
+}
+
+/* =========================
+   UTILITÁRIOS EXTRAS
+========================= */
+.bg-site {
+    background-color: var(--color-accent) !important;
+}
+
+.text-detail {
+    color: var(--color-detail) !important;
+}
+
+.text-gold {
+    color: var(--color-primary) !important;
+}
+
+.bg-gold {
+    background-color: var(--color-primary) !important;
+}
+
+/* =========================
+   BOTÕES (FALLBACK FORA DO TW)
+========================= */
+.btn-primary {
+    background-color: var(--color-primary);
+    color: var(--color-accent);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: var(--color-primary-light);
+    transform: scale(1.03);
+}
+
+.btn-accent {
+    background-color: var(--color-accent);
+    color: var(--color-detail);
+    border: 1px solid var(--color-primary);
+    padding: 0.75rem 1.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-accent:hover {
+    background-color: var(--color-accent-light);
+    transform: scale(1.03);
 }

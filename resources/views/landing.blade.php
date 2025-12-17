@@ -13,11 +13,11 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#111184',     /* azul escuro profundo */
-                        'primary-light': '#2222a0',  /* azul escuro médio */
-                        accent: '#111184',      /* azul médio vibrante */
-                        'accent-light': '#2222a0',   /* azul claro */
-                        'bg-light': '#111184'   /* azul muito claro */
+                        primary: '#BF8F00',     /* Dourado */
+                        'primary-light': '#D4A574',  /* Dourado claro */
+                        accent: '#BF8F00',      /* Dourado */
+                        'accent-light': '#D4A574',   /* Dourado claro */
+                        'bg-light': '#000000'   /* Preto */
                     },
                     fontFamily: {
                         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif']
@@ -37,14 +37,14 @@
     <link href="{{ asset('css/theme.css') }}" rel="stylesheet">
 
     <style>
-        /* Small tweaks */
-        .gradient-hero { background: linear-gradient(120deg, #111184 0%, rgba(17, 17, 132, 0.9) 40%, #1a1a95 100%); }
-        .card-shadow { box-shadow: 0 10px 30px rgba(17, 17, 132, 0.3); }
-        .glass { background: rgba(17, 17, 132, 0.4); backdrop-filter: blur(6px); }
+        /* Small tweaks now use theme variables */
+        .gradient-hero { background: var(--gradient-hero); }
+        .card-shadow { box-shadow: var(--shadow-card); }
+        .glass { background: var(--glass-bg); backdrop-filter: var(--glass-blur); }
     </style>
 
 </head>
-<body class="antialiased text-gray-800 font-sans">
+<body class="antialiased font-sans bg-site text-detail">
 
 <!-- Header -->
 @include('components.header')
@@ -56,7 +56,7 @@
 
     @include('components.audience')
 
-    <section class="py-16 bg-white">
+    <section class="py-16 bg-black text-white">
         <div class="container mx-auto px-6 lg:px-24">
             @include('components.benefits')
         </div>
@@ -71,7 +71,7 @@
         </div>
     </section>
 
-    <section class="py-16 bg-white">
+    <section class="py-16 bg-black text-white">
         <div class="container mx-auto px-6 lg:px-24">
             @include('components.mentor')
         </div>

@@ -98,7 +98,7 @@
             </div>
             <div class="bg-white p-6 rounded shadow">
                 <p class="text-gray-600 text-sm">Este Mês</p>
-                <p class="text-3xl font-bold text-blue-600">{{ $inscricoesThisMonth }}</p>
+                <p class="text-3xl font-bold text-red-600">{{ $inscricoesThisMonth }}</p>
             </div>
             <div class="bg-white p-6 rounded shadow">
                 <p class="text-gray-600 text-sm">Turmas Ativas</p>

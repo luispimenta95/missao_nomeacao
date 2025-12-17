@@ -1,103 +1,205 @@
 /**
  * Theme Configuration - Missão Nomeação
- * Centralized color and style definitions
- * All colors use dark blue tones for consistency
+ * Paleta oficial e estilos globais
  */
 
+/* =========================
+   ROOT / VARIÁVEIS
+========================= */
 :root {
-    /* Primary Colors - Dark Blue Palette */
-    --color-primary: #111184;           /* Azul escuro profundo */
-    --color-primary-light: #2222a0;     /* Azul escuro médio */
-    --color-primary-lighter: #3333bb;   /* Azul escuro claro */
-    --color-primary-dark: #0a0a60;      /* Azul escuro mais profundo */
-    
-    /* Accent Colors - Blue Accent Tones */
-    --color-accent: #111184;            /* Azul médio vibrante */
-    --color-accent-light: #2222a0;      /* Azul claro */
-    --color-accent-dark: #0a0a60;       /* Azul escuro para contraste */
-    
-    /* Background Colors */
-    --color-bg-light: #111184;          /* Azul muito claro para fundos */
-    --color-bg-lighter: #1a1a95;        /* Quase branco com tom azul */
-    
-    /* Gradient */
-    --gradient-hero: linear-gradient(120deg, #111184 0%, rgba(17, 17, 132, 0.9) 40%, #1a1a95 100%);
-    
-    /* Shadows */
-    --shadow-card: 0 10px 30px rgba(17, 17, 132, 0.3);
-    --shadow-hover: 0 15px 40px rgba(17, 17, 132, 0.4);
-    
-    /* Glass Effect */
-    --glass-bg: rgba(255, 255, 255, 0.6);
+    /* Paleta principal */
+    --color-bg-default: #000000;      /* Fundo principal - Preto */
+    --color-bg-darker: #0a0a0a;       /* Fundo mais escuro */
+    --color-detail: #FFFFFF;          /* Branco puro */
+    --color-accent: #BF8F00;          /* Dourado */
+    --color-accent-light: #D4A574;    /* Dourado claro */
+
+    /* Gradiente */
+    --gradient-hero: linear-gradient(
+        120deg,
+        var(--color-bg-default) 0%,
+        rgba(0, 0, 0, 0.95) 40%,
+        var(--color-bg-darker) 100%
+    );
+
+    /* Sombras */
+    --shadow-card: 0 10px 30px rgba(191, 143, 0, 0.2);
+    --shadow-hover: 0 15px 40px rgba(191, 143, 0, 0.3);
+
+    /* Glass effect */
+    --glass-bg: rgba(255, 255, 255, 0.05);
     --glass-blur: blur(6px);
 }
 
-/* Tailwind Custom Classes */
-.text-primary {
-    color: var(--color-primary) !important;
+/* =========================
+   RESET GLOBAL (REMOVE TRAÇO BRANCO)
+========================= */
+* {
+    box-sizing: border-box;
 }
 
-.bg-primary {
-    background-color: var(--color-primary) !important;
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+    background-color: var(--color-bg-default);
+    color: var(--color-detail);
+    overflow-x: hidden;
 }
 
-.border-primary {
-    border-color: var(--color-primary) !important;
+/* Remove linhas e bordas indesejadas */
+hr {
+    display: none;
 }
 
-.text-accent {
-    color: var(--color-accent) !important;
+/* =========================
+   ESTRUTURA GLOBAL
+========================= */
+main,
+section,
+header,
+footer,
+.hero,
+.layout,
+.app,
+.wrapper {
+    background-color: var(--color-bg-default);
+}
+
+/* Footer sem traço branco */
+footer,
+footer * {
+    border: none !important;
+    box-shadow: none !important;
+    background-color: var(--color-bg-default) !important;
+}
+
+/* =========================
+   TIPOGRAFIA
+========================= */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--color-detail);
+}
+
+p,
+span,
+small,
+li {
+    color: var(--color-detail);
+}
+
+a {
+    color: var(--color-gold);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+a:hover {
+    color: var(--color-gold-dark);
+}
+
+/* =========================
+   UTILITÁRIOS DE COR
+========================= */
+.bg-site {
+    background-color: var(--color-bg-default) !important;
 }
 
 .bg-accent {
-    background-color: var(--color-accent) !important;
+    background-color: var(--color-bg-default) !important;
+}
+
+.bg-primary,
+.bg-gold {
+    background-color: var(--color-gold) !important;
+}
+
+.text-primary,
+.text-detail {
+    color: var(--color-detail) !important;
+}
+
+.text-accent,
+.text-gold {
+    color: var(--color-gold) !important;
+}
+
+.border-primary {
+    border-color: var(--color-gold) !important;
+}
+
+/* =========================
+   HOVER STATES
+========================= */
+.hover\:bg-primary:hover {
+    background-color: var(--color-gold-dark) !important;
 }
 
 .hover\:bg-accent:hover {
-    background-color: var(--color-accent-dark) !important;
+    background-color: var(--color-bg-darker) !important;
 }
 
-.hover\:bg-primary:hover {
-    background-color: var(--color-primary-light) !important;
-}
-
-/* Utility Classes */
+/* =========================
+   GRADIENTE / HERO
+========================= */
 .gradient-hero {
     background: var(--gradient-hero);
 }
 
+/* =========================
+   CARDS
+========================= */
 .card-shadow {
     box-shadow: var(--shadow-card);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
 
 .card-shadow:hover {
     box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
 }
 
+/* =========================
+   GLASS EFFECT
+========================= */
 .glass {
     background: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
 }
 
-/* Button Styles */
+/* =========================
+   BOTÕES
+========================= */
 .btn-primary {
-    background-color: var(--color-primary);
-    color: white;
+    background-color: var(--color-gold);
+    color: var(--color-bg-default);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+    cursor: pointer;
     transition: all 0.3s ease;
 }
 
 .btn-primary:hover {
-    background-color: var(--color-primary-light);
-    transform: scale(1.05);
+    background-color: var(--color-gold-dark);
+    transform: scale(1.03);
 }
 
 .btn-accent {
-    background-color: var(--color-accent);
-    color: white;
+    background-color: var(--color-bg-default);
+    color: var(--color-detail);
+    border: 1px solid var(--color-gold);
+    padding: 0.75rem 1.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+    cursor: pointer;
     transition: all 0.3s ease;
 }
 
 .btn-accent:hover {
-    background-color: var(--color-accent-dark);
-    transform: scale(1.05);
+    background-color: var(--color-bg-darker);
+    transform: scale(1.03);
 }

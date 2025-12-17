@@ -11,15 +11,15 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#111184',
-                        'primary-light': '#2222a0',
+                        primary: '#000000',
+                        'primary-light': '#BF8F00',
                     }
                 }
             }
         }
     </script>
 </head>
-<body class="bg-gray-100">
+<body class="bg-black">
     <div class="flex h-screen">
         <!-- Sidebar -->
         <div class="w-64 bg-primary shadow-lg">
@@ -82,7 +82,7 @@
         </div>
 
         <!-- Main Content -->
-        <div class="flex-1 overflow-auto">
+        <div class="flex-1 overflow-auto bg-black">
             <div class="p-8">
                 @yield('content')
             </div>

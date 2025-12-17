@@ -32,7 +32,7 @@
             </label>
 
             <div class="mt-4 flex justify-end gap-3">
-                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">Salvar Upload</button>
+                <button type="submit" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded">Salvar Upload</button>
                 <a href="{{ route('materiais.index') }}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded border">Cancelar</a>
             </div>
         </form>

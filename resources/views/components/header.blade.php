@@ -1,19 +1,19 @@
-<header class="fixed inset-x-0 top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100">
+<header class="fixed inset-x-0 top-0 z-40 bg-site backdrop-blur-md border-b border-transparent">
     <div class="container mx-auto px-6 lg:px-24 py-4 flex items-center justify-between">
         <a href="/" class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold">M</div>
+            <div class="w-10 h-10 rounded-xl bg-gold flex items-center justify-center text-detail font-bold">M</div>
             <div class="hidden sm:block">
-                <div class="text-sm font-semibold text-primary">Missão Nomeação</div>
+                <div class="text-sm font-semibold text-detail">Missão Nomeação</div>
             </div>
         </a>
 
         <nav class="hidden md:flex items-center gap-8 text-sm">
-            <a href="#beneficios" class="text-gray-600 hover:text-primary">Benefícios</a>
-            <a href="#materiais" class="text-gray-600 hover:text-primary">Materiais</a>
+            <a href="#beneficios" class="text-detail hover:text-gold">Benefícios</a>
+            <a href="#materiais" class="text-detail hover:text-gold">Materiais</a>
 
-            <a href="#depoimentos" class="text-gray-600 hover:text-primary">Depoimentos</a>
-            <a href="#mentor" class="text-gray-600 hover:text-primary">Sobre</a>
-            <a href="#garanta" class="text-gray-600 hover:text-primary">Inscrição</a>
+            <a href="#depoimentos" class="text-detail hover:text-gold">Depoimentos</a>
+            <a href="#mentor" class="text-detail hover:text-gold">Sobre</a>
+            <a href="#garanta" class="text-detail hover:text-gold">Inscrição</a>
         </nav>
 
         <div class="flex items-center gap-3">

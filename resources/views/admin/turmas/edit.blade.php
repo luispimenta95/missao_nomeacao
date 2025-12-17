@@ -99,7 +99,7 @@
             <form action="{{ route('turmas.destroy', $turma) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja deletar esta turma?');">
                 @csrf
                 @method('DELETE')
-                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition">Deletar Turma</button>
+                <button type="submit" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded font-medium transition">Deletar Turma</button>
             </form>
         </div>
     </div>

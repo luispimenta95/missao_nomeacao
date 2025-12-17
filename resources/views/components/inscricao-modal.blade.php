@@ -1,6 +1,6 @@
 <!-- Modal de Inscrição em Turma -->
 <div id="inscricaoModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
-    <div class="bg-white rounded-2xl w-full max-w-lg p-6 mx-4">
+    <div class="bg-gray-900 rounded-2xl w-full max-w-lg p-6 mx-4 text-white border border-yellow-600">
         <div class="flex items-start justify-between">
             <h4 class="text-lg font-bold text-primary">Inscrever-se na turma</h4>
             <button id="closeInscricaoModal" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>
@@ -27,7 +27,7 @@
                     <input type="text" name="phone" id="inscricao_phone" required class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:ring-primary focus:border-primary">
                 </label>
 
-                <div id="inscricaoFormError" class="hidden text-sm text-red-600 bg-red-50 p-3 rounded-lg"></div>
+                <div id="inscricaoFormError" class="hidden text-sm text-yellow-600 bg-yellow-950 p-3 rounded-lg"></div>
             </div>
 
             <div class="mt-6 flex justify-end gap-3">
