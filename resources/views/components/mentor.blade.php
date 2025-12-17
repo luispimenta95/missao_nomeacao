@@ -5,7 +5,7 @@
             <div class="lg:col-span-1 flex justify-center" data-aos="fade-right">
                 <div class="relative">
                     <div class="w-64 h-64 rounded-3xl overflow-hidden shadow-2xl card-shadow">
-                        <img src="{{ asset('images/mentor.jpg') }}" alt="Mentora" loading="lazy" class="w-full h-full object-cover">
+                        <img src="{{ asset('img/mentor.jpg') }}" alt="Mentora" loading="lazy" class="w-full h-full object-cover">
                     </div>
                     <div class="absolute -bottom-4 -right-4 w-24 h-24 bg-primary rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-lg">
                         6+ <br> <span class="text-sm">anos</span>
