@@ -105,18 +105,6 @@
 <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 <script>
     AOS.init({ once: true, duration: 800 });
-
-    // Simple testimonials carousel
-    (function(){
-        const slides = document.querySelectorAll('[data-slice]');
-        if(!slides.length) return;
-        let idx = 0;
-        setInterval(()=>{
-            slides[idx].classList.add('hidden');
-            idx = (idx+1) % slides.length;
-            slides[idx].classList.remove('hidden');
-        }, 5000);
-    })();
 </script>
 
 </body>
