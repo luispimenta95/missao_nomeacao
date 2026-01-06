@@ -1,0 +1,28 @@
+/* Public theme overrides: enforce brand navy background (#001d3d) across CDN pages */
+
+/* Global background enforcement */
+html, body, main, section, header, footer, .hero, .layout, .app, .wrapper {
+  background-color: #001d3d !important;
+}
+
+/* Utility: site background */
+.bg-site {
+  background-color: #001d3d !important;
+}
+
+/* Text helper used on landing */
+.text-detail {
+  color: #ffffff !important;
+}
+
+/* Tailwind "black" utility overrides for CDN contexts */
+.bg-black { background-color: #001d3d !important; }
+.text-black { color: #001d3d !important; }
+.border-black { border-color: #001d3d !important; }
+.hover\:bg-black:hover { background-color: #001d3d !important; }
+.bg-black\/50 { background-color: rgba(0, 29, 61, 0.5) !important; }
+
+/* Optional: primary accent helpers if needed */
+.text-primary { color: #BF8F00 !important; }
+.bg-primary { background-color: #BF8F00 !important; }
+.bg-primary-light { background-color: #D4A574 !important; }

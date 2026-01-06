@@ -17,7 +17,7 @@
                         'primary-light': '#D4A574',  /* Dourado claro */
                         accent: '#BF8F00',      /* Dourado */
                         'accent-light': '#D4A574',   /* Dourado claro */
-                        'bg-light': '#000000'   /* Preto */
+                        'bg-light': '#001d3d'   /* Preto */
                     },
                     fontFamily: {
                         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif']
@@ -56,22 +56,22 @@
 
     @include('components.audience')
 
-    <section class="py-16 bg-black text-white">
+    <section class="py-16 bg-site text-white">
         <div class="container mx-auto px-6 lg:px-24">
             @include('components.benefits')
         </div>
     </section>
 
-    {{-- Seção de PDFs gratuitos --}}
-    @include('components.free-pdfs')
+    {{-- Turmas Abertas (moved up) --}}
+    @include('components.turmas-carousel')
 
-    <section class="py-16 bg-blush">
+    <section class="py-16 bg-site text-white">
         <div class="container mx-auto px-6 lg:px-24">
             @include('components.testimonials')
         </div>
     </section>
 
-    <section class="py-16 bg-black text-white">
+    <section class="py-16 bg-site text-white">
         <div class="container mx-auto px-6 lg:px-24">
             @include('components.mentor')
         </div>
@@ -79,13 +79,14 @@
 
     @include('components.neuroscience')
 
-    @include('components.turmas-carousel')
+    {{-- Materiais gratuitos (moved down) --}}
+    @include('components.free-pdfs')
 
     @include('components.urgency')
 
     @include('components.faq')
 
-    <section class="py-16 bg-gradient-to-b from-white to-gray-50">
+    <section class="py-16 bg-site text-white">
         <div class="container mx-auto px-6 lg:px-24">
             @include('components.cta')
         </div>

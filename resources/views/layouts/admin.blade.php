@@ -19,7 +19,7 @@
         }
     </script>
 </head>
-<body class="bg-black">
+<body class="bg-site">
     <div class="flex h-screen">
         <!-- Sidebar -->
         <div class="w-64 bg-primary shadow-lg">
@@ -82,7 +82,7 @@
         </div>
 
         <!-- Main Content -->
-        <div class="flex-1 overflow-auto bg-black">
+        <div class="flex-1 overflow-auto bg-site">
             <div class="p-8">
                 @yield('content')
             </div>

@@ -1,4 +1,4 @@
-<section id="materiais" class="py-16 bg-black text-white">
+<section id="materiais" class="py-16 bg-site text-white">
     <div class="container mx-auto px-6 lg:px-24">
         <div class="text-center mb-8" data-aos="fade-up">
             <h2 id="materiais" class="text-2xl font-bold text-yellow-600">Materiais gratuitos em PDF</h2>
@@ -8,7 +8,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 @if(isset($materials) && $materials->count())
                     @foreach($materials as $material)
-                        <article class="p-6 rounded-2xl card-shadow hover:scale-105 transition transform bg-black text-white border border-yellow-600" data-id="{{ $material->id }}" data-aos="zoom-in">
+                        <article class="p-6 rounded-2xl card-shadow hover:scale-105 transition transform bg-site text-white border border-yellow-600" data-id="{{ $material->id }}" data-aos="zoom-in">
                             <div class="text-yellow-600">
                                 <!-- book svg -->
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -31,7 +31,7 @@
                         </article>
                     @endforeach
                 @else
-                    <div class="col-span-1 sm:col-span-3 p-6 rounded-2xl card-shadow bg-black text-white text-center border border-yellow-600">
+                    <div class="col-span-1 sm:col-span-3 p-6 rounded-2xl card-shadow bg-site text-white text-center border border-yellow-600">
                         <p class="text-gray-400">Nenhum material disponível no momento. Em breve teremos conteúdos gratuitos.</p>
                     </div>
                 @endif
@@ -39,7 +39,7 @@
 
         <!-- Modal - simple Tailwind modal -->
         <div id="pdfModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
-            <div class="bg-black rounded-2xl w-full max-w-lg p-6 mx-4 text-white border border-yellow-600">
+            <div class="bg-site rounded-2xl w-full max-w-lg p-6 mx-4 text-white border border-yellow-600">
                 <div class="flex items-start justify-between">
                     <h4 class="text-lg font-bold">Para baixar o material, deixe seus dados</h4>
                     <button id="closePdfModal" class="text-gray-500 hover:text-gray-200">✕</button>

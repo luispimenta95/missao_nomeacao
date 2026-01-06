@@ -4,7 +4,7 @@
 
     <!-- Carrossel de Slides -->
     <div class="relative w-full max-w-3xl mx-auto" data-aos="fade-up">
-        <div class="relative bg-black rounded-2xl overflow-hidden card-shadow" style="aspect-ratio: 3/4;">
+        <div class="relative bg-site rounded-2xl overflow-hidden card-shadow" style="aspect-ratio: 3/4;">
             <!-- Container de Slides -->
             <div class="relative w-full h-full">
                 @php
@@ -13,7 +13,7 @@
                 @endphp
 
                 @forelse($testimonials as $index => $testimonial)
-                    <div class="testimonial-slide absolute inset-0 transition-opacity duration-500 flex items-center justify-center bg-black {{ $index === 0 ? 'opacity-100 visible' : 'opacity-0 invisible' }}" data-slide="{{ $index }}">
+                    <div class="testimonial-slide absolute inset-0 transition-opacity duration-500 flex items-center justify-center bg-site {{ $index === 0 ? 'opacity-100 visible' : 'opacity-0 invisible' }}" data-slide="{{ $index }}">
                         <img 
                             src="{{ asset($testimonial['image']) }}" 
                             alt="Depoimento {{ $index + 1 }}" 

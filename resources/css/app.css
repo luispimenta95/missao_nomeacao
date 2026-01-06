@@ -29,9 +29,9 @@
     ========================= */
     --color-primary: #BF8F00;        /* Dourado */
     --color-primary-light: #D4A574;  /* Dourado claro */
-    --color-accent: #000000;         /* Fundo principal - Preto */
+    --color-accent: #001d3d;         /* Fundo principal - Preto */
     --color-accent-light: #0a0a0a;   /* Fundo mais escuro */
-    --color-bg-light: #000000;        /* Fundo global */
+    --color-bg-light: #001d3d;        /* Fundo global */
 
     /* Detalhes */
     --color-detail: #FFFFFF;          /* Branco puro */

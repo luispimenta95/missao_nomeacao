@@ -1,4 +1,4 @@
-<section class="py-16 bg-black text-white">
+<section class="py-16 bg-site text-white">
     <div class="container mx-auto px-6 lg:px-24" data-aos="fade-up">
         <div class="max-w-4xl mx-auto text-justify">
             <p class="text-lg leading-relaxed text-white">Você já tentou tantas coisas…Cronogramas coloridos, planilhas, grupos com "material atualizado", técnicas de memorização que duraram três dias e até aquele suplemento que todo mundo jura que funciona.</p>

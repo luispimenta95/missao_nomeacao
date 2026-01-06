@@ -1,4 +1,4 @@
-<section class="py-16 bg-black text-white">
+<section class="py-16 bg-site text-white">
     <div class="container mx-auto px-6 lg:px-24" data-aos="fade-up">
         <h2 class="text-3xl font-bold text-yellow-600 text-center mb-8">O diferencial: Neurociência aplicada</h2>
 
@@ -6,7 +6,7 @@
             <div class="flex justify-center lg:justify-start">
                 <div class="w-full max-w-md">
                     <!-- Imagem de destaque ao lado do texto -->
-                    <img src="{{ asset('img/neuroscience.png') }}" alt="Neurociência" class="w-full rounded-lg shadow-lg object-cover border-2 border-yellow-600">
+                    <img src="{{ asset('img/site-body/neuro.png') }}" alt="Neurociência" class="w-full rounded-lg shadow-lg object-cover border-2 border-yellow-600">
                 </div>
             </div>
 

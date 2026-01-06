@@ -1,4 +1,4 @@
-<section id="turmas-abertas" class="py-16 bg-black text-white">
+<section id="turmas-abertas" class="py-16 bg-site text-white">
     <div class="container mx-auto px-6 lg:px-24">
         <h2 class="text-3xl font-bold text-primary text-center mb-12">Turmas Abertas</h2>
 
@@ -10,7 +10,7 @@
                     <div class="flex gap-6 transition-transform duration-500 ease-out" id="carouselTrack" style="width: max-content;">
                         @foreach($turmas as $turma)
                             <div class="turma-card flex-shrink-0 w-80">
-                                <div class="bg-black rounded-3xl card-shadow hover:shadow-2xl transition-all duration-300 h-full overflow-hidden flex flex-col hover:scale-105 cursor-pointer border border-yellow-600" onclick="event.stopPropagation()">
+                                <div class="bg-site rounded-3xl card-shadow hover:shadow-2xl transition-all duration-300 h-full overflow-hidden flex flex-col hover:scale-105 cursor-pointer border border-yellow-600" onclick="event.stopPropagation()">
                                         <!-- Logo Section -->
                                         <div class="h-48 bg-gray-100 flex items-center justify-center border-b border-gray-200">
                                             @if($turma->logo_path)

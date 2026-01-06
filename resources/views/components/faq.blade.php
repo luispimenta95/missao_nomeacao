@@ -1,9 +1,9 @@
-<section class="py-16 bg-black text-white">
+<section class="py-16 bg-site text-white">
     <div class="container mx-auto px-6 lg:px-24" data-aos="fade-up">
         <h2 class="text-3xl font-bold text-yellow-600 text-center mb-12">FAQ / Perguntas e respostas</h2>
 
         <div class="max-w-4xl mx-auto space-y-3">
-            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+            <div class="bg-site rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-1">
                     <span class="font-bold text-lg text-yellow-600">"E se eu aplicar tudo e mesmo assim não der certo?"</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -13,7 +13,7 @@
                 </div>
             </div>
 
-            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+            <div class="bg-site rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-2">
                     <span class="font-bold text-lg text-yellow-600">"Não tenho dinheiro pra investir agora."</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -23,7 +23,7 @@
                 </div>
             </div>
 
-            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+            <div class="bg-site rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-3">
                     <span class="font-bold text-lg text-yellow-600">"Não sei se sou capaz de manter o ritmo."</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -33,7 +33,7 @@
                 </div>
             </div>
 
-            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+            <div class="bg-site rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-4">
                     <span class="font-bold text-lg text-yellow-600">"E se eu tiver vergonha de tentar de novo e falhar?"</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -43,7 +43,7 @@
                 </div>
             </div>
 
-            <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+            <div class="bg-site rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-5">
                     <span class="font-bold text-lg text-yellow-600">"Não tenho tempo pra uma mentoria agora."</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -54,6 +54,7 @@
             </div>
 
             <div class="bg-black rounded-2xl card-shadow overflow-hidden border border-yellow-600">
+                <div class="bg-site rounded-2xl card-shadow overflow-hidden border border-yellow-600">
                 <button type="button" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4" aria-expanded="false" aria-controls="faq-6">
                     <span class="font-bold text-lg text-yellow-600">"Como funciona na prática?"</span>
                     <svg class="w-5 h-5 text-yellow-600 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
