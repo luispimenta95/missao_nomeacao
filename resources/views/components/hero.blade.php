@@ -27,7 +27,7 @@
 
             <!-- Right: Image -->
             <div>
-                <img src="{{ asset('img/site-body/header.jpeg') }}" alt="Hero" class="w-full h-auto object-cover rounded-md">
+                <img src="{{ asset('img/site-body/selfie.png') }}" alt="Hero" class="w-full h-auto object-cover rounded-md">
             </div>
         </div>
     </div>
