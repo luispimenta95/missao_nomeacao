@@ -10,6 +10,7 @@
         <nav class="hidden md:flex items-center gap-8 text-sm">
             <a href="#beneficios" class="text-detail hover:text-gold">Benefícios</a>
             <a href="#materiais" class="text-detail hover:text-gold">Materiais</a>
+            <a href="#turmas-abertas" class="text-detail hover:text-gold">Mentoria</a>
 
             <a href="#depoimentos" class="text-detail hover:text-gold">Depoimentos</a>
             <a href="#mentor" class="text-detail hover:text-gold">Sobre</a>

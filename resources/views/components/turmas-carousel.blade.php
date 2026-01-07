@@ -1,6 +1,6 @@
 <section id="turmas-abertas" class="py-16 bg-site text-white">
     <div class="container mx-auto px-6 lg:px-24">
-        <h2 class="text-3xl font-bold text-primary text-center mb-12">Turmas Abertas</h2>
+        <h2 id="turmas-abertas" class="text-3xl font-bold text-primary text-center mb-12">Turmas Abertas</h2>
 
         @if($turmas->count() > 0)
             <!-- Carousel Container -->
