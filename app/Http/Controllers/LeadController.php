@@ -27,7 +27,6 @@ class LeadController extends Controller
     $data['utm_source'] = 'site';
 
     $materialId = $request->input('material_id');
-
     if ($materialId) {
         $data['material_id'] = $materialId;
     }
@@ -35,7 +34,10 @@ class LeadController extends Controller
     try {
         Lead::create($data);
     } catch (\Exception $e) {
-        return response('Erro ao salvar os dados.', 400);
+        return response()->json([
+            'success' => false,
+            'message' => 'Erro ao salvar os dados.'
+        ], 400);
     }
 
     // URLs
@@ -52,7 +54,16 @@ class LeadController extends Controller
         $redirectUrl = 'https://pay.plataformatutory.com.br/checkout/19235f0f-222d-49a3-b9e0-f8cb71ee182a?utm_source=site';
     }
 
-    // Retorna HTML com JS embutido
+    // 👉 SE FOR AJAX
+    if ($request->expectsJson()) {
+        return response()->json([
+            'success' => true,
+            'download_url' => $downloadUrl,
+            'redirect_url' => $redirectUrl,
+        ]);
+    }
+
+    // 👉 SE NÃO FOR AJAX (HTML + JS)
     return response()->make("
         <!DOCTYPE html>
         <html lang='pt-BR'>
@@ -61,17 +72,17 @@ class LeadController extends Controller
             <title>Processando...</title>
         </head>
         <body>
-            <p>Seu download está sendo preparado...</p>
+            <p>Seu download está sendo iniciado...</p>
 
             <script>
                 (function () {
                     " . ($downloadUrl ? "
-                    const a = document.createElement('a');
-                    a.href = '{$downloadUrl}';
-                    a.download = '';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
+                        const a = document.createElement('a');
+                        a.href = '{$downloadUrl}';
+                        a.download = '';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
                     " : "") . "
 
                     setTimeout(function () {
@@ -83,4 +94,5 @@ class LeadController extends Controller
         </html>
     ");
 }
+
 }
