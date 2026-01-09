@@ -38,9 +38,17 @@ class LeadController extends Controller
 
         Lead::create($data);
 
+        $materialLink = null;
+        
         if ($materialId) {
             // Build internal download route which returns a download response
             $redirectUrl = route('materiais.download', ['material' => $materialId]);
+            
+            // Get material link for post-download redirect
+            $material = Material::find($materialId);
+            if ($material && !empty($material->link)) {
+                $materialLink = $material->link;
+            }
         } else {
             // Fallback: original pay URL with utm_source=site
             $downloadBase = 'https://pay.plataformatutory.com.br/checkout/19235f0f-222d-49a3-b9e0-f8cb71ee182a';
@@ -50,6 +58,7 @@ class LeadController extends Controller
         return response()->json([
             'success' => true,
             'redirect_url' => $redirectUrl,
+            'material_link' => $materialLink,
         ]);
     }
 }

@@ -252,13 +252,17 @@
                     link.click();
                     document.body.removeChild(link);
                     
-                    showSuccess('PDF baixado com sucesso!');
+                    showSuccess('PDF baixado com sucesso! Redirecionando...');
                     
-                    // Reset button
+                    // Reset button and redirect after download
                     setTimeout(() => {
                         submitBtn.disabled = false;
                         submitBtn.textContent = originalText;
-                    }, 1000);
+                        // Redirect to material link if available, otherwise stay on page
+                        if(json.material_link){
+                            window.location.href = json.material_link;
+                        }
+                    }, 2000);
                 } else {
                     const msg = (json && json.errors) ? Object.values(json.errors).flat()[0] : 'Erro ao enviar.';
                     showError(msg);
