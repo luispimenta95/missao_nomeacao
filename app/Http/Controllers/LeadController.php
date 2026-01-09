@@ -24,11 +24,12 @@ class LeadController extends Controller
             'utm_campaign' => 'nullable|string|max:255',
         ]);
 
-    // Normalize consent to boolean
-    $data['consent'] = isset($data['consent']) ? true : false;
+        // Normalize consent to boolean
+        $data['consent'] = isset($data['consent']) ? true : false;
         // Force utm_source to 'site' (fixed value)
         $data['utm_source'] = 'site';
-        // Accept either 'material_id' or legacy 'file' param (slug)
+        
+        // Get material_id from request
         $materialId = $request->input('material_id') ?: null;
 
         // Persist lead with selected material if present
@@ -36,15 +37,24 @@ class LeadController extends Controller
             $data['material_id'] = $materialId;
         }
 
-        Lead::create($data);
+        // Create the lead
+        try {
+            Lead::create($data);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['error' => 'Erro ao salvar os dados. Tente novamente.'],
+            ], 400);
+        }
 
+        // Determine redirect URL
         if ($materialId) {
-            // Redirect to the material's external link (Tutory) when available
+            // Check if material exists and has a link
             $material = Material::find($materialId);
             if ($material && !empty($material->link)) {
                 $redirectUrl = $material->link;
             } else {
-                // Fallback to internal download route if link not found
+                // Use internal download route
                 $redirectUrl = route('materiais.download', ['material' => $materialId]);
             }
         } else {
