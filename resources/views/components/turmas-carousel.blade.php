@@ -6,10 +6,10 @@
             <!-- Carousel Container -->
             <div class="relative -mx-6 lg:-mx-24 px-6 lg:px-24">
                 <!-- Track com scroll suave -->
-                <div class="overflow-hidden">
+                <div class="overflow-x-auto overflow-y-hidden scrollbar-hide lg:overflow-hidden snap-x snap-mandatory" id="carouselContainer">
                     <div class="flex gap-6 transition-transform duration-500 ease-out" id="carouselTrack" style="width: max-content;">
                         @foreach($turmas as $turma)
-                            <div class="turma-card flex-shrink-0 w-80">
+                            <div class="turma-card flex-shrink-0 w-72 sm:w-80 snap-center snap-always">
                                 <div class="bg-site rounded-3xl card-shadow hover:shadow-2xl transition-all duration-300 h-full overflow-hidden flex flex-col hover:scale-105 cursor-pointer border border-yellow-600" onclick="event.stopPropagation()">
                                         <!-- Logo Section -->
                                         <div class="h-48 bg-gray-100 flex items-center justify-center border-b border-gray-200">
@@ -66,20 +66,23 @@
                     </div>
                 </div>
 
-                <!-- Navigation Buttons -->
-                @if($turmas->count() > 3)
-                    <button id="prevBtn" class="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-primary text-white rounded-full p-3 hover:bg-opacity-90 shadow-lg hidden lg:flex items-center justify-center transition-all duration-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <!-- Navigation Buttons - Desktop only -->
+                @if($turmas->count() > 1)
+                    <button id="prevBtn" class="absolute left-2 lg:left-0 top-1/2 -translate-y-1/2 z-20 bg-primary text-white rounded-full p-2 lg:p-3 hover:bg-opacity-90 shadow-lg hidden lg:flex items-center justify-center transition-all duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                         </svg>
                     </button>
 
-                    <button id="nextBtn" class="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-primary text-white rounded-full p-3 hover:bg-opacity-90 shadow-lg hidden lg:flex items-center justify-center transition-all duration-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <button id="nextBtn" class="absolute right-2 lg:right-0 top-1/2 -translate-y-1/2 z-20 bg-primary text-white rounded-full p-2 lg:p-3 hover:bg-opacity-90 shadow-lg hidden lg:flex items-center justify-center transition-all duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
                 @endif
+                
+                <!-- Scroll indicator for mobile -->
+                <div class="flex justify-center mt-4 gap-2 lg:hidden" id="scrollIndicators"></div>
             </div>
         @else
             <div class="max-w-2xl mx-auto">
@@ -96,31 +99,92 @@
     </div>
 </section>
 
+<style>
+    /* Hide scrollbar for mobile while keeping functionality */
+    .scrollbar-hide {
+        -ms-overflow-style: none;  /* Internet Explorer 10+ */
+        scrollbar-width: none;  /* Firefox */
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;  /* Safari and Chrome */
+    }
+    
+    /* Smooth scroll behavior */
+    #carouselContainer {
+        scroll-behavior: smooth;
+    }
+</style>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const track = document.getElementById('carouselTrack');
+        const container = document.getElementById('carouselContainer');
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
         const cards = document.querySelectorAll('.turma-card');
+        const indicatorsContainer = document.getElementById('scrollIndicators');
 
         if (!track || cards.length === 0) return;
 
         let currentIndex = 0;
-        const cardWidth = 320; // card width (w-80)
-        const gap = 24; // gap between cards
-        const itemWidth = cardWidth + gap;
+        const isMobile = window.innerWidth < 1024;
+        
+        // Card dimensions
+        function getCardWidth() {
+            return window.innerWidth < 640 ? 288 : 320; // w-72 or w-80
+        }
+        
+        const gap = 24;
+
+        // Create scroll indicators for mobile
+        function createIndicators() {
+            if (window.innerWidth >= 1024 || !indicatorsContainer) return;
+            
+            indicatorsContainer.innerHTML = '';
+            for (let i = 0; i < cards.length; i++) {
+                const dot = document.createElement('div');
+                dot.className = `w-2 h-2 rounded-full transition-all duration-300 ${i === 0 ? 'bg-primary w-4' : 'bg-gray-400'}`;
+                dot.dataset.index = i;
+                indicatorsContainer.appendChild(dot);
+            }
+        }
+
+        function updateIndicators() {
+            if (window.innerWidth >= 1024 || !indicatorsContainer) return;
+            
+            const dots = indicatorsContainer.querySelectorAll('div');
+            dots.forEach((dot, index) => {
+                if (index === currentIndex) {
+                    dot.className = 'w-4 h-2 rounded-full transition-all duration-300 bg-primary';
+                } else {
+                    dot.className = 'w-2 h-2 rounded-full transition-all duration-300 bg-gray-400';
+                }
+            });
+        }
 
         function updateCarousel() {
-            const offset = -currentIndex * itemWidth;
-            track.style.transform = `translateX(${offset}px)`;
+            if (window.innerWidth >= 1024) {
+                // Desktop: use transform
+                const itemWidth = getCardWidth() + gap;
+                const offset = -currentIndex * itemWidth;
+                track.style.transform = `translateX(${offset}px)`;
+            } else {
+                // Mobile: use scroll
+                const itemWidth = getCardWidth() + gap;
+                const scrollPosition = currentIndex * itemWidth;
+                container.scrollLeft = scrollPosition;
+            }
+            updateIndicators();
         }
 
         function getMaxIndex() {
-            const containerWidth = track.parentElement.offsetWidth;
+            const itemWidth = getCardWidth() + gap;
+            const containerWidth = container.offsetWidth;
             const visibleCards = Math.floor(containerWidth / itemWidth);
             return Math.max(0, cards.length - visibleCards);
         }
 
+        // Desktop navigation buttons
         if (prevBtn) {
             prevBtn.addEventListener('click', () => {
                 currentIndex = Math.max(0, currentIndex - 1);
@@ -136,14 +200,28 @@
             });
         }
 
-        // Responsive carousel
+        // Mobile: detect scroll position to update indicators
+        if (container) {
+            container.addEventListener('scroll', () => {
+                if (window.innerWidth < 1024) {
+                    const itemWidth = getCardWidth() + gap;
+                    const scrollPos = container.scrollLeft;
+                    currentIndex = Math.round(scrollPos / itemWidth);
+                    updateIndicators();
+                }
+            });
+        }
+
+        // Handle window resize
         window.addEventListener('resize', () => {
             const maxIndex = getMaxIndex();
             currentIndex = Math.min(currentIndex, maxIndex);
+            createIndicators();
             updateCarousel();
         });
 
-        // Inicializa a posição
+        // Initialize
+        createIndicators();
         updateCarousel();
     });
 </script>
