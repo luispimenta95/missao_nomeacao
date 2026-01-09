@@ -222,6 +222,12 @@
                 return;
             }
 
+            // Disable submit button during request
+            const submitBtn = document.getElementById('submitPdf');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processando...';
+
             const data = new FormData(form);
             const tokenEl = document.querySelector('meta[name="csrf-token"]');
             const token = tokenEl ? tokenEl.getAttribute('content') : null;
@@ -232,24 +238,65 @@
                 const res = await fetch('/leads', { method: 'POST', headers, body: data });
                 const json = await res.json();
                 
-                if(res.ok && json.success){
-                    // redirect to download (server will return proper url)
+                if(res.ok && json.success && json.redirect_url){
+                    // Close modal first
                     modal.classList.add('hidden');
-                    window.location.href = json.redirect_url;
+                    clearForm();
+                    
+                    // Force download using a temporary link
+                    const link = document.createElement('a');
+                    link.href = json.redirect_url;
+                    link.download = '';
+                    link.setAttribute('target', '_blank');
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    showSuccess('PDF baixado com sucesso!');
+                    
+                    // Reset button
+                    setTimeout(() => {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalText;
+                    }, 1000);
                 } else {
                     const msg = (json && json.errors) ? Object.values(json.errors).flat()[0] : 'Erro ao enviar.';
                     showError(msg);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
                 }
             } catch(err){
                 showError('Erro de rede. Tente novamente.');
                 console.error(err);
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
             }
         });
+
+        function clearForm(){
+            document.getElementById('pdf_name').value = '';
+            document.getElementById('pdf_email').value = '';
+            document.getElementById('pdf_phone').value = '';
+            document.getElementById('pdf_consent').checked = false;
+            document.getElementById('pdfFormError').classList.add('hidden');
+            document.getElementById('pdfFormError').textContent = '';
+        }
 
         function showError(message){
             const el = document.getElementById('pdfFormError');
             el.textContent = message;
             el.classList.remove('hidden');
+            el.style.color = 'rgb(253, 224, 71)';
+            el.style.backgroundColor = 'rgba(120, 53, 15, 0.5)';
+        }
+
+        function showSuccess(message){
+            const el = document.getElementById('pdfFormError');
+            el.textContent = message;
+            el.classList.remove('hidden');
+            el.style.color = 'rgb(34, 197, 94)';
+            el.style.backgroundColor = 'rgba(22, 101, 52, 0.5)';
+            setTimeout(() => el.classList.add('hidden'), 3000);
         }
     })();
 </script>

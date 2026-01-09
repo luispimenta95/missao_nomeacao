@@ -57,15 +57,30 @@ class MaterialController extends Controller
 
     public function download(Material $material)
     {
-        // File is stored in storage/app/public/{file_path}
-        $storagePath = storage_path('app/public/' . $material->file_path);
-        if (!file_exists($storagePath)) {
-            abort(404);
+        // Get the storage disk and check if file exists
+        $disk = \Illuminate\Support\Facades\Storage::disk('public');
+        
+        if (!$disk->exists($material->file_path)) {
+            \Log::error('PDF file not found: ' . $material->file_path);
+            abort(404, 'Arquivo não encontrado.');
         }
 
-        return response()->download($storagePath, basename($material->file_path), [
-            'Content-Type' => 'application/pdf',
-        ]);
+        // Get full path to file
+        $filePath = $disk->path($material->file_path);
+        $filename = pathinfo($material->file_path, PATHINFO_BASENAME);
+
+        // Return download response with proper headers
+        return response()->download(
+            $filePath,
+            $filename,
+            [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"; filename*=UTF-8\'\'' . rawurlencode($filename),
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Pragma' => 'no-cache',
+                'Expires' => '0',
+            ]
+        );
     }
 
     public function edit(Material $material)
