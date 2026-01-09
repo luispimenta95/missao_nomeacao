@@ -49,6 +49,6 @@
             </li>
         </ul>
 
-        <p class="text-xl text-gray-800 font-bold mt-8">E no final? Liberdade. De tempo, de dinheiro, de escolha. A tranquilidade de acordar todo mês com o salário garantido. A vida que você sempre quis, mas que parecia impossível de alcançar.</p>
+        <p class="text-xl text-yellow-600 font-bold mt-8">E no final? Liberdade. De tempo, de dinheiro, de escolha. A tranquilidade de acordar todo mês com o salário garantido. A vida que você sempre quis, mas que parecia impossível de alcançar.</p>
     </div>
 </div>

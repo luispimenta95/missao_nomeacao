@@ -173,19 +173,23 @@ a:hover {
    BOTÕES
 ========================= */
 .btn-primary {
-    background-color: var(--color-gold);
-    color: var(--color-bg-default);
+    background: linear-gradient(135deg, #f9d64c 0%, #f0c419 100%);
+    color: #0c1424;
     border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 999px;
-    font-weight: 600;
+    padding: 0.9rem 1.75rem;
+    border-radius: 12px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    box-shadow: 0 14px 28px -14px rgba(0, 0, 0, 0.55), 0 6px 16px rgba(0, 0, 0, 0.18);
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.2s ease;
 }
 
 .btn-primary:hover {
-    background-color: var(--color-gold-dark);
-    transform: scale(1.03);
+    background: linear-gradient(135deg, #ffe062 0%, #f3c83a 100%);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 18px 30px -14px rgba(0, 0, 0, 0.6), 0 8px 18px rgba(0, 0, 0, 0.2);
+    filter: brightness(1.02);
 }
 
 .btn-accent {
