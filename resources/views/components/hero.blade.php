@@ -1,8 +1,18 @@
 <section class="py-12 mb-12 bg-site">
     <div class="w-full max-w-7xl mx-auto px-6">
-        <div class="grid grid-cols-1 lg:grid-cols-2 items-center gap-12 lg:gap-16">
-            <!-- Left: Text area -->
-            <div class="space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 items-center gap-6 sm:gap-8 lg:gap-16">
+            <!-- Image first on mobile, right on large screens -->
+            <div class="flex items-center justify-center lg:col-start-2">
+                <div class="relative w-full max-w-md">
+                    <!-- Decorative background element -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-[#1e90ff]/10 to-[#f0c419]/10 rounded-3xl blur-2xl"></div>
+                    <!-- Image -->
+                    <img src="{{ asset('img/site-body/selfie.png') }}" alt="Hero" class="relative w-full h-auto object-cover rounded-2xl shadow-2xl shadow-[#1e90ff]/20 border-2 border-[#1e90ff]/20">
+                </div>
+            </div>
+
+            <!-- Text second on mobile, left on large screens -->
+            <div class="space-y-6 lg:col-start-1">
                 <!-- Slot allows custom content to be injected when using the component -->
                 @if(isset($slot) && (method_exists($slot, 'isNotEmpty') ? $slot->isNotEmpty() : trim((string) $slot) !== ''))
                     {{ $slot }}
@@ -25,16 +35,6 @@
                     >
                         → Quero saber mais
                     </a>
-                </div>
-            </div>
-
-            <!-- Right: Image -->
-            <div class="flex items-center justify-center">
-                <div class="relative w-full max-w-md">
-                    <!-- Decorative background element -->
-                    <div class="absolute inset-0 bg-gradient-to-br from-[#1e90ff]/10 to-[#f0c419]/10 rounded-3xl blur-2xl"></div>
-                    <!-- Image -->
-                    <img src="{{ asset('img/site-body/selfie.png') }}" alt="Hero" class="relative w-full h-auto object-cover rounded-2xl shadow-2xl shadow-[#1e90ff]/20 border-2 border-[#1e90ff]/20">
                 </div>
             </div>
         </div>
