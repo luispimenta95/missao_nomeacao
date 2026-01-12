@@ -1,9 +1,9 @@
-<section class="py-12 mb-12 bg-site">
+<section class="py-10 md:py-12 mb-8 md:mb-12 bg-site">
     <div class="w-full max-w-7xl mx-auto px-6">
         <div class="grid grid-cols-1 lg:grid-cols-2 items-center gap-6 sm:gap-8 lg:gap-16">
             <!-- Image first on mobile, right on large screens -->
             <div class="flex items-center justify-center lg:col-start-2">
-                <div class="relative w-full max-w-md">
+                <div class="relative w-full max-w-md lg:max-w-lg overflow-hidden">
                     <!-- Decorative background element -->
                     <div class="absolute inset-0 bg-gradient-to-br from-[#1e90ff]/10 to-[#f0c419]/10 rounded-3xl blur-2xl"></div>
                     <!-- Image -->
