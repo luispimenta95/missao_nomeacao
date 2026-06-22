@@ -7,6 +7,8 @@ use App\Http\Controllers\TurmaController;
 use App\Http\Controllers\InscricaoController;
 use App\Http\Controllers\LeadAdminController;
 use App\Http\Controllers\InscricaoAdminController;
+use App\Http\Controllers\AnonymousVisitController;
+use App\Http\Controllers\AnonymousVisitAdminController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Models\Material;
 use App\Models\Turma;
@@ -24,6 +26,8 @@ Route::get('/', function () {
 
 Route::post('/leads', [LeadController::class, 'store'])->name('leads.store');
 Route::post('/inscricoes', [InscricaoController::class, 'store'])->name('inscricoes.store');
+Route::post('/anonymous-visits', [AnonymousVisitController::class, 'store'])->name('anonymous-visits.store');
+Route::post('/anonymous-visits/exit', [AnonymousVisitController::class, 'update'])->name('anonymous-visits.update');
 
 // Admin routes - protected by auth middleware
 Route::middleware(['auth'])->prefix('admin')->group(function () {
@@ -55,6 +59,9 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::get('/leads', [LeadAdminController::class, 'index'])->name('leads.index');
     Route::delete('/leads/{lead}', [LeadAdminController::class, 'destroy'])->name('leads.destroy');
     Route::get('/leads/export/csv', [LeadAdminController::class, 'export'])->name('leads.export');
+
+    // Anonymous visit routes
+    Route::get('/anonymous-visits', [AnonymousVisitAdminController::class, 'index'])->name('anonymous-visits.index');
 
     // Inscricoes routes
     Route::get('/inscricoes', [InscricaoAdminController::class, 'index'])->name('inscricoes.index');
