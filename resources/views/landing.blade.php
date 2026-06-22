@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Mentoria — Garanta sua vaga</title>
+    @include('components.analytics')
 
     <!-- Tailwind Play CDN (rápido para protótipo). Em produção, recomenda-se build com Vite + Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
