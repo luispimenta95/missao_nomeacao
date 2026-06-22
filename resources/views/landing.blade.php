@@ -108,5 +108,98 @@
     AOS.init({ once: true, duration: 800 });
 </script>
 
+<script>
+    (() => {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const storeUrl = '{{ route('anonymous-visits.store') }}';
+        const exitUrl = '{{ route('anonymous-visits.update') }}';
+        const storageKey = 'anonymous_visit_token';
+        let visitToken = sessionStorage.getItem(storageKey);
+        let exitSent = false;
+
+        const utmPayload = () => {
+            const params = new URLSearchParams(window.location.search);
+
+            return {
+                landing_page: window.location.href,
+                referrer: document.referrer || null,
+                utm_source: params.get('utm_source'),
+                utm_medium: params.get('utm_medium'),
+                utm_campaign: params.get('utm_campaign'),
+            };
+        };
+
+        const startVisit = async () => {
+            if (!csrfToken || visitToken) {
+                return;
+            }
+
+            try {
+                const response = await fetch(storeUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify(utmPayload()),
+                });
+
+                if (!response.ok) {
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.visit_token) {
+                    visitToken = data.visit_token;
+                    sessionStorage.setItem(storageKey, visitToken);
+                }
+            } catch (error) {
+                // Tracking must never interrupt the landing page experience.
+            }
+        };
+
+        const endVisit = () => {
+            visitToken = visitToken || sessionStorage.getItem(storageKey);
+
+            if (!csrfToken || !visitToken || exitSent) {
+                return;
+            }
+
+            exitSent = true;
+
+            const payload = JSON.stringify({
+                _token: csrfToken,
+                visit_token: visitToken,
+                exit_page: window.location.href,
+            });
+
+            if (navigator.sendBeacon) {
+                const sent = navigator.sendBeacon(exitUrl, new Blob([payload], { type: 'application/json' }));
+
+                if (sent) {
+                    sessionStorage.removeItem(storageKey);
+                    return;
+                }
+            }
+
+            fetch(exitUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: payload,
+                keepalive: true,
+            }).finally(() => sessionStorage.removeItem(storageKey));
+        };
+
+        window.addEventListener('pagehide', endVisit);
+        startVisit();
+    })();
+</script>
+
 </body>
 </html>
