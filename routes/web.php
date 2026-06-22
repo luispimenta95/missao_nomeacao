@@ -1,17 +1,17 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AnonymousVisitAdminController;
+use App\Http\Controllers\AnonymousVisitController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\InscricaoAdminController;
+use App\Http\Controllers\InscricaoController;
+use App\Http\Controllers\LeadAdminController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\TurmaController;
-use App\Http\Controllers\InscricaoController;
-use App\Http\Controllers\LeadAdminController;
-use App\Http\Controllers\InscricaoAdminController;
-use App\Http\Controllers\AnonymousVisitController;
-use App\Http\Controllers\AnonymousVisitAdminController;
-use App\Http\Controllers\Auth\LoginController;
 use App\Models\Material;
 use App\Models\Turma;
+use Illuminate\Support\Facades\Route;
 
 // Authentication routes
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
@@ -21,6 +21,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::get('/', function () {
     $materials = Material::with('turmas')->orderBy('created_at', 'desc')->get();
     $turmas = Turma::where('status', 'aberta')->orderBy('created_at', 'desc')->get();
+
     return view('landing', compact('materials', 'turmas'));
 });
 
