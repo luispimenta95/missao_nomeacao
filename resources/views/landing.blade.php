@@ -113,10 +113,13 @@
     (() => {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         const storeUrl = '{{ route('anonymous-visits.store') }}';
+        const touchUrl = '{{ route('anonymous-visits.touch') }}';
         const exitUrl = '{{ route('anonymous-visits.update') }}';
         const storageKey = 'anonymous_visit_token';
+        const heartbeatIntervalMs = 15000;
         let visitToken = sessionStorage.getItem(storageKey);
         let exitSent = false;
+        let heartbeatTimer = null;
 
         const utmPayload = () => {
             const params = new URLSearchParams(window.location.search);
@@ -130,8 +133,82 @@
             };
         };
 
+        const encodedPayload = (payload) => {
+            const params = new URLSearchParams();
+            params.append('_token', csrfToken);
+
+            Object.entries(payload).forEach(([key, value]) => {
+                if (value !== null && value !== undefined) {
+                    params.append(key, value);
+                }
+            });
+
+            return params.toString();
+        };
+
+        const sendBeaconPayload = (url, payload) => {
+            if (!navigator.sendBeacon) {
+                return false;
+            }
+
+            return navigator.sendBeacon(
+                url,
+                new Blob([encodedPayload(payload)], { type: 'application/x-www-form-urlencoded;charset=UTF-8' }),
+            );
+        };
+
+        const postVisitEvent = (url, payload, keepalive = false) => fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: encodedPayload(payload),
+            keepalive,
+        }).catch(() => {
+            // Tracking must never interrupt the landing page experience.
+        });
+
+        const touchVisit = (keepalive = false) => {
+            visitToken = visitToken || sessionStorage.getItem(storageKey);
+
+            if (!csrfToken || !visitToken || exitSent) {
+                return;
+            }
+
+            if (keepalive && sendBeaconPayload(touchUrl, { visit_token: visitToken })) {
+                return;
+            }
+
+            postVisitEvent(touchUrl, { visit_token: visitToken }, keepalive);
+        };
+
+        const startHeartbeat = () => {
+            if (heartbeatTimer) {
+                return;
+            }
+
+            heartbeatTimer = window.setInterval(() => touchVisit(), heartbeatIntervalMs);
+        };
+
+        const stopHeartbeat = () => {
+            if (!heartbeatTimer) {
+                return;
+            }
+
+            window.clearInterval(heartbeatTimer);
+            heartbeatTimer = null;
+        };
+
         const startVisit = async () => {
-            if (!csrfToken || visitToken) {
+            if (!csrfToken) {
+                return;
+            }
+
+            if (visitToken) {
+                touchVisit();
+                startHeartbeat();
                 return;
             }
 
@@ -155,6 +232,7 @@
                 if (data.visit_token) {
                     visitToken = data.visit_token;
                     sessionStorage.setItem(storageKey, visitToken);
+                    startHeartbeat();
                 }
             } catch (error) {
                 // Tracking must never interrupt the landing page experience.
@@ -169,35 +247,29 @@
             }
 
             exitSent = true;
+            stopHeartbeat();
 
-            const payload = JSON.stringify({
-                _token: csrfToken,
+            const payload = {
                 visit_token: visitToken,
                 exit_page: window.location.href,
-            });
+            };
 
-            if (navigator.sendBeacon) {
-                const sent = navigator.sendBeacon(exitUrl, new Blob([payload], { type: 'application/json' }));
-
-                if (sent) {
-                    sessionStorage.removeItem(storageKey);
-                    return;
-                }
+            if (sendBeaconPayload(exitUrl, payload)) {
+                sessionStorage.removeItem(storageKey);
+                return;
             }
 
-            fetch(exitUrl, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: payload,
-                keepalive: true,
-            }).finally(() => sessionStorage.removeItem(storageKey));
+            postVisitEvent(exitUrl, payload, true)
+                .finally(() => sessionStorage.removeItem(storageKey));
         };
 
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                touchVisit(true);
+            }
+        });
         window.addEventListener('pagehide', endVisit);
+        window.addEventListener('beforeunload', endVisit);
         startVisit();
     })();
 </script>

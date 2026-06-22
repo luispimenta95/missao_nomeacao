@@ -67,15 +67,41 @@ class AnonymousVisitController extends Controller
         }
 
         $exitedAt = now();
-        $durationSeconds = $visit->entered_at
-            ? max(0, (int) $visit->entered_at->diffInSeconds($exitedAt))
-            : null;
+
+        if ($visit->exited_at) {
+            return response()->noContent();
+        }
 
         $visit->update([
             'exit_page' => $data['exit_page'] ?? null,
             'last_seen_at' => $exitedAt,
             'exited_at' => $exitedAt,
-            'duration_seconds' => $durationSeconds,
+            'duration_seconds' => $this->durationSeconds($visit, $exitedAt),
+        ]);
+
+        return response()->noContent();
+    }
+
+    /**
+     * Refresh the activity timestamp while the page is still open.
+     */
+    public function touch(Request $request): Response
+    {
+        $data = $request->validate([
+            'visit_token' => 'required|uuid',
+        ]);
+
+        $visit = AnonymousVisit::where('visit_token', $data['visit_token'])->first();
+
+        if (! $visit || $visit->exited_at) {
+            return response()->noContent();
+        }
+
+        $seenAt = now();
+
+        $visit->update([
+            'last_seen_at' => $seenAt,
+            'duration_seconds' => $this->durationSeconds($visit, $seenAt),
         ]);
 
         return response()->noContent();
@@ -113,5 +139,12 @@ class AnonymousVisitController extends Controller
         $value = $this->header($request, $name);
 
         return $value ? rawurldecode($value) : null;
+    }
+
+    private function durationSeconds(AnonymousVisit $visit, mixed $endedAt): ?int
+    {
+        return $visit->entered_at
+            ? max(0, (int) $visit->entered_at->diffInSeconds($endedAt))
+            : null;
     }
 }

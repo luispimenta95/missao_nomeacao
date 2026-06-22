@@ -27,6 +27,7 @@ Route::get('/', function () {
 Route::post('/leads', [LeadController::class, 'store'])->name('leads.store');
 Route::post('/inscricoes', [InscricaoController::class, 'store'])->name('inscricoes.store');
 Route::post('/anonymous-visits', [AnonymousVisitController::class, 'store'])->name('anonymous-visits.store');
+Route::post('/anonymous-visits/touch', [AnonymousVisitController::class, 'touch'])->name('anonymous-visits.touch');
 Route::post('/anonymous-visits/exit', [AnonymousVisitController::class, 'update'])->name('anonymous-visits.update');
 
 // Admin routes - protected by auth middleware
