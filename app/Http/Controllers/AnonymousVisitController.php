@@ -68,7 +68,7 @@ class AnonymousVisitController extends Controller
 
         $exitedAt = now();
         $durationSeconds = $visit->entered_at
-            ? max(0, $visit->entered_at->diffInSeconds($exitedAt))
+            ? max(0, (int) $visit->entered_at->diffInSeconds($exitedAt))
             : null;
 
         $visit->update([

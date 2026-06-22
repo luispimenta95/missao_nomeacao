@@ -5,13 +5,14 @@ namespace Tests\Feature;
 use App\Models\AnonymousVisit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AnonymousVisitTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function it_stores_an_anonymous_visit_with_ip_information(): void
     {
         $response = $this
@@ -50,7 +51,7 @@ class AnonymousVisitTest extends TestCase
         $this->assertSame('BR', $visit->ip_data['cf_ipcountry']);
     }
 
-    /** @test */
+    #[Test]
     public function it_updates_an_anonymous_visit_when_the_user_exits(): void
     {
         $visit = AnonymousVisit::create([
@@ -74,7 +75,7 @@ class AnonymousVisitTest extends TestCase
         $this->assertGreaterThanOrEqual(45, $visit->duration_seconds);
     }
 
-    /** @test */
+    #[Test]
     public function it_does_not_start_tracking_authenticated_users(): void
     {
         $this->actingAs(User::factory()->create());
