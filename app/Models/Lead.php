@@ -12,7 +12,7 @@ class Lead extends Model
 
     protected $fillable = [
         'name',
-        'email',
+        'email', // try 
         'phone',
         'consent',
         'material_id',
