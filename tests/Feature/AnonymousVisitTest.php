@@ -157,4 +157,17 @@ class AnonymousVisitTest extends TestCase
         $response->assertNoContent();
         $this->assertDatabaseCount('anonymous_visits', 0);
     }
+
+    #[Test]
+    public function landing_page_uses_same_origin_urls_for_visit_tracking(): void
+    {
+        config(['app.url' => 'http://localhost']);
+
+        $this->get('https://example.test/')
+            ->assertOk()
+            ->assertSee("const storeUrl = '/anonymous-visits';", false)
+            ->assertSee("const touchUrl = '/anonymous-visits/touch';", false)
+            ->assertSee("const exitUrl = '/anonymous-visits/exit';", false)
+            ->assertDontSee("const storeUrl = 'http://localhost/anonymous-visits';", false);
+    }
 }

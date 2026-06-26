@@ -112,9 +112,9 @@
 <script>
     (() => {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        const storeUrl = '{{ route('anonymous-visits.store') }}';
-        const touchUrl = '{{ route('anonymous-visits.touch') }}';
-        const exitUrl = '{{ route('anonymous-visits.update') }}';
+        const storeUrl = '{{ route('anonymous-visits.store', [], false) }}';
+        const touchUrl = '{{ route('anonymous-visits.touch', [], false) }}';
+        const exitUrl = '{{ route('anonymous-visits.update', [], false) }}';
         const storageKey = 'anonymous_visit_token';
         const heartbeatIntervalMs = 15000;
         let visitToken = sessionStorage.getItem(storageKey);
