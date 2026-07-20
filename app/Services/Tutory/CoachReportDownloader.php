@@ -86,13 +86,16 @@ class CoachReportDownloader
             echo $message.PHP_EOL;
         };
 
-        $this->urlLogin = trim((string) env('LOGIN_URL', 'https://admin.tutory.com.br/login'));
+        $loginUrl = trim((string) env('LOGIN_URL', ''));
+        $this->urlLogin = $loginUrl !== '' ? $loginUrl : 'https://admin.tutory.com.br/login';
         $this->email = trim((string) env('LOGIN_USER', ''));
         $this->senha = trim((string) env('LOGIN_PASSWORD', ''));
         $pastaEnv = trim((string) env('PASTA_DOWNLOAD', ''));
-        $this->pastaDownload = $pastaEnv !== ''
-            ? $pastaEnv
-            : rtrim((string) getenv('HOME'), '/').'/Relatorios_Tutory';
+        $this->pastaDownload = $this->expandHome(
+            $pastaEnv !== ''
+                ? $pastaEnv
+                : rtrim((string) getenv('HOME'), '/').'/Relatorios_Tutory'
+        );
         $this->firefoxProfile = trim((string) env('FIREFOX_PROFILE', ''));
         $this->firefoxBinary = trim((string) env('FIREFOX_BINARY', ''));
         $headlessRaw = trim((string) env('HEADLESS', '0'));
