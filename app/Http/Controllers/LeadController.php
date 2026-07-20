@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Util\MailHelper;
 use App\Models\Lead;
 use App\Models\Material;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class LeadController extends Controller
 {
@@ -39,6 +41,7 @@ class LeadController extends Controller
         Lead::create($data);
 
         $materialLink = null;
+        $material = null;
         
         if ($materialId) {
             // Build internal download route which returns a download response
@@ -53,6 +56,19 @@ class LeadController extends Controller
             // Fallback: original pay URL with utm_source=site
             $downloadBase = 'https://pay.plataformatutory.com.br/checkout/19235f0f-222d-49a3-b9e0-f8cb71ee182a';
             $redirectUrl = $downloadBase . (strpos($downloadBase, '?') !== false ? '&' : '?') . http_build_query(['utm_source' => 'site']);
+        }
+
+        try {
+            MailHelper::emailLead([
+                'nome' => $data['name'],
+                'tituloMaterial' => $material?->title,
+                'url' => $redirectUrl,
+            ], $data['email']);
+        } catch (\Throwable $e) {
+            Log::warning('Falha ao enviar e-mail de lead', [
+                'email' => $data['email'],
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return response()->json([

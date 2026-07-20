@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Util\MailHelper;
 use App\Models\Inscricao;
 use App\Models\Turma;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class InscricaoController extends Controller
 {
@@ -42,6 +44,19 @@ class InscricaoController extends Controller
             if ($turma->fresh()->available_slots <= 0) {
                 $turma->update(['status' => 'completa']);
             }
+        }
+
+        try {
+            MailHelper::emailInscricao([
+                'nome' => $data['name'],
+                'tituloTurma' => $turma->title,
+                'url' => $turma->checkout_url,
+            ], $data['email']);
+        } catch (\Throwable $e) {
+            Log::warning('Falha ao enviar e-mail de inscrição', [
+                'email' => $data['email'],
+                'error' => $e->getMessage(),
+            ]);
         }
 
         // Redirect to checkout URL
