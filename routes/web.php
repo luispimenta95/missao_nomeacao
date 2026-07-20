@@ -7,6 +7,7 @@ use App\Http\Controllers\InscricaoAdminController;
 use App\Http\Controllers\InscricaoController;
 use App\Http\Controllers\LeadAdminController;
 use App\Http\Controllers\LeadController;
+use App\Http\Controllers\MailTestController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\TurmaController;
 use App\Models\Material;
@@ -27,6 +28,9 @@ Route::get('/', function () {
 
 Route::post('/leads', [LeadController::class, 'store'])->name('leads.store');
 Route::post('/inscricoes', [InscricaoController::class, 'store'])->name('inscricoes.store');
+
+// Rota de teste de e-mail (remover em produção)
+Route::get('/teste-email', MailTestController::class)->name('mail.test');
 Route::post('/anonymous-visits', [AnonymousVisitController::class, 'store'])->name('anonymous-visits.store');
 Route::post('/anonymous-visits/touch', [AnonymousVisitController::class, 'touch'])->name('anonymous-visits.touch');
 Route::post('/anonymous-visits/exit', [AnonymousVisitController::class, 'update'])->name('anonymous-visits.update');
