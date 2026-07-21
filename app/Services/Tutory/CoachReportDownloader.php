@@ -479,11 +479,6 @@ class CoachReportDownloader
 
         $destino = $this->caminhoDestinoPdf($nome, $id);
 
-        // Réplica do PDF do painel (mesmo PDFWriter/jsPDF do botão Baixar)
-        if ($this->gerarPdfComPuppeteer($nome, $reportUrl, $destino)) {
-            return $destino;
-        }
-
         $pagina = $this->client()
             ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
             ->get('/documentos/relatorios/' . $model, ['key' => $key]);
@@ -494,9 +489,42 @@ class CoachReportDownloader
             return null;
         }
 
-        $this->log("[{$nome}] Fallback Dompdf (Puppeteer indisponível)...");
+        $html = $pagina->body();
+        if (! str_contains($html, 'main-numbers') || ! str_contains($html, 'tabela_questoes')) {
+            $this->log("[{$nome}] AVISO: página sem Breve Panorama ou Performance por assunto");
+        }
 
-        return $this->gerarPdfDoHtml($nome, $id, $pagina->body(), $dtIniIso, $dtFimIso);
+        // Réplica do PDF do painel (mesmo PDFWriter/jsPDF do botão Baixar)
+        if ($this->gerarPdfComPuppeteer($nome, $reportUrl, $destino)) {
+            if ($this->pdfContemSecoesObrigatorias($destino)) {
+                return $destino;
+            }
+            $this->log("[{$nome}] PDF Puppeteer sem panorama/assuntos — regenerando via Dompdf");
+            @unlink($destino);
+        }
+
+        $this->log("[{$nome}] Fallback Dompdf (panorama + assuntos + gráficos)...");
+
+        return $this->gerarPdfDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso);
+    }
+
+    private function pdfContemSecoesObrigatorias(string $caminho): bool
+    {
+        if (! is_file($caminho) || filesize($caminho) < 500) {
+            return false;
+        }
+        $bytes = file_get_contents($caminho);
+        if ($bytes === false) {
+            return false;
+        }
+        // jsPDF grava texto em literais PDF; aceita com ou sem acentos escapados
+        $temPanorama = str_contains($bytes, 'Breve Panorama') || str_contains($bytes, 'Breve');
+        $temAssuntos = str_contains($bytes, 'Performance por assunto')
+            || str_contains($bytes, 'Performance por')
+            || str_contains($bytes, 'tabela_questoes')
+            || str_contains($bytes, 'Taxa de');
+
+        return $temPanorama && $temAssuntos;
     }
 
     private function cookieHeader(): string
@@ -597,7 +625,7 @@ class CoachReportDownloader
         string $dtIniIso,
         string $dtFimIso,
     ): ?string {
-        $this->log("[{$nome}] Montando PDF (Dompdf + gráficos QuickChart)...");
+        $this->log("[{$nome}] Montando PDF (Dompdf: panorama + gráficos + assuntos)...");
 
         $xp = $this->loadDom($html);
         $periodo = $this->xpathText($xp, "//*[contains(@class,'report-header')]//p")
@@ -605,53 +633,84 @@ class CoachReportDownloader
         $curso = $this->xpathText($xp, "//*[contains(@class,'report-aluno-desc')]//p")
             ?: '';
 
-        $chartsHtml = '';
-        if (extension_loaded('gd')) {
-            $chartIds = [
-                'chart_questoes_dia' => 'Acertos e Erros',
-                'chart_bolha_questoes' => 'Bolha de Questões',
-                'chart_top_melhores' => 'Top Melhores',
-                'chart_top_piores' => 'Top Piores',
-                'chart_evolucao_materia' => 'Evolução por Matéria',
-                'chart_questoes_disciplina' => 'Questões por Disciplina',
-            ];
-            foreach ($chartIds as $chartId => $titulo) {
-                $cfg = $this->extrairChartConfig($html, $chartId);
-                if ($cfg === null) {
-                    continue;
-                }
-                $img = $this->quickChartPngDataUri($cfg);
-                if ($img === null) {
-                    continue;
-                }
-                $chartsHtml .= '<h3 style="color:#00aced;margin:18px 0 8px;">' . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</h3>';
-                $chartsHtml .= '<img src="' . $img . '" style="width:100%;max-width:700px;" />';
-            }
-        } else {
-            $this->log("[{$nome}] AVISO: extensão GD ausente — PDF sem imagens de gráfico");
-            $chartsHtml = '<p style="color:#888;">(Gráficos omitidos: instale php-gd no servidor)</p>';
-        }
+        $panoramaHtml = $this->montarHtmlPanorama($xp);
+        $assuntosHtml = $this->montarHtmlAssuntos($xp);
+
+        $chartDia = $this->chartImgHtml($html, 'chart_questoes_dia', 'Acertos e Erros por Dia');
+        $chartBolha = $this->chartImgHtml($html, 'chart_bolha_questoes', null);
+        $chartMelhores = $this->chartImgHtml($html, 'chart_top_melhores', null);
+        $chartPiores = $this->chartImgHtml($html, 'chart_top_piores', null);
+        $chartEvolucao = $this->chartImgHtml($html, 'chart_evolucao_materia', null);
+
+        $sec2Desc = $this->xpathText($xp, "//h2[contains(@class,'section-2')]/following-sibling::p[1]")
+            ?: 'Confira o seu desempenho por disciplinas';
+        $sec3Desc = $this->xpathText($xp, "//h2[contains(@class,'section-3')]/following-sibling::p[1]")
+            ?: 'Agora, vamos acompanhar sua evolução no tempo por matéria';
+        $melhoresTitulo = $this->xpathText($xp, "//*[contains(@class,'section-2-1')]") ?: 'Suas 3 melhores matérias';
+        $pioresTitulo = $this->xpathText($xp, "//*[contains(@class,'section-2-2')]") ?: 'Suas 3 piores matérias';
 
         $seguroNome = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
         $seguroCurso = htmlspecialchars($curso, ENT_QUOTES, 'UTF-8');
         $seguroPeriodo = htmlspecialchars($periodo, ENT_QUOTES, 'UTF-8');
+        $seguroSec2 = htmlspecialchars($sec2Desc, ENT_QUOTES, 'UTF-8');
+        $seguroSec3 = htmlspecialchars($sec3Desc, ENT_QUOTES, 'UTF-8');
+        $seguroMelhores = htmlspecialchars($melhoresTitulo, ENT_QUOTES, 'UTF-8');
+        $seguroPiores = htmlspecialchars($pioresTitulo, ENT_QUOTES, 'UTF-8');
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-h1{font-size:20px; margin:0 0 6px;}
-h3{font-size:14px;}
-.sub{color:#555; margin-bottom:16px;}
+h1{font-size:20px; margin:0 0 6px; text-align:center;}
+.periodo{color:#555; margin-bottom:14px; text-align:center;}
+.aluno{margin:10px 0 18px;}
+.aluno h2{margin:0 0 4px; font-size:16px;}
+.section{margin:22px 0 8px; padding-left:10px; border-left:4px solid #00aced; font-size:15px;}
+.section-desc{color:#555; margin:0 0 12px;}
+.panorama{width:100%; border-collapse:separate; border-spacing:10px 0; margin:8px 0 16px;}
+.panorama td{width:33%; border:1px solid #cdcdcd; padding:10px 12px; vertical-align:top;}
+.panorama .label{color:#cccccc; font-size:11px; margin:0 0 6px;}
+.panorama .value{font-size:18px; font-weight:bold; margin:0;}
+.chart{width:100%; max-width:700px; margin:8px 0 16px;}
+.two-col{width:100%; border-collapse:collapse;}
+.two-col td{width:50%; vertical-align:top; padding:4px;}
+.assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
+.assuntos thead td{background:#00aced; color:#fff; font-weight:bold; padding:8px;}
+.assuntos tbody td{border-bottom:1px solid #eee; padding:8px; vertical-align:top;}
+.assuntos .taxa{text-align:right; font-weight:bold;}
 .rule{border:0;border-top:1px solid #eaeaea; margin:12px 0;}
 </style></head><body>
 <h1>Relatório de Questões</h1>
-<div class="sub">{$seguroPeriodo}</div>
+<div class="periodo">{$seguroPeriodo}</div>
 <hr class="rule" />
-<h2 style="margin:0 0 4px;">{$seguroNome}</h2>
-<div class="sub">{$seguroCurso}</div>
-{$chartsHtml}
-<p style="margin-top:24px;color:#888;font-size:10px;">Gerado via CLI HTTP · aluno id {$id}</p>
+<div class="aluno">
+  <h2>{$seguroNome}</h2>
+  <div class="periodo" style="text-align:left;margin:0;">{$seguroCurso}</div>
+</div>
+
+<h2 class="section">Breve Panorama</h2>
+<p class="section-desc">Confira o seu desempenho de questões no período</p>
+{$panoramaHtml}
+{$chartDia}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Desempenho por Disciplina</h2>
+<p class="section-desc">{$seguroSec2}</p>
+{$chartBolha}
+<table class="two-col"><tr>
+  <td><p><b>{$seguroMelhores}</b></p>{$chartMelhores}</td>
+  <td><p><b>{$seguroPiores}</b></p>{$chartPiores}</td>
+</tr></table>
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Evolução do Desempenho por Disciplina</h2>
+<p class="section-desc">{$seguroSec3}</p>
+{$chartEvolucao}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Performance por assunto</h2>
+<p class="section-desc">Confira o desempenho de questões por assunto no período do relatório:</p>
+{$assuntosHtml}
 </body></html>
 HTML;
 
@@ -670,6 +729,110 @@ HTML;
 
             return null;
         }
+    }
+
+    private function montarHtmlPanorama(DOMXPath $xp): string
+    {
+        $nodes = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' main-numbers ')]");
+        if ($nodes === false || $nodes->length === 0) {
+            return '<p style="color:#888;">(Breve Panorama indisponível na página)</p>';
+        }
+
+        $cells = '';
+        foreach ($nodes as $node) {
+            if (! $node instanceof DOMElement) {
+                continue;
+            }
+            $label = '';
+            $value = '';
+            foreach ($node->childNodes as $child) {
+                if (! $child instanceof DOMElement) {
+                    continue;
+                }
+                $tag = strtolower($child->tagName);
+                if ($tag === 'p') {
+                    $label = trim((string) $child->textContent);
+                }
+                if ($tag === 'h3') {
+                    $value = trim((string) $child->textContent);
+                }
+            }
+            if ($label === '' && $value === '') {
+                continue;
+            }
+            $cells .= '<td><div class="label">'.htmlspecialchars($label, ENT_QUOTES, 'UTF-8').'</div>'
+                .'<div class="value">'.htmlspecialchars($value, ENT_QUOTES, 'UTF-8').'</div></td>';
+        }
+
+        if ($cells === '') {
+            return '<p style="color:#888;">(Breve Panorama vazio)</p>';
+        }
+
+        return '<table class="panorama"><tr>'.$cells.'</tr></table>';
+    }
+
+    private function montarHtmlAssuntos(DOMXPath $xp): string
+    {
+        $rows = $xp->query("//*[@id='tabela_questoes']//tbody/tr");
+        if ($rows === false || $rows->length === 0) {
+            return '<p style="color:#888;">(Performance por assunto indisponível na página)</p>';
+        }
+
+        $body = '';
+        foreach ($rows as $tr) {
+            if (! $tr instanceof DOMElement) {
+                continue;
+            }
+            $tds = [];
+            foreach ($tr->getElementsByTagName('td') as $td) {
+                $tds[] = $td;
+            }
+            if (count($tds) < 3) {
+                continue;
+            }
+            $disciplina = htmlspecialchars(trim((string) $tds[0]->textContent), ENT_QUOTES, 'UTF-8');
+            $assunto = htmlspecialchars(trim((string) $tds[1]->textContent), ENT_QUOTES, 'UTF-8');
+            $taxa = htmlspecialchars(trim((string) $tds[2]->textContent), ENT_QUOTES, 'UTF-8');
+            $style = trim($tds[2]->getAttribute('style'));
+            $color = '#d09611';
+            if (preg_match('/color\s*:\s*([^;]+)/i', $style, $m)) {
+                $color = trim($m[1]);
+            }
+            $body .= '<tr>'
+                .'<td>'.$disciplina.'</td>'
+                .'<td>'.$assunto.'</td>'
+                .'<td class="taxa" style="color:'.htmlspecialchars($color, ENT_QUOTES, 'UTF-8').';">'.$taxa.'</td>'
+                .'</tr>';
+        }
+
+        return '<table class="assuntos"><thead><tr>'
+            .'<td>Disciplina</td><td>Assunto</td><td>Taxa de Acertos</td>'
+            .'</tr></thead><tbody>'.$body.'</tbody></table>';
+    }
+
+    private function chartImgHtml(string $html, string $chartId, ?string $titulo): string
+    {
+        if (! extension_loaded('gd')) {
+            return $titulo
+                ? '<p style="color:#888;">('.$titulo.' omitido: instale php-gd)</p>'
+                : '';
+        }
+        $cfg = $this->extrairChartConfig($html, $chartId);
+        if ($cfg === null) {
+            return '';
+        }
+        $img = $this->quickChartPngDataUri($cfg);
+        if ($img === null) {
+            return '';
+        }
+        $out = '';
+        if ($titulo !== null && $titulo !== '') {
+            $out .= '<p style="text-align:center;font-weight:bold;margin:8px 0;">'
+                .htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</p>';
+        }
+        $out .= '<img class="chart" src="'.$img.'" />';
+
+        return $out;
     }
 
     private function xpathText(DOMXPath $xp, string $query): string
