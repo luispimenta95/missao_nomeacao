@@ -66,26 +66,21 @@ class CoachReportDownloader
         $this->periodo = $periodo;
         $this->teste = $teste;
         $this->logger = $logger ?? static function (string $message): void {
-            echo $message.PHP_EOL;
+            echo $message . PHP_EOL;
         };
 
         $loginUrl = trim((string) env('LOGIN_URL', ''));
-        $this->urlLogin = $loginUrl !== '' ? $loginUrl : self::BASE.'/login';
-
-        // TEMP (teste): credenciais hardcoded — trocar por .env depois
-        $this->email = 'missaonomeacao';
+        $this->urlLogin = 'https://admin.tutory.com.br/login';
         $this->senha = '05473793150';
-
-        $pastaEnv = trim((string) env('PASTA_DOWNLOAD', ''));
-        $defaultPasta = function_exists('public_path')
-            ? public_path('pdfs')
-            : (function_exists('storage_path')
-                ? storage_path('app/tutory-relatorios')
-                : rtrim((string) getenv('HOME'), '/').'/Relatorios_Tutory');
+        $this->email = 'missaonomeacao';
+        $pastaEnv = public_path('pdfs/');
+        $defaultPasta = function_exists('storage_path')
+            ? storage_path('app/tutory-relatorios')
+            : rtrim((string) getenv('HOME'), '/') . '/Relatorios_Tutory';
         $this->pastaDownload = $this->expandHome($pastaEnv !== '' ? $pastaEnv : $defaultPasta);
 
-        $this->timeout = (int) (env('TIMEOUT') ?: 120);
-        $this->cookieFile = sys_get_temp_dir().'/tutory_cookies_'.getmypid().'.json';
+        $this->timeout = (int) (env('TIMEOUT') ?: 60);
+        $this->cookieFile = sys_get_temp_dir() . '/tutory_cookies_' . getmypid() . '.json';
         $this->cookieJar = new FileCookieJar($this->cookieFile, true);
 
         if (! is_dir($this->pastaDownload)) {
@@ -120,7 +115,18 @@ class CoachReportDownloader
 
     private function validarConfig(): void
     {
-        // TEMP: credenciais hardcoded para teste — validação de .env desativada
+        $faltando = [];
+        if ($this->email === '') {
+            $faltando[] = 'LOGIN_USER';
+        }
+        if ($this->senha === '') {
+            $faltando[] = 'LOGIN_PASSWORD';
+        }
+        if ($faltando !== []) {
+            throw new RuntimeException(
+                'Configure no .env: ' . implode(', ', $faltando) . '. Use .env.example como modelo.'
+            );
+        }
         if (! in_array($this->periodo, ['1', '2'], true)) {
             throw new RuntimeException('--periodo deve ser 1 ou 2.');
         }
@@ -129,7 +135,7 @@ class CoachReportDownloader
     private function expandHome(string $path): string
     {
         if (str_starts_with($path, '~/')) {
-            return rtrim((string) getenv('HOME'), '/').substr($path, 1);
+            return rtrim((string) getenv('HOME'), '/') . substr($path, 1);
         }
 
         return $path;
@@ -149,7 +155,7 @@ class CoachReportDownloader
                 'Accept' => 'application/json, text/html, */*;q=0.8',
                 'X-Requested-With' => 'XMLHttpRequest',
                 'Origin' => self::BASE,
-                'Referer' => self::BASE.'/alunos/consulta',
+                'Referer' => self::BASE . '/alunos/consulta',
             ])
             ->baseUrl(self::BASE);
 
@@ -165,7 +171,7 @@ class CoachReportDownloader
         $this->log('Abrindo página de login...');
         $loginPage = $this->client()->get($this->urlLogin);
         if ($loginPage->status() >= 400) {
-            throw new RuntimeException('Não foi possível abrir a página de login (HTTP '.$loginPage->status().').');
+            throw new RuntimeException('Não foi possível abrir a página de login (HTTP ' . $loginPage->status() . ').');
         }
 
         $this->log('Enviando credenciais para /intent/login...');
@@ -180,7 +186,7 @@ class CoachReportDownloader
         $json = $response->json();
         if (! is_array($json) || empty($json['result'])) {
             $erro = is_array($json) ? (string) ($json['error'] ?? 'login falhou') : $response->body();
-            throw new RuntimeException('Falha no login: '.$erro);
+            throw new RuntimeException('Falha no login: ' . $erro);
         }
 
         $index = $this->client()
@@ -227,7 +233,7 @@ class CoachReportDownloader
         }
         $ultimo = (int) $hoje->format('t');
 
-        return [$hoje->format('Y-m-16'), $hoje->format('Y-m-').str_pad((string) $ultimo, 2, '0', STR_PAD_LEFT)];
+        return [$hoje->format('Y-m-16'), $hoje->format('Y-m-') . str_pad((string) $ultimo, 2, '0', STR_PAD_LEFT)];
     }
 
     /**
@@ -246,7 +252,7 @@ class CoachReportDownloader
     private function loadDom(string $html): DOMXPath
     {
         $dom = new DOMDocument;
-        @$dom->loadHTML('<?xml encoding="utf-8"?>'.$html);
+        @$dom->loadHTML('<?xml encoding="utf-8"?>' . $html);
 
         return new DOMXPath($dom);
     }
@@ -283,17 +289,17 @@ class CoachReportDownloader
         // Endpoints reais da página (ex.: /intent/cadastrar-relatorio-coach)
         if (preg_match_all('#/intent/[a-zA-Z0-9_./-]+#', $html, $m)) {
             $this->endpointsGeracao = array_values(array_unique($m[0]));
-            $this->log('Intents na página: '.implode(', ', $this->endpointsGeracao));
+            $this->log('Intents na página: ' . implode(', ', $this->endpointsGeracao));
         }
 
         $alunos = [];
         $vistos = [];
         $pagina = 1;
-        $urlAtual = self::BASE.'/alunos/consulta?status=ativos';
+        $urlAtual = self::BASE . '/alunos/consulta?status=ativos';
 
         while (true) {
             $paginaAlunos = $this->parseAlunosDaPagina($html);
-            $this->log("Coletando página {$pagina}: ".count($paginaAlunos).' aluno(s)');
+            $this->log("Coletando página {$pagina}: " . count($paginaAlunos) . ' aluno(s)');
             foreach ($paginaAlunos as $aluno) {
                 if ($aluno['id'] === '' || isset($vistos[$aluno['id']])) {
                     continue;
@@ -306,7 +312,7 @@ class CoachReportDownloader
             if ($proxima === null) {
                 break;
             }
-            $this->log('Próxima página: '.$proxima);
+            $this->log('Próxima página: ' . $proxima);
             $html = $this->client()->get($proxima)->body();
             $urlAtual = $proxima;
             $pagina++;
@@ -315,7 +321,7 @@ class CoachReportDownloader
             }
         }
 
-        $this->log('Total de alunos ativos: '.count($alunos));
+        $this->log('Total de alunos ativos: ' . count($alunos));
 
         return $alunos;
     }
@@ -413,13 +419,13 @@ class CoachReportDownloader
             return $url;
         }
         if (str_starts_with($url, '//')) {
-            return 'https:'.$url;
+            return 'https:' . $url;
         }
         if (str_starts_with($url, '/')) {
-            return self::BASE.$url;
+            return self::BASE . $url;
         }
 
-        return rtrim($base, '/').'/'.ltrim($url, '/');
+        return rtrim($base, '/') . '/' . ltrim($url, '/');
     }
 
     /**
@@ -447,12 +453,11 @@ class CoachReportDownloader
         }
 
         $this->log("[{$nome}] Gerando via {$endpoint}...");
-        // PDF de referência usa agrupamento diário (gráficos por dia)
-        $agrupamento = trim((string) env('TUTORY_REPORT_AGRUPAMENTO', 'dia')) ?: 'dia';
-        $body = 'alunos[]='.rawurlencode($id)
-            .'&dt_ini='.rawurlencode($dtIni)
-            .'&dt_fim='.rawurlencode($dtFim)
-            .'&agrupamento='.rawurlencode($agrupamento);
+        // Backend PHP espera alunos[]=ID (como o jQuery do painel)
+        $body = 'alunos[]=' . rawurlencode($id)
+            . '&dt_ini=' . rawurlencode($dtIni)
+            . '&dt_fim=' . rawurlencode($dtFim)
+            . '&agrupamento=mes';
 
         $resp = $this->client()
             ->withHeaders(['Content-Type' => 'application/x-www-form-urlencoded; charset=UTF-8'])
@@ -462,21 +467,21 @@ class CoachReportDownloader
         $json = $resp->json();
         if (! is_array($json) || empty($json['result'])) {
             $erro = is_array($json) ? (string) ($json['error'] ?? $resp->body()) : $resp->body();
-            $this->log("[{$nome}] Falha ao gerar: ".$erro);
+            $this->log("[{$nome}] Falha ao gerar: " . $erro);
 
             return null;
         }
 
         $lista = $json['data'] ?? null;
         if (! is_array($lista) || $lista === [] || empty($lista[0]['token'])) {
-            $this->log("[{$nome}] Resposta sem token de relatório: ".$resp->body());
+            $this->log("[{$nome}] Resposta sem token de relatório: " . $resp->body());
 
             return null;
         }
 
         $key = (string) $lista[0]['token'];
         $model = trim((string) env('TUTORY_REPORT_MODEL', 'questoes')) ?: 'questoes';
-        $reportUrl = self::BASE.'/documentos/relatorios/'.$model.'?key='.rawurlencode($key);
+        $reportUrl = self::BASE . '/documentos/relatorios/' . $model . '?key=' . rawurlencode($key);
         $this->log("[{$nome}] Abrindo relatório...");
 
         $destino = $this->caminhoDestinoPdf($nome, $id);
@@ -488,7 +493,7 @@ class CoachReportDownloader
 
         $pagina = $this->client()
             ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
-            ->get('/documentos/relatorios/'.$model, ['key' => $key]);
+            ->get('/documentos/relatorios/' . $model, ['key' => $key]);
 
         if ($pagina->status() >= 400 || ! str_contains($pagina->body(), 'btn_save')) {
             $this->log("[{$nome}] Página do relatório inválida (HTTP {$pagina->status()})");
@@ -626,8 +631,8 @@ class CoachReportDownloader
                 if ($img === null) {
                     continue;
                 }
-                $chartsHtml .= '<h3 style="color:#00aced;margin:18px 0 8px;">'.htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</h3>';
-                $chartsHtml .= '<img src="'.$img.'" style="width:100%;max-width:700px;" />';
+                $chartsHtml .= '<h3 style="color:#00aced;margin:18px 0 8px;">' . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</h3>';
+                $chartsHtml .= '<img src="' . $img . '" style="width:100%;max-width:700px;" />';
             }
         } else {
             $this->log("[{$nome}] AVISO: extensão GD ausente — PDF sem imagens de gráfico");
@@ -668,7 +673,7 @@ HTML;
 
             return $this->salvarBytesPdf($nome, $dompdf->output() ?? '', $id);
         } catch (Throwable $exc) {
-            $this->log("[{$nome}] Erro Dompdf: ".$exc->getMessage());
+            $this->log("[{$nome}] Erro Dompdf: " . $exc->getMessage());
 
             return null;
         }
@@ -700,7 +705,7 @@ HTML;
         // Mais preciso: achar getElementById('id') e o new Chart seguinte
         $pos = strpos($html, "getElementById('{$canvasId}')");
         if ($pos === false) {
-            $pos = strpos($html, 'getElementById("'.$canvasId.'")');
+            $pos = strpos($html, 'getElementById("' . $canvasId . '")');
         }
         if ($pos === false) {
             return null;
@@ -730,7 +735,8 @@ HTML;
         $data = json_decode($json, true);
         if (! is_array($data)) {
             // fallback mínimo só com type/data se parse falhar
-            if (preg_match('/type:\s*[\'"](\w+)[\'"]/', $jsonish, $tm)
+            if (
+                preg_match('/type:\s*[\'"](\w+)[\'"]/', $jsonish, $tm)
                 && preg_match('/labels:\s*(\[[^\]]*\])/', $jsonish, $lm)
             ) {
                 return [
@@ -808,17 +814,17 @@ HTML;
                     'chart' => $chartConfig,
                 ]);
             if ($resp->successful() && strlen($resp->body()) > 100) {
-                return 'data:image/png;base64,'.base64_encode($resp->body());
+                return 'data:image/png;base64,' . base64_encode($resp->body());
             }
 
             // GET fallback
-            $url = 'https://quickchart.io/chart?c='.rawurlencode(json_encode($chartConfig, JSON_UNESCAPED_UNICODE) ?: '{}').'&w=800&h=400&bkg=white&f=png';
+            $url = 'https://quickchart.io/chart?c=' . rawurlencode(json_encode($chartConfig, JSON_UNESCAPED_UNICODE) ?: '{}') . '&w=800&h=400&bkg=white&f=png';
             $get = Http::timeout(30)->get($url);
             if ($get->successful() && strlen($get->body()) > 100) {
-                return 'data:image/png;base64,'.base64_encode($get->body());
+                return 'data:image/png;base64,' . base64_encode($get->body());
             }
         } catch (Throwable $exc) {
-            $this->log('QuickChart erro: '.$exc->getMessage());
+            $this->log('QuickChart erro: ' . $exc->getMessage());
         }
 
         return null;
@@ -829,7 +835,15 @@ HTML;
         if ($bytes === '') {
             return null;
         }
-        $destino = $this->caminhoDestinoPdf($nomeAluno, $id);
+        $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
+        $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
+        $mes = date('Y-m');
+        $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '.pdf';
+        $n = 1;
+        while (file_exists($destino)) {
+            $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '_' . $n . '.pdf';
+            $n++;
+        }
         file_put_contents($destino, $bytes);
         $this->log("[{$nomeAluno}] Arquivo salvo: {$destino}");
 
@@ -865,24 +879,24 @@ HTML;
         array $falhas,
         array $resultados,
     ): string {
-        $caminho = $this->pastaDownload.'/log_download_'.$inicio->format('Ymd_His').'.txt';
+        $caminho = $this->pastaDownload . '/log_download_' . $inicio->format('Ymd_His') . '.txt';
         $linhas = [
             'Relatórios Tutory - CLI/HTTP',
-            'Início: '.$inicio->format('d/m/Y H:i:s'),
-            'Fim:    '.$fim->format('d/m/Y H:i:s'),
-            'Duração: '.$this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()),
+            'Início: ' . $inicio->format('d/m/Y H:i:s'),
+            'Fim:    ' . $fim->format('d/m/Y H:i:s'),
+            'Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()),
             "Alunos: {$total}",
-            'PDFs: '.count($pdfs),
-            'Falhas: '.count($falhas),
+            'PDFs: ' . count($pdfs),
+            'Falhas: ' . count($falhas),
             "Pasta: {$this->pastaDownload}",
             '',
             'Arquivos:',
         ];
-        $linhas = array_merge($linhas, $pdfs !== [] ? array_map(static fn ($p) => '- '.basename($p), $pdfs) : ['- (nenhum)']);
+        $linhas = array_merge($linhas, $pdfs !== [] ? array_map(static fn($p) => '- ' . basename($p), $pdfs) : ['- (nenhum)']);
         $linhas[] = '';
         $linhas[] = 'Status:';
         foreach ($resultados as $r) {
-            $linhas[] = '- ['.($r['sucesso'] ? 'OK' : 'FALHA')."] {$r['nome']} (tentativas: {$r['tentativas']})";
+            $linhas[] = '- [' . ($r['sucesso'] ? 'OK' : 'FALHA') . "] {$r['nome']} (tentativas: {$r['tentativas']})";
         }
         if ($falhas !== []) {
             $linhas[] = '';
@@ -891,7 +905,7 @@ HTML;
                 $linhas[] = "- {$f}";
             }
         }
-        file_put_contents($caminho, implode("\n", $linhas)."\n");
+        file_put_contents($caminho, implode("\n", $linhas) . "\n");
 
         return $caminho;
     }
@@ -899,20 +913,20 @@ HTML;
     private function baixarTodos(): void
     {
         $inicio = new \DateTimeImmutable('now');
-        $this->log('Processo iniciado em: '.$inicio->format('d/m/Y H:i:s'));
-        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + Puppeteer/PDFWriter (fallback Dompdf)');
+        $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
+        $this->log('Modo: CLI/HTTP → /intent/cadastrar-relatorio-coach + Dompdf');
 
         $alunos = $this->coletarAlunosAtivos();
         if ($this->teste) {
             $alvo = mb_strtolower(self::ALUNA_TESTE);
             $alunos = array_values(array_filter(
                 $alunos,
-                static fn (array $a) => str_contains(mb_strtolower($a['nome']), $alvo)
+                static fn(array $a) => str_contains(mb_strtolower($a['nome']), $alvo)
             ));
             if ($alunos !== []) {
-                $this->log('Modo --teste: '.$alunos[0]['nome'].' (id '.$alunos[0]['id'].')');
+                $this->log('Modo --teste: ' . $alunos[0]['nome'] . ' (id ' . $alunos[0]['id'] . ')');
             } else {
-                $this->log("Modo --teste: '".self::ALUNA_TESTE."' não encontrada.");
+                $this->log("Modo --teste: '" . self::ALUNA_TESTE . "' não encontrada.");
             }
         }
 
@@ -943,11 +957,11 @@ HTML;
                 $resultados[$nome]['tentativas']++;
                 $t = $resultados[$nome]['tentativas'];
                 $this->log(str_repeat('=', 50));
-                $this->log("[rodada {$rodada}] Aluno ".($i + 1)."/{$total}: {$nome} (tentativa {$t}/".self::MAX_TENTATIVAS.')');
+                $this->log("[rodada {$rodada}] Aluno " . ($i + 1) . "/{$total}: {$nome} (tentativa {$t}/" . self::MAX_TENTATIVAS . ')');
                 try {
                     $arquivo = $this->processarAluno($resultados[$nome]['meta']);
                 } catch (Throwable $exc) {
-                    $this->log("[{$nome}] ERRO: ".$exc->getMessage());
+                    $this->log("[{$nome}] ERRO: " . $exc->getMessage());
                     $arquivo = null;
                 }
                 if ($arquivo !== null) {
@@ -964,14 +978,14 @@ HTML;
 
         $processarLote($nomes, 1);
         for ($rodada = 2; $rodada <= self::MAX_TENTATIVAS; $rodada++) {
-            $pendentes = array_values(array_filter($nomes, static fn ($n) => ! $resultados[$n]['sucesso']));
+            $pendentes = array_values(array_filter($nomes, static fn($n) => ! $resultados[$n]['sucesso']));
             if ($pendentes === []) {
                 $this->log(str_repeat('=', 50));
                 $this->log('Nenhuma falha restante.');
                 break;
             }
             $this->log(str_repeat('=', 50));
-            $this->log('Reprocessando '.count($pendentes)." falha(s) (rodada {$rodada}/".self::MAX_TENTATIVAS.')...');
+            $this->log('Reprocessando ' . count($pendentes) . " falha(s) (rodada {$rodada}/" . self::MAX_TENTATIVAS . ')...');
             $processarLote($pendentes, $rodada);
         }
 
@@ -985,16 +999,16 @@ HTML;
                 $falhas[] = $r['nome'];
             }
         }
-        $lista = array_map(static fn ($n) => $resultados[$n], $nomes);
+        $lista = array_map(static fn($n) => $resultados[$n], $nomes);
         $fim = new \DateTimeImmutable('now');
         $log = $this->gravarLogResumo($inicio, $fim, count($nomes), $pdfs, $falhas, $lista);
 
         $this->log(str_repeat('=', 50));
-        $this->log('Início: '.$inicio->format('d/m/Y H:i:s'));
-        $this->log('Fim:    '.$fim->format('d/m/Y H:i:s'));
-        $this->log('Duração: '.$this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()));
-        $this->log('PDFs baixados: '.count($pdfs));
-        $this->log('Falhas finais: '.count($falhas));
+        $this->log('Início: ' . $inicio->format('d/m/Y H:i:s'));
+        $this->log('Fim:    ' . $fim->format('d/m/Y H:i:s'));
+        $this->log('Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()));
+        $this->log('PDFs baixados: ' . count($pdfs));
+        $this->log('Falhas finais: ' . count($falhas));
         foreach ($falhas as $f) {
             $this->log("- {$f} (tentativas: {$resultados[$f]['tentativas']})");
         }
