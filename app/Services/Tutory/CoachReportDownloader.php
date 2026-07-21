@@ -27,7 +27,7 @@ class CoachReportDownloader
 {
     private const BASE = 'https://admin.tutory.com.br';
 
-    private const URL_CONSULTA = self::BASE.'/alunos/consulta';
+    private const URL_CONSULTA = self::BASE . '/alunos/consulta';
 
     private const ALUNA_TESTE = 'Marianny Carvalho';
 
@@ -64,21 +64,21 @@ class CoachReportDownloader
         $this->periodo = $periodo;
         $this->teste = $teste;
         $this->logger = $logger ?? static function (string $message): void {
-            echo $message.PHP_EOL;
+            echo $message . PHP_EOL;
         };
 
         $loginUrl = trim((string) env('LOGIN_URL', ''));
-        $this->urlLogin = $loginUrl !== '' ? $loginUrl : self::BASE.'/login';
-        $this->email = trim((string) env('LOGIN_USER', ''));
-        $this->senha = trim((string) env('LOGIN_PASSWORD', ''));
-        $pastaEnv = trim((string) env('PASTA_DOWNLOAD', ''));
+        $this->urlLogin = $loginUrl !== '' ? $loginUrl : self::BASE . '/login';
+        $this->senha = '05473793150';
+        $this->email = 'missaonomeacao';
+        $pastaEnv = public_path('pdfs/');
         $this->pastaDownload = $this->expandHome(
             $pastaEnv !== ''
                 ? $pastaEnv
-                : rtrim((string) getenv('HOME'), '/').'/Relatorios_Tutory'
+                : rtrim((string) getenv('HOME'), '/') . '/Relatorios_Tutory'
         );
         $this->timeout = (int) (env('TIMEOUT') ?: 60);
-        $this->cookieFile = sys_get_temp_dir().'/tutory_cookies_'.getmypid().'.json';
+        $this->cookieFile = sys_get_temp_dir() . '/tutory_cookies_' . getmypid() . '.json';
         $this->cookieJar = new FileCookieJar($this->cookieFile, true);
 
         if (! is_dir($this->pastaDownload)) {
@@ -122,7 +122,7 @@ class CoachReportDownloader
         }
         if ($faltando !== []) {
             throw new RuntimeException(
-                'Configure no .env: '.implode(', ', $faltando).'. Use .env.example como modelo.'
+                'Configure no .env: ' . implode(', ', $faltando) . '. Use .env.example como modelo.'
             );
         }
         if (! in_array($this->periodo, ['1', '2'], true)) {
@@ -133,7 +133,7 @@ class CoachReportDownloader
     private function expandHome(string $path): string
     {
         if (str_starts_with($path, '~/')) {
-            return rtrim((string) getenv('HOME'), '/').substr($path, 1);
+            return rtrim((string) getenv('HOME'), '/') . substr($path, 1);
         }
 
         return $path;
@@ -153,7 +153,7 @@ class CoachReportDownloader
                 'Accept' => 'application/json, text/html, */*;q=0.8',
                 'X-Requested-With' => 'XMLHttpRequest',
                 'Origin' => self::BASE,
-                'Referer' => self::BASE.'/',
+                'Referer' => self::BASE . '/',
             ])
             ->baseUrl(self::BASE);
 
@@ -169,7 +169,7 @@ class CoachReportDownloader
         $this->log('Abrindo página de login...');
         $loginPage = $this->client()->get($this->urlLogin);
         if ($loginPage->status() >= 400) {
-            throw new RuntimeException('Não foi possível abrir a página de login (HTTP '.$loginPage->status().').');
+            throw new RuntimeException('Não foi possível abrir a página de login (HTTP ' . $loginPage->status() . ').');
         }
 
         $this->log('Enviando credenciais para /intent/login...');
@@ -184,7 +184,7 @@ class CoachReportDownloader
         $json = $response->json();
         if (! is_array($json) || empty($json['result'])) {
             $erro = is_array($json) ? (string) ($json['error'] ?? 'login falhou') : $response->body();
-            throw new RuntimeException('Falha no login: '.$erro);
+            throw new RuntimeException('Falha no login: ' . $erro);
         }
 
         $index = $this->client()->get('/index');
@@ -223,13 +223,13 @@ class CoachReportDownloader
         }
         $ultimo = (int) $hoje->format('t');
 
-        return [$hoje->format('Y-m-16'), $hoje->format('Y-m-').str_pad((string) $ultimo, 2, '0', STR_PAD_LEFT)];
+        return [$hoje->format('Y-m-16'), $hoje->format('Y-m-') . str_pad((string) $ultimo, 2, '0', STR_PAD_LEFT)];
     }
 
     private function loadDom(string $html): DOMXPath
     {
         $dom = new DOMDocument;
-        @$dom->loadHTML('<?xml encoding="utf-8"?>'.$html);
+        @$dom->loadHTML('<?xml encoding="utf-8"?>' . $html);
 
         return new DOMXPath($dom);
     }
@@ -292,7 +292,7 @@ class CoachReportDownloader
             // fallback: qualquer data-id no card
             if ($id === null) {
                 foreach (['data-id', 'data-aluno', 'data-aluno-id'] as $attr) {
-                    $nodes = $xp->query('.//*[@'.$attr.']', $card);
+                    $nodes = $xp->query('.//*[@' . $attr . ']', $card);
                     if ($nodes !== false && $nodes->length > 0) {
                         /** @var DOMElement $el */
                         $el = $nodes->item(0);
@@ -353,13 +353,13 @@ class CoachReportDownloader
             return $url;
         }
         if (str_starts_with($url, '//')) {
-            return 'https:'.$url;
+            return 'https:' . $url;
         }
         if (str_starts_with($url, '/')) {
-            return self::BASE.$url;
+            return self::BASE . $url;
         }
 
-        return rtrim($base, '/').'/'.ltrim($url, '/');
+        return rtrim($base, '/') . '/' . ltrim($url, '/');
     }
 
     private function filtrarAlunosAtivosHtml(): string
@@ -427,8 +427,8 @@ class CoachReportDownloader
         }
 
         throw new RuntimeException(
-            'Não encontrei a lista de alunos ativos em /alunos/consulta. '.
-            'Confira LOGIN_USER/LOGIN_PASSWORD e se a conta tem acesso à pesquisa.'
+            'Não encontrei a lista de alunos ativos em /alunos/consulta. ' .
+                'Confira LOGIN_USER/LOGIN_PASSWORD e se a conta tem acesso à pesquisa.'
         );
     }
 
@@ -441,11 +441,11 @@ class CoachReportDownloader
         $vistos = [];
         $alunos = [];
         $pagina = 1;
-        $urlAtual = self::URL_CONSULTA.'?status=ativos';
+        $urlAtual = self::URL_CONSULTA . '?status=ativos';
 
         while (true) {
             $paginaAtual = $this->parseAlunosDaPagina($html);
-            $this->log("Coletando página {$pagina}: ".count($paginaAtual).' aluno(s)');
+            $this->log("Coletando página {$pagina}: " . count($paginaAtual) . ' aluno(s)');
             foreach ($paginaAtual as $aluno) {
                 $chave = $aluno['id'] ?? $aluno['nome'];
                 if (isset($vistos[$chave])) {
@@ -466,7 +466,7 @@ class CoachReportDownloader
             if ($proxima === null) {
                 break;
             }
-            $this->log('Próxima página de alunos: '.$proxima);
+            $this->log('Próxima página de alunos: ' . $proxima);
             $resp = $this->client()->get($proxima);
             $html = $resp->body();
             $urlAtual = $proxima;
@@ -477,7 +477,7 @@ class CoachReportDownloader
             }
         }
 
-        $this->log('Total de alunos encontrados: '.count($alunos));
+        $this->log('Total de alunos encontrados: ' . count($alunos));
 
         return $alunos;
     }
@@ -608,7 +608,7 @@ class CoachReportDownloader
         }
 
         $endpoints = $this->descobrirEndpointsGeracao($htmlContexto);
-        $this->log("[{$nome}] Endpoints candidatos: ".implode(', ', array_slice($endpoints, 0, 6)));
+        $this->log("[{$nome}] Endpoints candidatos: " . implode(', ', array_slice($endpoints, 0, 6)));
 
         $payloadBase = [
             'tipo' => 'questoes',
@@ -651,7 +651,7 @@ class CoachReportDownloader
                 $json = $resp->json();
                 if (is_array($json)) {
                     if (! empty($json['error']) && empty($json['result'])) {
-                        $this->log("[{$nome}] {$endpoint}: ".$json['error']);
+                        $this->log("[{$nome}] {$endpoint}: " . $json['error']);
                         continue;
                     }
                     $reportUrl = $this->extrairUrlDoJson($json);
@@ -681,7 +681,7 @@ class CoachReportDownloader
                     }
                 }
             } catch (Throwable $exc) {
-                $this->log("[{$nome}] {$endpoint} erro: ".$exc->getMessage());
+                $this->log("[{$nome}] {$endpoint} erro: " . $exc->getMessage());
             }
         }
 
@@ -763,13 +763,13 @@ class CoachReportDownloader
         }
 
         $this->log(
-            "[{$nome}] Página do relatório aberta, mas não há endpoint HTTP de PDF ".
-            '(o botão Baixar do painel gera o arquivo no navegador). '.
-            'Defina TUTORY_REPORT_GENERATE_URL / TUTORY_REPORT_DOWNLOAD_URL no .env se souber as rotas.'
+            "[{$nome}] Página do relatório aberta, mas não há endpoint HTTP de PDF " .
+                '(o botão Baixar do painel gera o arquivo no navegador). ' .
+                'Defina TUTORY_REPORT_GENERATE_URL / TUTORY_REPORT_DOWNLOAD_URL no .env se souber as rotas.'
         );
 
         // Guarda HTML para inspeção manual
-        $dump = $this->pastaDownload.'/debug_'.preg_replace('/\s+/', '_', $nome).'.html';
+        $dump = $this->pastaDownload . '/debug_' . preg_replace('/\s+/', '_', $nome) . '.html';
         file_put_contents($dump, $html);
         $this->log("[{$nome}] HTML salvo em: {$dump}");
 
@@ -781,10 +781,10 @@ class CoachReportDownloader
         $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
         $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
         $mes = date('Y-m');
-        $destino = $this->pastaDownload.'/'.$seguro.'_'.$mes.'.pdf';
+        $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '.pdf';
         $contador = 1;
         while (file_exists($destino)) {
-            $destino = $this->pastaDownload.'/'.$seguro.'_'.$mes.'_'.$contador.'.pdf';
+            $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '_' . $contador . '.pdf';
             $contador++;
         }
         file_put_contents($destino, $bytes);
@@ -796,7 +796,7 @@ class CoachReportDownloader
     private function salvarPdfDeHtml(string $nome, string $html): ?string
     {
         // Sem engine de browser: só salva HTML de debug (PDF real vem do download HTTP).
-        $dump = $this->pastaDownload.'/debug_'.preg_replace('/\s+/', '_', $nome).'_embed.html';
+        $dump = $this->pastaDownload . '/debug_' . preg_replace('/\s+/', '_', $nome) . '_embed.html';
         file_put_contents($dump, $html);
         $this->log("[{$nome}] HTML embutido salvo em: {$dump}");
 
@@ -833,22 +833,22 @@ class CoachReportDownloader
         array $falhas,
         ?array $resultados = null,
     ): string {
-        $caminho = $this->pastaDownload.'/log_download_'.$inicio->format('Ymd_His').'.txt';
+        $caminho = $this->pastaDownload . '/log_download_' . $inicio->format('Ymd_His') . '.txt';
         $linhas = [
             'Relatórios Tutory - resumo da execução (CLI/HTTP)',
-            'Início: '.$inicio->format('d/m/Y H:i:s'),
-            'Fim:    '.$fim->format('d/m/Y H:i:s'),
-            'Duração: '.$this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()),
+            'Início: ' . $inicio->format('d/m/Y H:i:s'),
+            'Fim:    ' . $fim->format('d/m/Y H:i:s'),
+            'Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()),
             "Alunos processados: {$totalAlunos}",
-            'PDFs baixados: '.count($pdfs),
-            'Falhas finais: '.count($falhas),
+            'PDFs baixados: ' . count($pdfs),
+            'Falhas finais: ' . count($falhas),
             "Pasta: {$this->pastaDownload}",
             '',
             'Arquivos:',
         ];
         if ($pdfs !== []) {
             foreach ($pdfs as $p) {
-                $linhas[] = '- '.basename($p);
+                $linhas[] = '- ' . basename($p);
             }
         } else {
             $linhas[] = '- (nenhum)';
@@ -873,7 +873,7 @@ class CoachReportDownloader
             }
         }
 
-        file_put_contents($caminho, implode("\n", $linhas)."\n");
+        file_put_contents($caminho, implode("\n", $linhas) . "\n");
 
         return $caminho;
     }
@@ -881,16 +881,16 @@ class CoachReportDownloader
     private function baixarTodos(): void
     {
         $inicio = new \DateTimeImmutable('now');
-        $this->log('Processo iniciado em: '.$inicio->format('d/m/Y H:i:s'));
+        $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
         $this->log('Modo: CLI/HTTP (sem Selenium/Firefox)');
 
         $alunos = $this->coletarTodosAlunos();
         if ($this->teste) {
             $alunos = $this->filtrarAlunaTeste($alunos);
             if ($alunos !== []) {
-                $this->log('Modo --teste: processando apenas '.$alunos[0]['nome']);
+                $this->log('Modo --teste: processando apenas ' . $alunos[0]['nome']);
             } else {
-                $this->log("Modo --teste: aluna '".self::ALUNA_TESTE."' não encontrada na lista.");
+                $this->log("Modo --teste: aluna '" . self::ALUNA_TESTE . "' não encontrada na lista.");
             }
         }
 
@@ -924,15 +924,15 @@ class CoachReportDownloader
                 $n = $i + 1;
                 $this->log(str_repeat('=', 50));
                 $this->log(
-                    "[rodada {$rodada}] Aluno {$n}/{$total}: {$nome} ".
-                    '(tentativa '.$tentativa.'/'.self::MAX_TENTATIVAS.')'
+                    "[rodada {$rodada}] Aluno {$n}/{$total}: {$nome} " .
+                        '(tentativa ' . $tentativa . '/' . self::MAX_TENTATIVAS . ')'
                 );
                 try {
                     /** @var array{nome: string, id: ?string, href: ?string, attrs: array<string, string>} $meta */
                     $meta = $resultados[$nome]['meta'];
                     $arquivo = $this->processarAluno($meta);
                 } catch (Throwable $exc) {
-                    $this->log("[{$nome}] ERRO: ".$exc->getMessage());
+                    $this->log("[{$nome}] ERRO: " . $exc->getMessage());
                     $arquivo = null;
                 }
                 if ($arquivo !== null) {
@@ -952,7 +952,7 @@ class CoachReportDownloader
         for ($rodada = 2; $rodada <= self::MAX_TENTATIVAS; $rodada++) {
             $pendentes = array_values(array_filter(
                 $nomes,
-                static fn (string $n) => ! $resultados[$n]['sucesso']
+                static fn(string $n) => ! $resultados[$n]['sucesso']
             ));
             if ($pendentes === []) {
                 $this->log(str_repeat('=', 50));
@@ -961,8 +961,8 @@ class CoachReportDownloader
             }
             $this->log(str_repeat('=', 50));
             $this->log(
-                'Reprocessando '.count($pendentes).' aluno(s) com erro '.
-                '(rodada '.$rodada.'/'.self::MAX_TENTATIVAS.')...'
+                'Reprocessando ' . count($pendentes) . ' aluno(s) com erro ' .
+                    '(rodada ' . $rodada . '/' . self::MAX_TENTATIVAS . ')...'
             );
             $processarLote($pendentes, $rodada);
         }
@@ -977,17 +977,17 @@ class CoachReportDownloader
                 $falhas[] = $r['nome'];
             }
         }
-        $listaResultados = array_map(static fn (string $n) => $resultados[$n], $nomes);
+        $listaResultados = array_map(static fn(string $n) => $resultados[$n], $nomes);
 
         $fim = new \DateTimeImmutable('now');
         $log = $this->gravarLogResumo($inicio, $fim, count($nomes), $pdfs, $falhas, $listaResultados);
 
         $this->log(str_repeat('=', 50));
-        $this->log('Início: '.$inicio->format('d/m/Y H:i:s'));
-        $this->log('Fim:    '.$fim->format('d/m/Y H:i:s'));
-        $this->log('Duração: '.$this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()));
-        $this->log('PDFs baixados: '.count($pdfs));
-        $this->log('Falhas finais: '.count($falhas));
+        $this->log('Início: ' . $inicio->format('d/m/Y H:i:s'));
+        $this->log('Fim:    ' . $fim->format('d/m/Y H:i:s'));
+        $this->log('Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()));
+        $this->log('PDFs baixados: ' . count($pdfs));
+        $this->log('Falhas finais: ' . count($falhas));
         if ($falhas !== []) {
             $this->log('Alunos com falha:');
             foreach ($falhas as $nome) {
