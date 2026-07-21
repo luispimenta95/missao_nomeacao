@@ -66,11 +66,15 @@ try {
 
   await page.waitForSelector('#btn_save', { timeout: 60000 });
   await page.waitForSelector('#chart_questoes_dia', { timeout: 60000 });
+  await page.waitForSelector('.main-numbers h3', { timeout: 60000 });
+  await page.waitForSelector('#tabela_questoes tbody tr', { timeout: 60000 });
 
   // Espera Chart.js pintar e congela animações (igual ao script Selenium)
   await page.waitForFunction(() => {
     const c = document.getElementById('chart_questoes_dia');
-    return c && c.width > 10 && c.height > 10;
+    const rows = document.querySelectorAll('#tabela_questoes tbody tr');
+    const nums = document.querySelectorAll('.main-numbers h3');
+    return c && c.width > 10 && c.height > 10 && rows.length > 0 && nums.length >= 3;
   }, { timeout: 60000 });
 
   await new Promise((r) => setTimeout(r, 2500));
@@ -90,10 +94,16 @@ try {
     });
   });
 
-  // Intercepta jsPDF.save para capturar o ArrayBuffer
+  // Intercepta jsPDF.save e dispara o mesmo fluxo do botão Baixar
   const pdfBase64 = await page.evaluate(async () => {
     if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
       throw new Error('PDFWriter não encontrado na página');
+    }
+
+    const panoramaOk = document.querySelectorAll('.main-numbers h3').length >= 3;
+    const assuntosOk = document.querySelectorAll('#tabela_questoes tbody tr').length > 0;
+    if (!panoramaOk || !assuntosOk) {
+      throw new Error(`Seções incompletas no DOM (panorama=${panoramaOk}, assuntos=${assuntosOk})`);
     }
 
     return await new Promise((resolve, reject) => {
@@ -107,7 +117,6 @@ try {
           return;
         }
 
-        const originalSave = PDFWriter.doc.save.bind(PDFWriter.doc);
         PDFWriter.doc.save = function patchedSave(filename) {
           try {
             const dataUri = this.output('datauristring');
