@@ -606,12 +606,11 @@ class CoachReportDownloader
     {
         $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
         $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
-        $data = date('dmY');
-        $prefix = ($id !== null && $id !== '') ? 'relatorio-'.$id.'-' : 'relatorio-';
-        $destino = $this->pastaDownload.'/'.$prefix.$seguro.'-'.$data.'.pdf';
+        // Formato pedido: relatorio_$aluno_$periodo.pdf
+        $destino = $this->pastaDownload.'/relatorio_'.$seguro.'_'.$this->periodo.'.pdf';
         $n = 1;
         while (file_exists($destino)) {
-            $destino = $this->pastaDownload.'/'.$prefix.$seguro.'-'.$data.'_'.$n.'.pdf';
+            $destino = $this->pastaDownload.'/relatorio_'.$seguro.'_'.$this->periodo.'_'.$n.'.pdf';
             $n++;
         }
 
