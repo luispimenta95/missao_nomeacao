@@ -4,7 +4,9 @@
 /**
  * Baixa o Relatório do Coach no Tutory para os alunos ATIVOS da consulta.
  *
- * Uso (equivalente ao script Python):
+ * CLI/HTTP puro — sem Selenium, sem Firefox, sem php-webdriver.
+ *
+ * Uso:
  *   php scripts/baixar_relatorios_tutory.php --periodo=1
  *   php scripts/baixar_relatorios_tutory.php --periodo=2 --teste
  *
@@ -24,7 +26,7 @@ $options = getopt('', ['periodo:', 'teste', 'help']);
 
 if (isset($options['help']) || ! isset($options['periodo'])) {
     fwrite(STDERR, <<<'HELP'
-Baixa o Relatório do Coach no Tutory para alunos ativos.
+Baixa o Relatório do Coach no Tutory para alunos ativos (CLI/HTTP).
 
 Uso:
   php scripts/baixar_relatorios_tutory.php --periodo=1
@@ -36,9 +38,6 @@ Opções:
                   2 = Dia inicial: 16 / Dia final: último dia do mês
   --teste         Baixa só o relatório da aluna Marianny Carvalho
   --help          Mostra esta ajuda
-
-Também disponível via Artisan:
-  php artisan tutory:baixar-relatorios --periodo=1
 
 HELP);
     exit(isset($options['help']) ? 0 : 1);
