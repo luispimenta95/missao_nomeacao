@@ -26,7 +26,7 @@
             <div class="mb-6">
                 <label class="block">
                     <span class="text-sm font-semibold text-gray-700">Nome *</span>
-                    <input type="text" name="nome" required class="mt-2 w-full rounded border border-gray-300 p-3 focus:ring-primary focus:border-primary @error('nome') border-red-500 @enderror" value="{{ old('nome') }}" placeholder="Ex: Laíra Larceda">
+                    <input type="text" name="nome" required class="mt-2 w-full rounded border border-gray-300 p-3 focus:ring-primary focus:border-primary @error('nome') border-red-500 @enderror" value="{{ old('nome') }}" placeholder="Ex: Laíra Lacerda">
                     @error('nome') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
                 </label>
             </div>

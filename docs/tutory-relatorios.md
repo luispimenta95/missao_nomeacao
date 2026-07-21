@@ -52,9 +52,9 @@ php artisan tutory:baixar-relatorios --periodo=2 --teste
 ```
 
 Arquivo gerado: `relatorio_{Ymd_Hi}_{aluno}_{periodo}.pdf`  
-Exemplo: `relatorio_20260721_1830_Laíra_Larceda_1.pdf`
+Exemplo: `relatorio_20260721_1830_Laíra_Lacerda_1.pdf`
 
-O envio de e-mail usa o PDF mais recente do aluno na pasta para o `--periodo` informado.
+O envio de e-mail usa o PDF mais recente do aluno na pasta para o `--periodo` informado (aceita pequenas diferenças de digitação no nome).
 
 ## Agendamento (Laravel Scheduler)
 
