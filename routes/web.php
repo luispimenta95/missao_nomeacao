@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AlunoController;
 use App\Http\Controllers\AnonymousVisitAdminController;
 use App\Http\Controllers\AnonymousVisitController;
 use App\Http\Controllers\Auth\LoginController;
@@ -60,6 +61,14 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::get('/turmas/{turma}/edit', [TurmaController::class, 'edit'])->name('turmas.edit');
     Route::put('/turmas/{turma}', [TurmaController::class, 'update'])->name('turmas.update');
     Route::delete('/turmas/{turma}', [TurmaController::class, 'destroy'])->name('turmas.destroy');
+
+    // Alunos routes
+    Route::get('/alunos', [AlunoController::class, 'index'])->name('alunos.index');
+    Route::get('/alunos/create', [AlunoController::class, 'create'])->name('alunos.create');
+    Route::post('/alunos', [AlunoController::class, 'store'])->name('alunos.store');
+    Route::get('/alunos/{aluno}/edit', [AlunoController::class, 'edit'])->name('alunos.edit');
+    Route::put('/alunos/{aluno}', [AlunoController::class, 'update'])->name('alunos.update');
+    Route::delete('/alunos/{aluno}', [AlunoController::class, 'destroy'])->name('alunos.destroy');
 
     // Leads routes
     Route::get('/leads', [LeadAdminController::class, 'index'])->name('leads.index');
