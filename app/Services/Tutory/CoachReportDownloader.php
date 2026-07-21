@@ -859,65 +859,148 @@ HTML;
      */
     private function extrairChartConfig(string $html, string $canvasId): ?array
     {
-        // new Chart(elChartQuestoesDia, { ... });
-        // ou new Chart(document.getElementById('chart_...'), { ... });
-        $patterns = [
-            '/new\s+Chart\s*\(\s*[^,]+,\s*(\{.*?)\s*\)\s*;\s*(?:var\s+chart|\$\("#btn_save"\)|var\s+elChart|<\/script>)/s',
-        ];
-
-        // Mais preciso: achar getElementById('id') e o new Chart seguinte
-        $pos = strpos($html, "getElementById('{$canvasId}')");
-        if ($pos === false) {
-            $pos = strpos($html, 'getElementById("' . $canvasId . '")');
-        }
-        if ($pos === false) {
-            return null;
+        // var elFoo = document.getElementById('chart_...');
+        // new Chart(elFoo, { ... });
+        $elVar = null;
+        if (preg_match(
+            '/var\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*document\.getElementById\(\s*[\'"]'.preg_quote($canvasId, '/').'[\'"]\s*\)/',
+            $html,
+            $vm
+        )) {
+            $elVar = $vm[1];
         }
 
-        $slice = substr($html, $pos, 12000);
-        if (! preg_match('/new\s+Chart\s*\(\s*[^,]+,\s*(\{)/', $slice, $m, PREG_OFFSET_CAPTURE)) {
-            return null;
+        $jsonish = null;
+        if ($elVar !== null) {
+            $needle = 'new Chart('.$elVar;
+            $pos = strpos($html, $needle);
+            if ($pos === false) {
+                $pos = strpos($html, 'new Chart( '.$elVar);
+            }
+            if ($pos !== false) {
+                $slice = substr($html, $pos, 20000);
+                if (preg_match('/new\s+Chart\s*\(\s*'.preg_quote($elVar, '/').'\s*,\s*(\{)/', $slice, $m, PREG_OFFSET_CAPTURE)) {
+                    $jsonish = $this->extrairObjetoJsBalanceado($slice, (int) $m[1][1]);
+                }
+            }
         }
-        $start = (int) $m[1][1];
-        $jsonish = $this->extrairObjetoJsBalanceado($slice, $start);
+
+        // Fallback: new Chart(document.getElementById('id'), { ... })
+        if ($jsonish === null) {
+            if (preg_match(
+                '/new\s+Chart\s*\(\s*document\.getElementById\(\s*[\'"]'.preg_quote($canvasId, '/').'[\'"]\s*\)\s*,\s*(\{)/',
+                $html,
+                $m,
+                PREG_OFFSET_CAPTURE
+            )) {
+                $jsonish = $this->extrairObjetoJsBalanceado($html, (int) $m[1][1]);
+            }
+        }
+
         if ($jsonish === null) {
             return null;
         }
 
+        $colors = $this->extrairChartColors($html);
+
         // JS object → JSON aproximado
         $json = $jsonish;
+        // Substitui chartColors[Math.floor(Math.random()*chartColors.length)] por cores fixas
+        $colorIdx = 0;
+        $json = preg_replace_callback(
+            '/chartColors\s*\[\s*Math\.floor\s*\(\s*Math\.random\s*\(\s*\)\s*\*\s*chartColors\.length\s*\)\s*\]/',
+            static function () use (&$colorIdx, $colors): string {
+                $c = $colors[$colorIdx % count($colors)];
+                $colorIdx++;
+
+                return "'".$c."'";
+            },
+            $json
+        ) ?? $json;
+
         $json = preg_replace('/([{\[,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/', '$1"$2":', $json) ?? $json;
         $json = str_replace("'", '"', $json);
         $json = preg_replace('/,\s*([}\]])/', '$1', $json) ?? $json;
         // remove functions (datalabels formatter etc.)
         $json = preg_replace('/"formatter"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
+        $json = preg_replace('/"label"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
         $json = preg_replace('/"function"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
         $json = preg_replace('/function\s*\(.*?\)\s*\{.*?\},?/s', 'null,', $json) ?? $json;
         $json = preg_replace('/,\s*([}\]])/', '$1', $json) ?? $json;
 
         $data = json_decode($json, true);
         if (! is_array($data)) {
-            // fallback mínimo só com type/data se parse falhar
-            if (
-                preg_match('/type:\s*[\'"](\w+)[\'"]/', $jsonish, $tm)
-                && preg_match('/labels:\s*(\[[^\]]*\])/', $jsonish, $lm)
-            ) {
-                return [
-                    'type' => $tm[1],
-                    'data' => [
-                        'labels' => json_decode(str_replace("'", '"', $lm[1]), true) ?: [],
-                        'datasets' => [],
-                    ],
-                    'options' => ['plugins' => ['legend' => ['display' => true]]],
-                ];
-            }
-
             return null;
         }
 
-        // QuickChart: datalabels oficiais (caixinhas pretas) só em gráficos de linha
-        $type = $data['type'] ?? '';
-        if ($type === 'line') {
+        return $this->aplicarDatalabelsOficiais($data, $canvasId);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extrairChartColors(string $html): array
+    {
+        $defaults = [
+            '#00ACED', '#FF595E', '#FFCA3A', '#8AC926', '#6A4C93', '#FF70A6',
+            '#6D4C3D', '#0D0221', '#5CF64A', '#F94144', '#F3722C', '#F9C74F',
+            '#90BE6D', '#43AA8B', '#577590',
+        ];
+        if (! preg_match('/var\s+chartColors\s*=\s*\[(.*?)\]/s', $html, $m)) {
+            return $defaults;
+        }
+        preg_match_all('/[\'"](#[0-9A-Fa-f]{3,8})[\'"]/', $m[1], $cm);
+        $colors = array_values(array_unique($cm[1] ?? []));
+
+        return $colors !== [] ? $colors : $defaults;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function aplicarDatalabelsOficiais(array $data, string $canvasId): array
+    {
+        $type = (string) ($data['type'] ?? '');
+
+        // Garante legenda com nomes das disciplinas (bolha / evolução)
+        if (in_array($canvasId, ['chart_bolha_questoes', 'chart_evolucao_materia'], true)) {
+            $data['options']['legend']['display'] = true;
+            $data['options']['legend']['labels'] = [
+                'boxWidth' => 12,
+                'fontSize' => 9,
+            ];
+        }
+
+        // Barras: nomes das disciplinas no eixo X
+        if ($type === 'bar') {
+            $data['options']['scales']['xAxes'] = [[
+                'ticks' => [
+                    'fontSize' => 8,
+                    'autoSkip' => false,
+                    'maxRotation' => 45,
+                    'minRotation' => 45,
+                ],
+            ]];
+            if (! isset($data['options']['scales']['yAxes'])) {
+                $data['options']['scales']['yAxes'] = [[
+                    'ticks' => ['beginAtZero' => true, 'max' => 120],
+                ]];
+            }
+            $data['options']['legend']['display'] = false;
+            $data['options']['plugins']['datalabels'] = [
+                'color' => '#333',
+                'anchor' => 'end',
+                'align' => 'end',
+                'offset' => 6,
+                'font' => ['size' => 10],
+                'formatter' => '__DATALABEL_PERCENT__',
+            ];
+
+            return $data;
+        }
+
+        if ($type === 'bubble') {
             $data['options']['plugins']['datalabels'] = [
                 'anchor' => 'end',
                 'align' => 'end',
@@ -927,8 +1010,31 @@ HTML;
                 'borderRadius' => 0,
                 'padding' => 4,
                 'font' => ['size' => 10],
-                // placeholder trocado por function() no POST do QuickChart
-                'formatter' => '__DATALABEL_FORMATTER__',
+                'formatter' => '__DATALABEL_BUBBLE_PERCENT__',
+            ];
+            $padding = is_array($data['options']['layout']['padding'] ?? null)
+                ? $data['options']['layout']['padding']
+                : [];
+            $data['options']['layout']['padding'] = array_merge($padding, [
+                'top' => 20,
+                'right' => 16,
+            ]);
+
+            return $data;
+        }
+
+        if ($type === 'line') {
+            $isQuestoesDia = $canvasId === 'chart_questoes_dia';
+            $data['options']['plugins']['datalabels'] = [
+                'anchor' => 'end',
+                'align' => 'end',
+                'offset' => 8,
+                'color' => '#fff',
+                'backgroundColor' => '#000',
+                'borderRadius' => 0,
+                'padding' => 4,
+                'font' => ['size' => 10],
+                'formatter' => $isQuestoesDia ? '__DATALABEL_QUESTOES__' : '__DATALABEL_PERCENT__',
             ];
             $padding = is_array($data['options']['layout']['padding'] ?? null)
                 ? $data['options']['layout']['padding']
@@ -937,9 +1043,14 @@ HTML;
                 'top' => 28,
                 'right' => 16,
             ]);
-        } else {
-            unset($data['options']['plugins']['datalabels']);
+            if ($canvasId === 'chart_evolucao_materia') {
+                $data['options']['legend']['display'] = true;
+            }
+
+            return $data;
         }
+
+        unset($data['options']['plugins']['datalabels']);
 
         return $data;
     }
@@ -990,18 +1101,19 @@ HTML;
     private function quickChartPngDataUri(array $chartConfig): ?string
     {
         try {
-            // chart como string JS para permitir formatter() (caixinhas pretas "N questões")
+            // chart como string JS para permitir formatter() (caixinhas pretas "N questões" / "N%")
             $chartJs = json_encode($chartConfig, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             if ($chartJs === false) {
                 return null;
             }
-            if (str_contains($chartJs, '__DATALABEL_FORMATTER__')) {
-                $chartJs = str_replace(
-                    '"__DATALABEL_FORMATTER__"',
-                    'function(value){return Number(value).toFixed(0)+" questões";}',
-                    $chartJs
-                );
-            }
+            $replacements = [
+                '"__DATALABEL_QUESTOES__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
+                '"__DATALABEL_PERCENT__"' => 'function(value){return Number(value).toFixed(0)+"%";}',
+                '"__DATALABEL_BUBBLE_PERCENT__"' => 'function(value){return value&&value.r!=null?Number(value.r*10).toFixed(0)+"%":"";}',
+                // legado
+                '"__DATALABEL_FORMATTER__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
+            ];
+            $chartJs = str_replace(array_keys($replacements), array_values($replacements), $chartJs);
 
             $payload = [
                 'width' => 900,
