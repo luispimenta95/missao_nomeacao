@@ -667,10 +667,17 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .aluno h2{margin:0 0 4px; font-size:16px;}
 .section{margin:22px 0 8px; padding-left:10px; border-left:4px solid #00aced; font-size:15px;}
 .section-desc{color:#555; margin:0 0 12px;}
-.panorama{width:100%; border-collapse:separate; border-spacing:10px 0; margin:8px 0 16px;}
-.panorama td{width:33%; border:1px solid #cdcdcd; padding:10px 12px; vertical-align:top;}
-.panorama .label{color:#cccccc; font-size:11px; margin:0 0 6px;}
-.panorama .value{font-size:18px; font-weight:bold; margin:0;}
+.panorama{width:100%; border-collapse:separate; border-spacing:10px 0; margin:6px 0 14px; table-layout:fixed;}
+.panorama td{
+  width:33%;
+  border:0.4pt solid #cdcdcd;
+  padding:6pt 8pt 10pt;
+  height:52pt;
+  vertical-align:top;
+  background:#ffffff;
+}
+.panorama .label{color:#cccccc; font-size:9pt; margin:0 0 12pt; line-height:1.1;}
+.panorama .value{font-size:12pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
 .chart{width:100%; max-width:700px; margin:8px 0 16px;}
 .two-col{width:100%; border-collapse:collapse;}
 .two-col td{width:50%; vertical-align:top; padding:4px;}
@@ -908,8 +915,31 @@ HTML;
             return null;
         }
 
-        // QuickChart usa Chart.js v3+ em parte; simplifica options
-        unset($data['options']['plugins']['datalabels']);
+        // QuickChart: datalabels oficiais (caixinhas pretas) só em gráficos de linha
+        $type = $data['type'] ?? '';
+        if ($type === 'line') {
+            $data['options']['plugins']['datalabels'] = [
+                'anchor' => 'end',
+                'align' => 'end',
+                'offset' => 8,
+                'color' => '#fff',
+                'backgroundColor' => '#000',
+                'borderRadius' => 0,
+                'padding' => 4,
+                'font' => ['size' => 10],
+                // placeholder trocado por function() no POST do QuickChart
+                'formatter' => '__DATALABEL_FORMATTER__',
+            ];
+            $padding = is_array($data['options']['layout']['padding'] ?? null)
+                ? $data['options']['layout']['padding']
+                : [];
+            $data['options']['layout']['padding'] = array_merge($padding, [
+                'top' => 28,
+                'right' => 16,
+            ]);
+        } else {
+            unset($data['options']['plugins']['datalabels']);
+        }
 
         return $data;
     }
@@ -960,27 +990,53 @@ HTML;
     private function quickChartPngDataUri(array $chartConfig): ?string
     {
         try {
-            $resp = Http::timeout(30)
-                ->asJson()
-                ->post('https://quickchart.io/chart', [
-                    'width' => 800,
-                    'height' => 400,
-                    'format' => 'png',
-                    'backgroundColor' => 'white',
-                    'chart' => $chartConfig,
-                ]);
-            if ($resp->successful() && strlen($resp->body()) > 100) {
-                return 'data:image/png;base64,' . base64_encode($resp->body());
+            // chart como string JS para permitir formatter() (caixinhas pretas "N questões")
+            $chartJs = json_encode($chartConfig, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($chartJs === false) {
+                return null;
+            }
+            if (str_contains($chartJs, '__DATALABEL_FORMATTER__')) {
+                $chartJs = str_replace(
+                    '"__DATALABEL_FORMATTER__"',
+                    'function(value){return Number(value).toFixed(0)+" questões";}',
+                    $chartJs
+                );
             }
 
-            // GET fallback
-            $url = 'https://quickchart.io/chart?c=' . rawurlencode(json_encode($chartConfig, JSON_UNESCAPED_UNICODE) ?: '{}') . '&w=800&h=400&bkg=white&f=png';
-            $get = Http::timeout(30)->get($url);
-            if ($get->successful() && strlen($get->body()) > 100) {
-                return 'data:image/png;base64,' . base64_encode($get->body());
+            $payload = [
+                'width' => 900,
+                'height' => 420,
+                'devicePixelRatio' => 2,
+                'format' => 'png',
+                'backgroundColor' => 'white',
+                'version' => '2.9.4',
+                'plugins' => ['datalabels'],
+                'chart' => $chartJs,
+            ];
+
+            $resp = Http::timeout(45)
+                ->asJson()
+                ->post('https://quickchart.io/chart', $payload);
+
+            if ($resp->successful() && strlen($resp->body()) > 100) {
+                $body = $resp->body();
+                $ctype = (string) ($resp->header('Content-Type') ?? '');
+                if (str_starts_with($body, "\x89PNG") || str_contains($ctype, 'image')) {
+                    return 'data:image/png;base64,'.base64_encode($body);
+                }
+                $this->log('QuickChart resposta inesperada: '.substr($body, 0, 180));
+            }
+
+            // GET fallback (sem function — só útil se não houver formatter)
+            if (! str_contains($chartJs, 'function(value)')) {
+                $url = 'https://quickchart.io/chart?c='.rawurlencode($chartJs).'&w=900&h=420&bkg=white&f=png&v=2.9.4';
+                $get = Http::timeout(45)->get($url);
+                if ($get->successful() && strlen($get->body()) > 100) {
+                    return 'data:image/png;base64,'.base64_encode($get->body());
+                }
             }
         } catch (Throwable $exc) {
-            $this->log('QuickChart erro: ' . $exc->getMessage());
+            $this->log('QuickChart erro: '.$exc->getMessage());
         }
 
         return null;
@@ -991,15 +1047,7 @@ HTML;
         if ($bytes === '') {
             return null;
         }
-        $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
-        $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
-        $mes = date('Y-m');
-        $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '.pdf';
-        $n = 1;
-        while (file_exists($destino)) {
-            $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '_' . $n . '.pdf';
-            $n++;
-        }
+        $destino = $this->caminhoDestinoPdf($nomeAluno, $id);
         file_put_contents($destino, $bytes);
         $this->log("[{$nomeAluno}] Arquivo salvo: {$destino}");
 
