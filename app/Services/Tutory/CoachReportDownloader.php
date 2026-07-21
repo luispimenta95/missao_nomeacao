@@ -865,12 +865,17 @@ class CoachReportDownloader
         $seguroPiores = htmlspecialchars($pioresTitulo, ENT_QUOTES, 'UTF-8');
         $logoHtml = $this->montarHtmlLogoPdf();
 
+        $logoFontFace = $this->montarCssFonteLogoPdf();
+
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
+{$logoFontFace}
 body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-.logo{text-align:center; margin:0 0 10px;}
-.logo img{width:120px; height:auto;}
+.logo{text-align:center; margin:0 0 12px; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+.logo .l1{font-size:26pt; letter-spacing:0.2pt;}
+.logo .l2{font-size:22pt; letter-spacing:0.2pt;}
+.logo .icon{width:22pt; height:22pt; vertical-align:middle; margin-left:2pt; margin-top:-4pt;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .periodo{color:#555; margin-bottom:14px; text-align:center;}
 .aluno{margin:10px 0 18px;}
@@ -935,7 +940,16 @@ HTML;
         try {
             $options = new Options;
             $options->set('isRemoteEnabled', true);
+            $options->set('isFontSubsettingEnabled', true);
             $options->set('defaultFont', 'DejaVu Sans');
+            $chroot = array_values(array_filter([
+                base_path(),
+                public_path(),
+                storage_path('fonts'),
+            ], 'is_dir'));
+            if ($chroot !== []) {
+                $options->setChroot($chroot);
+            }
             $dompdf = new Dompdf($options);
             $dompdf->loadHtml($pdfHtml, 'UTF-8');
             $dompdf->setPaper('A4', 'portrait');
@@ -950,11 +964,24 @@ HTML;
     }
 
     /**
-     * Logo no topo do PDF (Dompdf). Usa data-URI para funcionar sem acesso remoto.
+     * Logo vetorial no topo do PDF (texto + ícone), nítida em qualquer zoom.
      */
     private function montarHtmlLogoPdf(): string
     {
-        $path = public_path('img/logo-missao-nomeacao.png');
+        $iconSrc = $this->logoIconDataUri();
+        $iconHtml = $iconSrc !== ''
+            ? '<img class="icon" src="' . $iconSrc . '" alt="" />'
+            : '';
+
+        return '<div class="logo">'
+            . '<div class="l1">Missão' . $iconHtml . '</div>'
+            . '<div class="l2">nomeação</div>'
+            . '</div>';
+    }
+
+    private function montarCssFonteLogoPdf(): string
+    {
+        $path = storage_path('fonts/Fredoka-Bold.ttf');
         if (! is_file($path)) {
             return '';
         }
@@ -964,9 +991,24 @@ HTML;
             return '';
         }
 
-        $src = 'data:image/png;base64,' . base64_encode($bytes);
+        $src = 'data:font/truetype;base64,' . base64_encode($bytes);
 
-        return '<div class="logo"><img src="' . $src . '" alt="Missão Nomeação" /></div>';
+        return "@font-face{font-family:'FredokaBrand';font-style:normal;font-weight:bold;src:url('{$src}') format('truetype');}";
+    }
+
+    private function logoIconDataUri(): string
+    {
+        $path = public_path('img/logo-missao-icon.png');
+        if (! is_file($path)) {
+            return '';
+        }
+
+        $bytes = @file_get_contents($path);
+        if ($bytes === false || $bytes === '') {
+            return '';
+        }
+
+        return 'data:image/png;base64,' . base64_encode($bytes);
     }
 
     private function montarHtmlPanorama(DOMXPath $xp): string
