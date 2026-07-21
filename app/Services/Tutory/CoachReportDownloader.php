@@ -5,9 +5,9 @@
  *
  * 1. Login (/intent/login) → sessão + Bearer
  * 2. /alunos/consulta?status=ativos (cards com data-id)
- * 3. POST /intent/cadastrar-relatorio-coach
+ * 3. POST /intent/cadastrar-relatorio-coach (agrupamento=dia)
  * 4. GET /documentos/relatorios/questoes?key=...
- * 5. Gera PDF via Dompdf (gráficos via QuickChart a partir do Chart.js embutido)
+ * 5. PDF oficial via Puppeteer + PDFWriter/jsPDF do painel (fallback: Dompdf)
  * 6. Reprocessa falhas (até 3x)
  */
 
@@ -484,6 +484,13 @@ class CoachReportDownloader
         $reportUrl = self::BASE . '/documentos/relatorios/' . $model . '?key=' . rawurlencode($key);
         $this->log("[{$nome}] Abrindo relatório...");
 
+        $destino = $this->caminhoDestinoPdf($nome, $id);
+
+        // Réplica do PDF do painel (mesmo PDFWriter/jsPDF do botão Baixar)
+        if ($this->gerarPdfComPuppeteer($nome, $reportUrl, $destino)) {
+            return $destino;
+        }
+
         $pagina = $this->client()
             ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
             ->get('/documentos/relatorios/' . $model, ['key' => $key]);
@@ -494,7 +501,100 @@ class CoachReportDownloader
             return null;
         }
 
+        $this->log("[{$nome}] Fallback Dompdf (Puppeteer indisponível)...");
+
         return $this->gerarPdfDoHtml($nome, $id, $pagina->body(), $dtIniIso, $dtFimIso);
+    }
+
+    private function cookieHeader(): string
+    {
+        if ($this->cookieJar === null) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ($this->cookieJar as $cookie) {
+            $parts[] = $cookie->getName().'='.$cookie->getValue();
+        }
+
+        return implode('; ', $parts);
+    }
+
+    /**
+     * Usa o PDFWriter/jsPDF do painel via Puppeteer → PDF idêntico ao "Baixar".
+     */
+    private function gerarPdfComPuppeteer(string $nome, string $reportUrl, string $destino): bool
+    {
+        $script = function_exists('base_path')
+            ? base_path('scripts/tutory-render-pdf.mjs')
+            : dirname(__DIR__, 3).'/scripts/tutory-render-pdf.mjs';
+
+        if (! is_file($script)) {
+            $this->log("[{$nome}] Script Puppeteer ausente: {$script}");
+
+            return false;
+        }
+
+        $node = trim((string) env('NODE_BINARY', 'node')) ?: 'node';
+        $cmd = [$node, $script, '--url', $reportUrl, '--out', $destino];
+        $cookie = $this->cookieHeader();
+        if ($cookie !== '') {
+            $cmd[] = '--cookie';
+            $cmd[] = $cookie;
+        }
+        if ($this->bearerToken !== null && $this->bearerToken !== '') {
+            $cmd[] = '--token';
+            $cmd[] = $this->bearerToken;
+        }
+
+        $this->log("[{$nome}] Renderizando PDF oficial (PDFWriter/jsPDF via Puppeteer)...");
+
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $cwd = function_exists('base_path') ? base_path() : dirname($script, 2);
+        $proc = @proc_open($cmd, $descriptors, $pipes, $cwd, null);
+        if (! is_resource($proc)) {
+            $this->log("[{$nome}] Não foi possível iniciar Node/Puppeteer");
+
+            return false;
+        }
+
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]) ?: '';
+        $stderr = stream_get_contents($pipes[2]) ?: '';
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+
+        if ($code !== 0 || ! is_file($destino) || filesize($destino) < 500) {
+            $detail = trim($stderr !== '' ? $stderr : $stdout);
+            $this->log("[{$nome}] Puppeteer falhou (exit {$code}): ".$detail);
+
+            return false;
+        }
+
+        $this->log("[{$nome}] Arquivo salvo: {$destino}");
+
+        return true;
+    }
+
+    private function caminhoDestinoPdf(string $nomeAluno, ?string $id = null): string
+    {
+        $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
+        $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
+        $data = date('dmY');
+        $prefix = ($id !== null && $id !== '') ? 'relatorio-'.$id.'-' : 'relatorio-';
+        $destino = $this->pastaDownload.'/'.$prefix.$seguro.'-'.$data.'.pdf';
+        $n = 1;
+        while (file_exists($destino)) {
+            $destino = $this->pastaDownload.'/'.$prefix.$seguro.'-'.$data.'_'.$n.'.pdf';
+            $n++;
+        }
+
+        return $destino;
     }
 
     private function gerarPdfDoHtml(
@@ -571,7 +671,7 @@ HTML;
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
 
-            return $this->salvarBytesPdf($nome, $dompdf->output() ?? '');
+            return $this->salvarBytesPdf($nome, $dompdf->output() ?? '', $id);
         } catch (Throwable $exc) {
             $this->log("[{$nome}] Erro Dompdf: " . $exc->getMessage());
 
@@ -730,7 +830,7 @@ HTML;
         return null;
     }
 
-    private function salvarBytesPdf(string $nomeAluno, string $bytes): ?string
+    private function salvarBytesPdf(string $nomeAluno, string $bytes, ?string $id = null): ?string
     {
         if ($bytes === '') {
             return null;
