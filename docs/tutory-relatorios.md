@@ -26,6 +26,8 @@ CHART_WAIT=30
 
 ## Uso
 
+Via Artisan:
+
 ```bash
 # Período 1–15 do mês atual
 php artisan tutory:baixar-relatorios --periodo=1
@@ -35,6 +37,13 @@ php artisan tutory:baixar-relatorios --periodo=2
 
 # Teste com uma aluna (valida PDF com gráficos)
 php artisan tutory:baixar-relatorios --periodo=1 --teste
+```
+
+Via script CLI (mesmo fluxo do Python original):
+
+```bash
+php scripts/baixar_relatorios_tutory.php --periodo=1
+php scripts/baixar_relatorios_tutory.php --periodo=2 --teste
 ```
 
 ## Fluxo
