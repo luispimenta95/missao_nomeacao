@@ -32,7 +32,7 @@ class CoachReportDownloader
 {
     private const BASE = 'https://admin.tutory.com.br';
 
-    private const ALUNA_TESTE = 'Laíra Larceda';
+    private const ALUNA_TESTE = 'Laíra Lacerda';
 
     private const MAX_TENTATIVAS = 3;
 
@@ -633,6 +633,75 @@ class CoachReportDownloader
     }
 
     /**
+     * Normaliza nome para comparação (sem acento/underscore/case).
+     */
+    private function normalizarParaComparacao(string $nome): string
+    {
+        $nome = mb_strtolower(str_replace('_', ' ', $nome));
+        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $nome);
+        $nome = is_string($ascii) && $ascii !== '' ? $ascii : $nome;
+
+        return preg_replace('/[^a-z0-9]+/', '', $nome) ?? '';
+    }
+
+    /**
+     * Compara nomes do admin vs nome embutido no arquivo (aceita pequenas diferenças de digitação).
+     */
+    private function nomesArquivoSaoCompativeis(string $nomeAdmin, string $nomeArquivo): bool
+    {
+        if (strcasecmp($nomeAdmin, $nomeArquivo) === 0) {
+            return true;
+        }
+
+        similar_text(mb_strtolower($nomeAdmin), mb_strtolower($nomeArquivo), $pct);
+        if ($pct >= 85.0) {
+            return true;
+        }
+
+        $a = $this->normalizarParaComparacao($nomeAdmin);
+        $b = $this->normalizarParaComparacao($nomeArquivo);
+        if ($a === '' || $b === '') {
+            return false;
+        }
+        if ($a === $b) {
+            return true;
+        }
+
+        // Ex.: Larceda vs Lacerda (troca de letras)
+        $maxLen = max(strlen($a), strlen($b));
+        if ($maxLen <= 0) {
+            return false;
+        }
+        $dist = levenshtein($a, $b);
+        $limite = $maxLen <= 8 ? 1 : 2;
+
+        return $dist >= 0 && $dist <= $limite;
+    }
+
+    /**
+     * Extrai o trecho do nome em filenames conhecidos.
+     */
+    private function extrairNomeDoArquivoPdf(string $arquivo): ?string
+    {
+        $periodo = preg_quote($this->periodo, '/');
+
+        // relatorio_{Ymd}_{Hi}_{Nome}_{periodo}.pdf
+        if (preg_match('/^relatorio_\d{8}_\d{4}_(.+)_'.$periodo.'(?:_\d+)?\.pdf$/ui', $arquivo, $m)) {
+            return $m[1];
+        }
+        // legado: relatorio-{id}-{Nome}-{ddmmyyyy}.pdf
+        if (preg_match('/^relatorio-\d+-(.+)-\d{8}(?:_\d+)?\.pdf$/ui', $arquivo, $m)) {
+            return $m[1];
+        }
+        // legado: {Nome}_{Ym}.pdf
+        if (preg_match('/^(.+)_\d{4}-\d{2}(?:_\d+)?\.pdf$/ui', $arquivo, $m)) {
+            return $m[1];
+        }
+
+        return null;
+    }
+
+    /**
      * Localiza o PDF mais recente do aluno na pasta de download para o período atual.
      */
     private function encontrarPdfAluno(string $nomeAluno): ?string
@@ -642,30 +711,20 @@ class CoachReportDownloader
         }
 
         $seguro = $this->sanitizarNomeArquivo($nomeAluno);
-        $periodo = preg_quote($this->periodo, '/');
-        $seguroQuoted = preg_quote($seguro, '/');
-
         $candidatos = [];
+
         foreach (scandir($this->pastaDownload) ?: [] as $arquivo) {
             if (! str_ends_with(mb_strtolower($arquivo), '.pdf')) {
                 continue;
             }
-            // Atual: relatorio_{data}_{Nome}_{periodo}.pdf ou ..._{periodo}_{n}.pdf
-            if (preg_match('/^relatorio_.+_'.$seguroQuoted.'_'.$periodo.'(?:_\d+)?\.pdf$/ui', $arquivo)) {
-                $candidatos[] = $this->pastaDownload.'/'.$arquivo;
-
+            $nomeArquivo = $this->extrairNomeDoArquivoPdf($arquivo);
+            if ($nomeArquivo === null) {
                 continue;
             }
-            // Legado: relatorio-{id}-{Nome}-{ddmmyyyy}.pdf
-            if (preg_match('/^relatorio-\d+-'.$seguroQuoted.'-\d{8}(?:_\d+)?\.pdf$/ui', $arquivo)) {
-                $candidatos[] = $this->pastaDownload.'/'.$arquivo;
-
+            if (! $this->nomesArquivoSaoCompativeis($seguro, $nomeArquivo)) {
                 continue;
             }
-            // Legado simples: {Nome}_{Ym}.pdf
-            if (preg_match('/^'.$seguroQuoted.'_\d{4}-\d{2}(?:_\d+)?\.pdf$/ui', $arquivo)) {
-                $candidatos[] = $this->pastaDownload.'/'.$arquivo;
-            }
+            $candidatos[] = $this->pastaDownload.'/'.$arquivo;
         }
 
         if ($candidatos === []) {
@@ -713,11 +772,18 @@ class CoachReportDownloader
             $pdf = $this->encontrarPdfAluno($aluno->nome);
             if ($pdf === null) {
                 $this->log("[{$aluno->nome}] PDF não encontrado em {$this->pastaDownload}");
+                $this->log("[{$aluno->nome}] Dica: o nome no admin deve coincidir com o do Tutory (ex.: Laíra Lacerda).");
                 $falhas++;
 
                 continue;
             }
-            $this->log("[{$aluno->nome}] PDF: ".basename($pdf));
+            $encontrado = basename($pdf);
+            $seguro = $this->sanitizarNomeArquivo($aluno->nome);
+            if (! str_contains($encontrado, $seguro)) {
+                $this->log("[{$aluno->nome}] PDF aproximado encontrado: {$encontrado}");
+            } else {
+                $this->log("[{$aluno->nome}] PDF: {$encontrado}");
+            }
 
             if (! $aluno->recebe_email) {
                 $this->log("[{$aluno->nome}] E-mail não enviado (recebe_email=false)");
