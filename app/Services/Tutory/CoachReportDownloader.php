@@ -3,42 +3,31 @@
 /**
  * Baixa o Relatório do Coach no Tutory para os alunos ATIVOS da consulta.
  *
- * Fluxo por aluno (igual ao script Python):
- * 1. Login
- * 2. Alunos → Pesquisa (/alunos/consulta)
- * 3. Filtro status = ativos + Buscar
- * 4. Opções do aluno → Relatório do Coach
- * 5. Filtros (questões + mês + datas) → Gerar
- * 6. Acessar Relatório → Baixar
- * 7. Fecha a aba do relatório e passa para o próximo aluno
- * 8. Ao fim, reprocessa falhas (até 3 tentativas por aluno)
+ * Fluxo CLI/HTTP (sem browser):
+ * 1. Login em /intent/login (sessão + Bearer token)
+ * 2. GET/POST /alunos/consulta com status=ativos
+ * 3. Para cada aluno: abre Relatório do Coach → gera com filtros → baixa PDF
+ * 4. Reprocessa falhas (até 3 tentativas por aluno)
  *
  * Credenciais e pastas vêm do .env (veja .env.example).
  */
 
 namespace App\Services\Tutory;
 
-use Facebook\WebDriver\Exception\ElementClickInterceptedException;
-use Facebook\WebDriver\Exception\NoSuchElementException;
-use Facebook\WebDriver\Exception\StaleElementReferenceException;
-use Facebook\WebDriver\Exception\TimeoutException;
-use Facebook\WebDriver\Firefox\FirefoxDriver;
-use Facebook\WebDriver\Firefox\FirefoxOptions;
-use Facebook\WebDriver\Remote\DesiredCapabilities;
-use Facebook\WebDriver\Remote\RemoteWebDriver;
-use Facebook\WebDriver\Remote\RemoteWebElement;
-use Facebook\WebDriver\WebDriverBy;
-use Facebook\WebDriver\WebDriverDimension;
-use Facebook\WebDriver\WebDriverExpectedCondition;
-use Facebook\WebDriver\WebDriverKeys;
-use Facebook\WebDriver\WebDriverSelect;
-use Facebook\WebDriver\WebDriverWait;
+use DOMDocument;
+use DOMElement;
+use DOMXPath;
+use GuzzleHttp\Cookie\FileCookieJar;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Throwable;
 
 class CoachReportDownloader
 {
-    private const URL_CONSULTA = 'https://admin.tutory.com.br/alunos/consulta';
+    private const BASE = 'https://admin.tutory.com.br';
+
+    private const URL_CONSULTA = self::BASE.'/alunos/consulta';
 
     private const ALUNA_TESTE = 'Marianny Carvalho';
 
@@ -52,25 +41,17 @@ class CoachReportDownloader
 
     private string $pastaDownload;
 
-    private string $firefoxProfile;
-
-    private string $firefoxBinary;
-
-    private bool $headless;
-
     private int $timeout;
-
-    private int $downloadTimeout;
-
-    private int $chartWait;
 
     private string $periodo;
 
     private bool $teste;
 
-    private ?RemoteWebDriver $driver = null;
+    private string $cookieFile;
 
-    private ?WebDriverWait $wait = null;
+    private ?FileCookieJar $cookieJar = null;
+
+    private ?string $bearerToken = null;
 
     /** @var callable(string): void */
     private $logger;
@@ -87,7 +68,7 @@ class CoachReportDownloader
         };
 
         $loginUrl = trim((string) env('LOGIN_URL', ''));
-        $this->urlLogin = $loginUrl !== '' ? $loginUrl : 'https://admin.tutory.com.br/login';
+        $this->urlLogin = $loginUrl !== '' ? $loginUrl : self::BASE.'/login';
         $this->email = trim((string) env('LOGIN_USER', ''));
         $this->senha = trim((string) env('LOGIN_PASSWORD', ''));
         $pastaEnv = trim((string) env('PASTA_DOWNLOAD', ''));
@@ -96,13 +77,9 @@ class CoachReportDownloader
                 ? $pastaEnv
                 : rtrim((string) getenv('HOME'), '/').'/Relatorios_Tutory'
         );
-        $this->firefoxProfile = trim((string) env('FIREFOX_PROFILE', ''));
-        $this->firefoxBinary = trim((string) env('FIREFOX_BINARY', ''));
-        $headlessRaw = trim((string) env('HEADLESS', '0'));
-        $this->headless = in_array(strtolower($headlessRaw), ['1', 'true', 'yes'], true);
-        $this->timeout = (int) (env('TIMEOUT') ?: 25);
-        $this->downloadTimeout = (int) (env('DOWNLOAD_TIMEOUT') ?: 90);
-        $this->chartWait = (int) (env('CHART_WAIT') ?: 30);
+        $this->timeout = (int) (env('TIMEOUT') ?: 60);
+        $this->cookieFile = sys_get_temp_dir().'/tutory_cookies_'.getmypid().'.json';
+        $this->cookieJar = new FileCookieJar($this->cookieFile, true);
 
         if (! is_dir($this->pastaDownload)) {
             mkdir($this->pastaDownload, 0775, true);
@@ -112,8 +89,6 @@ class CoachReportDownloader
     public function run(): int
     {
         $this->validarConfig();
-        $this->driver = $this->criarDriver();
-        $this->wait = new WebDriverWait($this->driver, $this->timeout);
 
         try {
             $this->login();
@@ -123,20 +98,10 @@ class CoachReportDownloader
         } catch (Throwable $exc) {
             $this->log('ERRO FATAL:');
             $this->log((string) $exc);
-            try {
-                $this->driver->takeScreenshot($this->pastaDownload.'/erro_tutory.png');
-            } catch (Throwable) {
-                try {
-                    $this->driver->takeScreenshot('erro_tutory.png');
-                } catch (Throwable) {
-                    // ignore
-                }
-            }
-
             throw $exc;
         } finally {
-            if ($this->driver !== null) {
-                $this->driver->quit();
+            if (is_file($this->cookieFile)) {
+                @unlink($this->cookieFile);
             }
         }
     }
@@ -165,73 +130,6 @@ class CoachReportDownloader
         }
     }
 
-    private function pareceBinarioFirefox(string $caminho): bool
-    {
-        if (! is_file($caminho) || ! is_executable($caminho)) {
-            return false;
-        }
-
-        $fh = @fopen($caminho, 'rb');
-        if ($fh === false) {
-            return false;
-        }
-        $inicio = fread($fh, 128) ?: '';
-        fclose($fh);
-
-        if (str_starts_with($inicio, '#!')) {
-            return false;
-        }
-
-        $nome = strtolower(basename($caminho));
-
-        return str_contains($nome, 'firefox') || in_array($nome, ['firefox', 'firefox-bin', 'firefox-esr'], true);
-    }
-
-    private function resolverBinarioFirefox(): ?string
-    {
-        $candidatos = [];
-
-        if ($this->firefoxBinary !== '') {
-            $candidatos[] = $this->expandHome($this->firefoxBinary);
-        }
-
-        $candidatos = array_merge($candidatos, [
-            '/usr/lib/firefox/firefox',
-            '/usr/lib/firefox-esr/firefox-esr',
-            '/snap/firefox/current/usr/lib/firefox/firefox',
-            '/opt/firefox/firefox',
-            rtrim((string) getenv('HOME'), '/').'/firefox/firefox',
-            '/Applications/Firefox.app/Contents/MacOS/firefox',
-        ]);
-
-        $which = trim((string) shell_exec('command -v firefox 2>/dev/null || command -v firefox-esr 2>/dev/null'));
-        if ($which !== '') {
-            $candidatos[] = realpath($which) ?: $which;
-        }
-
-        $vistos = [];
-        foreach ($candidatos as $cand) {
-            $chave = is_file($cand) ? (realpath($cand) ?: $cand) : $cand;
-            if (isset($vistos[$chave])) {
-                continue;
-            }
-            $vistos[$chave] = true;
-            if ($this->pareceBinarioFirefox($cand)) {
-                return realpath($cand) ?: $cand;
-            }
-        }
-
-        if ($this->firefoxBinary !== '') {
-            $this->log(
-                "AVISO: FIREFOX_BINARY='{$this->firefoxBinary}' não é um executável ".
-                'Firefox válido (wrappers como /usr/bin/firefox do snap não servem). '.
-                'Tentando deixar o geckodriver achar o padrão...'
-            );
-        }
-
-        return null;
-    }
-
     private function expandHome(string $path): string
     {
         if (str_starts_with($path, '~/')) {
@@ -241,846 +139,668 @@ class CoachReportDownloader
         return $path;
     }
 
-    private function criarDriver(): RemoteWebDriver
+    private function client(): PendingRequest
     {
-        $pasta = realpath($this->pastaDownload) ?: $this->pastaDownload;
-        $options = new FirefoxOptions;
+        $req = Http::withOptions([
+            'cookies' => $this->cookieJar,
+            'allow_redirects' => true,
+            'timeout' => $this->timeout,
+            'connect_timeout' => 20,
+            'http_errors' => false,
+        ])
+            ->withHeaders([
+                'User-Agent' => 'MissaoNomeacao-TutoryCLI/1.0',
+                'Accept' => 'application/json, text/html, */*;q=0.8',
+                'X-Requested-With' => 'XMLHttpRequest',
+                'Origin' => self::BASE,
+                'Referer' => self::BASE.'/',
+            ])
+            ->baseUrl(self::BASE);
 
-        $binario = $this->resolverBinarioFirefox();
-        if ($binario !== null) {
-            $options->setOption('binary', $binario);
-            $this->log("Firefox binary: {$binario}");
-        } else {
-            $this->log(
-                'Firefox binary: (padrão do geckodriver). '.
-                'Se falhar, defina FIREFOX_BINARY no .env para o executável real.'
-            );
+        if ($this->bearerToken !== null && $this->bearerToken !== '') {
+            $req = $req->withToken($this->bearerToken);
         }
 
-        if ($this->firefoxProfile !== '') {
-            $perfil = $this->expandHome($this->firefoxProfile);
-            $options->addArguments(['-profile', $perfil]);
-            $this->log("Firefox profile: {$perfil}");
-        }
-
-        if ($this->headless) {
-            $options->addArguments(['-headless']);
-        }
-
-        $options->setPreference('browser.download.folderList', 2);
-        $options->setPreference('browser.download.dir', $pasta);
-        $options->setPreference('browser.download.useDownloadDir', true);
-        $options->setPreference('browser.download.manager.showWhenStarting', false);
-        $options->setPreference('browser.download.alwaysOpenPanel', false);
-        $options->setPreference('browser.download.always_ask_before_handling_new_types', false);
-        $options->setPreference('browser.download.improvements_to_download_panel', false);
-        $options->setPreference('browser.download.viewableInternally.enabledTypes', '');
-        $options->setPreference('pdfjs.disabled', true);
-        $options->setPreference(
-            'browser.helperApps.neverAsk.saveToDisk',
-            'application/pdf,application/x-pdf,application/octet-stream,binary/octet-stream'
-        );
-        $options->setPreference('browser.helperApps.alwaysAsk.force', false);
-        $options->setPreference('browser.download.forbid_open_with', true);
-
-        $capabilities = DesiredCapabilities::firefox();
-        $capabilities->setCapability(FirefoxOptions::CAPABILITY, $options);
-
-        try {
-            $driver = FirefoxDriver::start($capabilities);
-        } catch (Throwable $exc) {
-            $msg = (string) $exc;
-            if (str_contains($msg, 'not a Firefox executable') || str_contains(strtolower($msg), 'binary is not')) {
-                throw new RuntimeException(
-                    "Não achei um Firefox executável válido para o geckodriver.\n".
-                    "No .env, aponte FIREFOX_BINARY para o binário real (não o wrapper):\n".
-                    "  FIREFOX_BINARY=/usr/lib/firefox/firefox\n".
-                    "  # ou snap:\n".
-                    "  FIREFOX_BINARY=/snap/firefox/current/usr/lib/firefox/firefox\n".
-                    'Erro original: '.$exc->getMessage(),
-                    0,
-                    $exc
-                );
-            }
-            throw $exc;
-        }
-
-        $driver->manage()->timeouts()->pageLoadTimeout(60);
-        try {
-            $driver->manage()->window()->maximize();
-        } catch (Throwable) {
-            $driver->manage()->window()->setSize(new WebDriverDimension(1920, 1080));
-        }
-
-        $this->log("Firefox iniciado (download em: {$pasta})");
-
-        return $driver;
-    }
-
-    private function jsClick(RemoteWebElement $elemento): void
-    {
-        $this->driver->executeScript('arguments[0].click();', [$elemento]);
-    }
-
-    private function fecharAbasExtras(string $abaPrincipal): void
-    {
-        foreach ($this->driver->getWindowHandles() as $handle) {
-            if ($handle !== $abaPrincipal) {
-                $this->driver->switchTo()->window($handle);
-                $this->driver->close();
-            }
-        }
-        $this->driver->switchTo()->window($abaPrincipal);
-    }
-
-    private function limparOverlays(): void
-    {
-        $this->driver->executeScript(<<<'JS'
-            document.querySelectorAll('.dropdown-menu.show').forEach(el => el.classList.remove('show'));
-            document.querySelectorAll('.dropdown.show, .btn-group.show').forEach(el => el.classList.remove('show'));
-            document.querySelectorAll('.modal.show').forEach(el => {
-                el.classList.remove('show');
-                el.style.display = 'none';
-            });
-            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
-            document.querySelectorAll('.swal-overlay, .swal-modal').forEach(el => el.remove());
-        JS);
-
-        try {
-            $this->driver->findElement(WebDriverBy::tagName('body'))->sendKeys(WebDriverKeys::ESCAPE);
-        } catch (Throwable) {
-            // ignore
-        }
-        usleep(200_000);
-    }
-
-    private function elementoVisivel(RemoteWebElement $el): bool
-    {
-        try {
-            if (! $el->isDisplayed()) {
-                return false;
-            }
-            $size = $el->getSize();
-
-            return $size->getHeight() > 0 && $size->getWidth() > 0;
-        } catch (StaleElementReferenceException) {
-            return false;
-        }
-    }
-
-    private function esperarLinkRelatorioVisivel(RemoteWebElement $card, ?int $timeout = null): RemoteWebElement
-    {
-        $timeout ??= $this->timeout;
-        $fim = microtime(true) + $timeout;
-        $ultimoErro = 'link não apareceu';
-
-        while (microtime(true) < $fim) {
-            $candidatos = [];
-
-            foreach ($this->driver->findElements(WebDriverBy::cssSelector(
-                '.dropdown-menu.show a.btn-generate-report, '.
-                '.dropdown-menu.show a[class*="btn-generate-report"]'
-            )) as $el) {
-                $candidatos[] = $el;
-            }
-
-            foreach ($card->findElements(WebDriverBy::cssSelector(
-                '.dropdown-menu a.btn-generate-report, a.btn-generate-report, '.
-                '.pesquisa-aluno-acoes a'
-            )) as $el) {
-                $candidatos[] = $el;
-            }
-
-            foreach ($this->driver->findElements(WebDriverBy::xpath(
-                "//a[contains(normalize-space(.),'Relatório do Coach') or ".
-                "contains(normalize-space(.),'Relatorio do Coach')]"
-            )) as $el) {
-                $candidatos[] = $el;
-            }
-
-            $vistos = [];
-            foreach ($candidatos as $el) {
-                try {
-                    $idEl = $el->getID();
-                    if (isset($vistos[$idEl])) {
-                        continue;
-                    }
-                    $vistos[$idEl] = true;
-
-                    $texto = strtolower(trim($el->getText() ?: (string) $el->getAttribute('textContent')));
-                    if (! str_contains($texto, 'relat') && ! str_contains($texto, 'coach')) {
-                        $classes = (string) $el->getAttribute('class');
-                        if (! str_contains($classes, 'btn-generate-report')) {
-                            continue;
-                        }
-                    }
-                    if (! $this->elementoVisivel($el)) {
-                        continue;
-                    }
-
-                    return $el;
-                } catch (StaleElementReferenceException) {
-                    $ultimoErro = 'elemento stale';
-                    continue;
-                }
-            }
-
-            usleep(250_000);
-        }
-
-        throw new TimeoutException(
-            "Relatório do Coach visível não encontrado em {$timeout}s ({$ultimoErro})"
-        );
+        return $req;
     }
 
     private function login(): void
     {
         $this->log('Abrindo página de login...');
-        $this->driver->get($this->urlLogin);
-
-        $account = $this->wait->until(
-            WebDriverExpectedCondition::visibilityOfElementLocated(WebDriverBy::name('account'))
-        );
-        $password = $this->wait->until(
-            WebDriverExpectedCondition::visibilityOfElementLocated(WebDriverBy::name('password'))
-        );
-
-        $account->clear();
-        $account->sendKeys($this->email);
-        $password->clear();
-        $password->sendKeys($this->senha);
-
-        $botao = $this->wait->until(
-            WebDriverExpectedCondition::elementToBeClickable(WebDriverBy::cssSelector('input.login-submit'))
-        );
-        $this->jsClick($botao);
-        $this->wait->until(function (RemoteWebDriver $d): bool {
-            return ! str_contains($d->getCurrentURL(), '/login');
-        });
-        $this->log('Login realizado');
-    }
-
-    private function filtrarAlunosAtivos(): void
-    {
-        $this->log("Filtrando alunos com status 'ativos'...");
-        $selectEl = $this->wait->until(
-            WebDriverExpectedCondition::presenceOfElementLocated(WebDriverBy::name('status'))
-        );
-        (new WebDriverSelect($selectEl))->selectByValue('ativos');
-        $this->driver->executeScript(<<<'JS'
-            arguments[0].value = 'ativos';
-            arguments[0].dispatchEvent(new Event('change', {bubbles: true}));
-            arguments[0].dispatchEvent(new Event('input', {bubbles: true}));
-        JS, [$selectEl]);
-
-        $buscar = $this->wait->until(
-            WebDriverExpectedCondition::elementToBeClickable(WebDriverBy::cssSelector(
-                "input[type='submit'][value='Buscar'], button[type='submit'][value='Buscar']"
-            ))
-        );
-        try {
-            $buscar->click();
-        } catch (Throwable) {
-            $this->jsClick($buscar);
+        $loginPage = $this->client()->get($this->urlLogin);
+        if ($loginPage->status() >= 400) {
+            throw new RuntimeException('Não foi possível abrir a página de login (HTTP '.$loginPage->status().').');
         }
-        $this->log('Clicou em Buscar');
 
-        usleep(800_000);
-        $this->wait->until(
-            WebDriverExpectedCondition::presenceOfElementLocated(WebDriverBy::cssSelector('.pesquisa-aluno-container'))
-        );
-        $this->log('Filtro de alunos ativos aplicado');
+        $this->log('Enviando credenciais para /intent/login...');
+        $response = $this->client()
+            ->asForm()
+            ->withHeaders(['Referer' => $this->urlLogin])
+            ->post('/intent/login', [
+                'account' => $this->email,
+                'password' => $this->senha,
+            ]);
+
+        $json = $response->json();
+        if (! is_array($json) || empty($json['result'])) {
+            $erro = is_array($json) ? (string) ($json['error'] ?? 'login falhou') : $response->body();
+            throw new RuntimeException('Falha no login: '.$erro);
+        }
+
+        $index = $this->client()->get('/index');
+        $this->bearerToken = $this->extrairToken($index->body())
+            ?? $this->extrairToken(json_encode($json) ?: '');
+
+        if ($this->bearerToken !== null) {
+            $this->log('Login realizado (Bearer token obtido)');
+        } else {
+            $this->log('Login realizado (sessão por cookie; token Bearer não encontrado no HTML)');
+        }
     }
 
-    private function abrirPesquisaAlunos(): void
+    private function extrairToken(string $html): ?string
     {
-        $this->log('Abrindo pesquisa de alunos...');
-        $this->driver->get(self::URL_CONSULTA);
-        $this->wait->until(fn (RemoteWebDriver $d): bool => str_contains($d->getCurrentURL(), '/alunos/consulta'));
-        $this->wait->until(WebDriverExpectedCondition::presenceOfElementLocated(WebDriverBy::name('status')));
-        $this->filtrarAlunosAtivos();
-        $this->log('Pesquisa de alunos aberta');
+        if (preg_match('/adminUser\s*=\s*\{(.*?)\}\s*;/s', $html, $m)) {
+            if (preg_match('/["\']token["\']\s*:\s*["\']([^"\']+)["\']/', $m[1], $t)) {
+                return $t[1];
+            }
+        }
+        if (preg_match('/["\']token["\']\s*:\s*["\']([A-Za-z0-9._\-+/=]+)["\']/', $html, $t)) {
+            return $t[1];
+        }
+
+        return null;
     }
 
     /**
-     * @return list<array{index: int, nome: string}>
+     * @return array{0: string, 1: string} [dataInicio, dataFim] Y-m-d
      */
-    private function listarAlunosVisiveis(): array
+    private function datasPeriodo(): array
     {
-        $cards = $this->driver->findElements(WebDriverBy::cssSelector('.pesquisa-aluno-container'));
+        $hoje = new \DateTimeImmutable('now');
+        if ($this->periodo === '1') {
+            return [$hoje->format('Y-m-01'), $hoje->format('Y-m-15')];
+        }
+        $ultimo = (int) $hoje->format('t');
+
+        return [$hoje->format('Y-m-16'), $hoje->format('Y-m-').str_pad((string) $ultimo, 2, '0', STR_PAD_LEFT)];
+    }
+
+    private function loadDom(string $html): DOMXPath
+    {
+        $dom = new DOMDocument;
+        @$dom->loadHTML('<?xml encoding="utf-8"?>'.$html);
+
+        return new DOMXPath($dom);
+    }
+
+    /**
+     * @return list<array{nome: string, id: ?string, href: ?string, attrs: array<string, string>}>
+     */
+    private function parseAlunosDaPagina(string $html): array
+    {
+        $xp = $this->loadDom($html);
+        $cards = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' pesquisa-aluno-container ')]");
         $alunos = [];
-        foreach ($cards as $i => $card) {
-            try {
-                $nomeEl = $card->findElements(WebDriverBy::cssSelector('.pesquisa-aluno-nome'));
-                $nome = $nomeEl !== [] ? trim($nomeEl[0]->getText()) : 'aluno_'.($i + 1);
-            } catch (StaleElementReferenceException) {
-                $nome = 'aluno_'.($i + 1);
+        if ($cards === false) {
+            return [];
+        }
+
+        /** @var DOMElement $card */
+        foreach ($cards as $card) {
+            $nomeNodes = $xp->query(".//*[contains(concat(' ', normalize-space(@class), ' '), ' pesquisa-aluno-nome ')]", $card);
+            $nome = '';
+            if ($nomeNodes !== false && $nomeNodes->length > 0) {
+                $nome = trim($nomeNodes->item(0)?->textContent ?? '');
             }
-            $alunos[] = ['index' => $i, 'nome' => $nome !== '' ? $nome : 'aluno_'.($i + 1)];
+            if ($nome === '') {
+                continue;
+            }
+
+            $link = null;
+            $links = $xp->query(
+                ".//a[contains(concat(' ', normalize-space(@class), ' '), ' btn-generate-report ')
+                    or contains(translate(normalize-space(.), 'RELATÓRIO', 'relatorio'), 'relatorio do coach')
+                    or contains(translate(normalize-space(.), 'RELATORIO', 'relatorio'), 'relatorio do coach')]",
+                $card
+            );
+            $attrs = [];
+            $href = null;
+            $id = null;
+            if ($links !== false && $links->length > 0) {
+                /** @var DOMElement $link */
+                $link = $links->item(0);
+                foreach (['href', 'data-id', 'data-aluno', 'data-aluno-id', 'data-student', 'data-url', 'data-href', 'data-action', 'onclick'] as $attr) {
+                    $val = $link->getAttribute($attr);
+                    if ($val !== '') {
+                        $attrs[$attr] = $val;
+                    }
+                }
+                $href = $attrs['href'] ?? $attrs['data-url'] ?? $attrs['data-href'] ?? null;
+                if ($href === '#' || $href === 'javascript:;' || $href === 'javascript:void(0)') {
+                    $href = null;
+                }
+                $id = $attrs['data-id'] ?? $attrs['data-aluno'] ?? $attrs['data-aluno-id'] ?? $attrs['data-student'] ?? null;
+                if ($id === null && isset($attrs['onclick']) && preg_match('/(\d{2,})/', $attrs['onclick'], $m)) {
+                    $id = $m[1];
+                }
+                if ($id === null && is_string($href) && preg_match('/(?:aluno|id|student)[=\/](\d+)/i', $href, $m)) {
+                    $id = $m[1];
+                }
+            }
+
+            // fallback: qualquer data-id no card
+            if ($id === null) {
+                foreach (['data-id', 'data-aluno', 'data-aluno-id'] as $attr) {
+                    $nodes = $xp->query('.//*[@'.$attr.']', $card);
+                    if ($nodes !== false && $nodes->length > 0) {
+                        /** @var DOMElement $el */
+                        $el = $nodes->item(0);
+                        $id = $el->getAttribute($attr) ?: null;
+                        if ($id !== null) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            $alunos[] = [
+                'nome' => $nome,
+                'id' => $id,
+                'href' => $href,
+                'attrs' => $attrs,
+            ];
         }
 
         return $alunos;
     }
 
-    private function irParaProximaPagina(): bool
+    /**
+     * @return list<string> URLs absolutas de próximas páginas
+     */
+    private function parseLinksProximaPagina(string $html, string $paginaAtual): array
     {
-        $primeiro = $this->driver->findElements(
-            WebDriverBy::cssSelector('.pesquisa-aluno-container .pesquisa-aluno-nome')
-        );
-        $textoAntes = $primeiro !== [] ? $primeiro[0]->getText() : '';
-
-        $xpaths = [
+        $xp = $this->loadDom($html);
+        $urls = [];
+        $queries = [
             "//li[contains(@class,'page-item') and not(contains(@class,'disabled'))]/a[@rel='next']",
-            "//li[contains(@class,'page-item') and not(contains(@class,'disabled'))]".
-            "/a[contains(@aria-label,'Next') or contains(@aria-label,'Próximo') or contains(@aria-label,'Proximo')]",
-            "//a[contains(@class,'page-link') and (normalize-space()='›' or normalize-space()='»' or normalize-space()='>')]",
+            "//a[contains(@class,'page-link') and (@rel='next' or normalize-space()='›' or normalize-space()='»' or normalize-space()='>')]",
             "//a[contains(translate(normalize-space(.),'PRÓXIMOPROXIMO','proximoproximo'),'proximo')]",
         ];
-
-        foreach ($xpaths as $xpath) {
-            $links = $this->driver->findElements(WebDriverBy::xpath($xpath));
-            foreach ($links as $link) {
-                try {
-                    $parent = $link->findElement(WebDriverBy::xpath('..'));
-                    if (str_contains((string) $parent->getAttribute('class'), 'disabled')) {
-                        continue;
-                    }
-                    $this->jsClick($link);
-                    usleep(1_200_000);
-                    $this->wait->until(
-                        WebDriverExpectedCondition::presenceOfElementLocated(
-                            WebDriverBy::cssSelector('.pesquisa-aluno-container')
-                        )
-                    );
-                    $depois = $this->driver->findElements(
-                        WebDriverBy::cssSelector('.pesquisa-aluno-container .pesquisa-aluno-nome')
-                    );
-                    $textoDepois = $depois !== [] ? $depois[0]->getText() : '';
-                    if ($textoDepois !== '' && $textoDepois !== $textoAntes) {
-                        $this->log('Próxima página de alunos carregada');
-
-                        return true;
-                    }
-                } catch (Throwable) {
+        foreach ($queries as $q) {
+            $nodes = $xp->query($q);
+            if ($nodes === false) {
+                continue;
+            }
+            foreach ($nodes as $node) {
+                if (! $node instanceof DOMElement) {
                     continue;
                 }
+                $href = trim($node->getAttribute('href'));
+                if ($href === '' || str_starts_with($href, '#')) {
+                    continue;
+                }
+                $urls[] = $this->absolutizar($href, $paginaAtual);
             }
         }
 
-        return false;
+        return array_values(array_unique($urls));
+    }
+
+    private function absolutizar(string $url, string $base = self::BASE): string
+    {
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+        if (str_starts_with($url, '//')) {
+            return 'https:'.$url;
+        }
+        if (str_starts_with($url, '/')) {
+            return self::BASE.$url;
+        }
+
+        return rtrim($base, '/').'/'.ltrim($url, '/');
+    }
+
+    private function filtrarAlunosAtivosHtml(): string
+    {
+        $this->log("Filtrando alunos com status 'ativos'...");
+
+        // Alguns painéis usam GET, outros POST — tentamos ambos.
+        $get = $this->client()->get('/alunos/consulta', ['status' => 'ativos']);
+        $html = $get->body();
+        if (str_contains($html, 'pesquisa-aluno-container')) {
+            $this->log('Filtro aplicados via GET');
+
+            return $html;
+        }
+
+        $post = $this->client()->asForm()->post('/alunos/consulta', ['status' => 'ativos']);
+        $html = $post->body();
+        if (str_contains($html, 'pesquisa-aluno-container')) {
+            $this->log('Filtro aplicados via POST');
+
+            return $html;
+        }
+
+        // Página base + formulário Buscar
+        $base = $this->client()->get('/alunos/consulta');
+        $htmlBase = $base->body();
+        $action = '/alunos/consulta';
+        $xp = $this->loadDom($htmlBase);
+        $forms = $xp->query('//form[.//select[@name="status"] or .//input[@name="status"]]');
+        if ($forms !== false && $forms->length > 0) {
+            /** @var DOMElement $form */
+            $form = $forms->item(0);
+            $formAction = $form->getAttribute('data-action') ?: $form->getAttribute('action');
+            if ($formAction !== '') {
+                $action = $formAction;
+            }
+            $method = strtoupper($form->getAttribute('method') ?: 'GET');
+            $payload = ['status' => 'ativos'];
+            $inputs = $xp->query('.//input[@name]|.//select[@name]|.//textarea[@name]', $form);
+            if ($inputs !== false) {
+                foreach ($inputs as $input) {
+                    if (! $input instanceof DOMElement) {
+                        continue;
+                    }
+                    $name = $input->getAttribute('name');
+                    if ($name === '' || $name === 'status') {
+                        continue;
+                    }
+                    $type = strtolower($input->getAttribute('type'));
+                    if (in_array($type, ['submit', 'button', 'image'], true)) {
+                        continue;
+                    }
+                    $payload[$name] = $input->getAttribute('value');
+                }
+            }
+            $resp = $method === 'POST'
+                ? $this->client()->asForm()->post($action, $payload)
+                : $this->client()->get($action, $payload);
+            $html = $resp->body();
+            if (str_contains($html, 'pesquisa-aluno-container')) {
+                $this->log("Filtro aplicados via formulário ({$method} {$action})");
+
+                return $html;
+            }
+        }
+
+        throw new RuntimeException(
+            'Não encontrei a lista de alunos ativos em /alunos/consulta. '.
+            'Confira LOGIN_USER/LOGIN_PASSWORD e se a conta tem acesso à pesquisa.'
+        );
     }
 
     /**
-     * @return list<string>
+     * @return list<array{nome: string, id: ?string, href: ?string, attrs: array<string, string>}>
      */
     private function coletarTodosAlunos(): array
     {
-        $this->abrirPesquisaAlunos();
-        $nomes = [];
+        $html = $this->filtrarAlunosAtivosHtml();
+        $vistos = [];
+        $alunos = [];
         $pagina = 1;
+        $urlAtual = self::URL_CONSULTA.'?status=ativos';
 
         while (true) {
-            $paginaAtual = $this->listarAlunosVisiveis();
+            $paginaAtual = $this->parseAlunosDaPagina($html);
             $this->log("Coletando página {$pagina}: ".count($paginaAtual).' aluno(s)');
             foreach ($paginaAtual as $aluno) {
-                if (! in_array($aluno['nome'], $nomes, true)) {
-                    $nomes[] = $aluno['nome'];
-                }
-            }
-            if (! $this->irParaProximaPagina()) {
-                break;
-            }
-            $pagina++;
-        }
-
-        $this->log('Total de alunos encontrados: '.count($nomes));
-
-        return $nomes;
-    }
-
-    private function encontrarAlunoPorTrecho(string $trecho): ?string
-    {
-        $alvo = mb_strtolower(trim($trecho));
-        $this->abrirPesquisaAlunos();
-        $pagina = 1;
-
-        while (true) {
-            $paginaAtual = $this->listarAlunosVisiveis();
-            $this->log("Buscando '{$trecho}' na página {$pagina}: ".count($paginaAtual).' aluno(s)');
-            foreach ($paginaAtual as $aluno) {
-                if (str_contains(mb_strtolower($aluno['nome']), $alvo)) {
-                    return $aluno['nome'];
-                }
-            }
-            if (! $this->irParaProximaPagina()) {
-                break;
-            }
-            $pagina++;
-        }
-
-        return null;
-    }
-
-    private function localizarCardPorNome(string $nome): RemoteWebElement
-    {
-        $this->limparOverlays();
-        $this->abrirPesquisaAlunos();
-        $this->limparOverlays();
-
-        while (true) {
-            $cards = $this->driver->findElements(WebDriverBy::cssSelector('.pesquisa-aluno-container'));
-            foreach ($cards as $card) {
-                try {
-                    $nomeEl = $card->findElements(WebDriverBy::cssSelector('.pesquisa-aluno-nome'));
-                    $atual = $nomeEl !== [] ? trim($nomeEl[0]->getText()) : '';
-                } catch (StaleElementReferenceException) {
+                $chave = $aluno['id'] ?? $aluno['nome'];
+                if (isset($vistos[$chave])) {
                     continue;
                 }
-                if ($atual === $nome) {
-                    return $card;
+                $vistos[$chave] = true;
+                $alunos[] = $aluno;
+            }
+
+            $proximas = $this->parseLinksProximaPagina($html, $urlAtual);
+            $proxima = null;
+            foreach ($proximas as $cand) {
+                if ($cand !== $urlAtual) {
+                    $proxima = $cand;
+                    break;
                 }
             }
-            if (! $this->irParaProximaPagina()) {
+            if ($proxima === null) {
+                break;
+            }
+            $this->log('Próxima página de alunos: '.$proxima);
+            $resp = $this->client()->get($proxima);
+            $html = $resp->body();
+            $urlAtual = $proxima;
+            $pagina++;
+            if ($pagina > 200) {
+                $this->log('AVISO: limite de 200 páginas atingido');
                 break;
             }
         }
 
-        throw new RuntimeException("Aluno não encontrado na lista: {$nome}");
-    }
+        $this->log('Total de alunos encontrados: '.count($alunos));
 
-    private function abrirRelatorioCoachDoCard(RemoteWebElement $card, string $nome): void
-    {
-        $this->log("[{$nome}] Abrindo opções...");
-        $this->limparOverlays();
-        $this->driver->executeScript("arguments[0].scrollIntoView({block:'center'});", [$card]);
-        usleep(400_000);
-
-        $botaoOpcoes = null;
-        foreach ([
-            '.pesquisa-aluno-acoes button.dropdown-toggle-split',
-            '.pesquisa-aluno-acoes .dropdown-toggle-split',
-            'button.dropdown-toggle-split',
-            '.dropdown-toggle-split',
-        ] as $seletor) {
-            $achados = $card->findElements(WebDriverBy::cssSelector($seletor));
-            if ($achados !== []) {
-                $botaoOpcoes = $achados[0];
-                break;
-            }
-        }
-        if ($botaoOpcoes === null) {
-            $achados = $card->findElements(
-                WebDriverBy::cssSelector('.pesquisa-aluno-acoes button, .dropdown button')
-            );
-            if ($achados !== []) {
-                $botaoOpcoes = $achados[0];
-            }
-        }
-        if ($botaoOpcoes === null) {
-            throw new RuntimeException("[{$nome}] Botão de opções não encontrado no card.");
-        }
-
-        try {
-            $this->wait->until(static function () use ($botaoOpcoes): bool {
-                return $botaoOpcoes->isDisplayed() && $botaoOpcoes->isEnabled();
-            });
-            $botaoOpcoes->click();
-        } catch (Throwable) {
-            $this->jsClick($botaoOpcoes);
-        }
-
-        usleep(350_000);
-        $menusAbertos = $this->driver->findElements(WebDriverBy::cssSelector('.dropdown-menu.show'));
-        if ($menusAbertos === []) {
-            $this->log("[{$nome}] Menu não abriu no 1º clique; tentando de novo...");
-            $this->limparOverlays();
-            usleep(200_000);
-            try {
-                $botaoOpcoes->click();
-            } catch (Throwable) {
-                $this->jsClick($botaoOpcoes);
-            }
-            usleep(350_000);
-        }
-
-        $relatorio = $this->esperarLinkRelatorioVisivel($card);
-        try {
-            $relatorio->click();
-        } catch (Throwable) {
-            $this->jsClick($relatorio);
-        }
-        $this->log("[{$nome}] Relatório do Coach aberto");
-
-        $this->wait->until(
-            WebDriverExpectedCondition::presenceOfElementLocated(WebDriverBy::cssSelector(
-                "button.btn-selector[data-value='questoes'], #relDataIni"
-            ))
-        );
-    }
-
-    private function configurarFiltrosRelatorio(string $nome): void
-    {
-        $this->log("[{$nome}] Configurando filtros...");
-
-        $questoes = $this->wait->until(
-            WebDriverExpectedCondition::elementToBeClickable(
-                WebDriverBy::cssSelector("button.btn-selector[data-value='questoes']")
-            )
-        );
-        $this->jsClick($questoes);
-
-        $mes = $this->wait->until(
-            WebDriverExpectedCondition::elementToBeClickable(
-                WebDriverBy::cssSelector("button.btn-selector[data-value='mes']")
-            )
-        );
-        $this->jsClick($mes);
-
-        $hoje = new \DateTimeImmutable('now');
-        if ($this->periodo === '1') {
-            $dataInicio = $hoje->format('Y-m-01');
-            $dataFim = $hoje->format('Y-m-15');
-        } else {
-            $ultimoDia = (int) $hoje->format('t');
-            $dataInicio = $hoje->format('Y-m-16');
-            $dataFim = $hoje->format('Y-m-').str_pad((string) $ultimoDia, 2, '0', STR_PAD_LEFT);
-        }
-        $this->log("[{$nome}] Datas: {$dataInicio} → {$dataFim}");
-
-        $campoInicio = $this->wait->until(
-            WebDriverExpectedCondition::visibilityOfElementLocated(WebDriverBy::id('relDataIni'))
-        );
-        $campoFim = $this->wait->until(
-            WebDriverExpectedCondition::visibilityOfElementLocated(WebDriverBy::id('relDataFim'))
-        );
-
-        $this->driver->executeScript(<<<'JS'
-            arguments[0].value = arguments[1];
-            arguments[0].dispatchEvent(new Event('change', {bubbles:true}));
-        JS, [$campoInicio, $dataInicio]);
-        $this->driver->executeScript(<<<'JS'
-            arguments[0].value = arguments[1];
-            arguments[0].dispatchEvent(new Event('change', {bubbles:true}));
-        JS, [$campoFim, $dataFim]);
-
-        $gerar = $this->wait->until(
-            WebDriverExpectedCondition::elementToBeClickable(
-                WebDriverBy::cssSelector('a.btn-generate-my-report')
-            )
-        );
-        $this->jsClick($gerar);
-        $this->log("[{$nome}] Relatório solicitado");
+        return $alunos;
     }
 
     /**
-     * @param  list<string>  $pastas
-     * @return set<string>
+     * @param  list<array{nome: string, id: ?string, href: ?string, attrs: array<string, string>}>  $alunos
+     * @return list<array{nome: string, id: ?string, href: ?string, attrs: array<string, string>}>
      */
-    private function listarArquivosDownload(array $pastas): array
+    private function filtrarAlunaTeste(array $alunos): array
     {
-        $arquivos = [];
-        foreach ($pastas as $pasta) {
-            if (! is_dir($pasta)) {
+        $alvo = mb_strtolower(self::ALUNA_TESTE);
+        foreach ($alunos as $aluno) {
+            if (str_contains(mb_strtolower($aluno['nome']), $alvo)) {
+                return [$aluno];
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Extrai URL de relatório de um JSON arbitrário da API Tutory.
+     *
+     * @param  array<mixed>  $json
+     */
+    private function extrairUrlDoJson(array $json): ?string
+    {
+        $keys = ['url', 'link', 'href', 'report_url', 'relatorio', 'redirect', 'data'];
+        foreach ($keys as $key) {
+            if (! array_key_exists($key, $json)) {
                 continue;
             }
-            foreach (glob(rtrim($pasta, '/').'/*') ?: [] as $p) {
-                if (is_file($p)) {
-                    $arquivos[$p] = true;
+            $val = $json[$key];
+            if (is_string($val) && (str_starts_with($val, 'http') || str_starts_with($val, '/'))) {
+                return $this->absolutizar($val);
+            }
+            if (is_array($val)) {
+                $nested = $this->extrairUrlDoJson($val);
+                if ($nested !== null) {
+                    return $nested;
                 }
             }
         }
-
-        return $arquivos;
-    }
-
-    /**
-     * @param  set<string>  $antes
-     * @param  list<string>|null  $pastas
-     */
-    private function aguardarNovoDownload(array $antes, ?array $pastas = null, ?int $timeout = null): ?string
-    {
-        $timeout ??= $this->downloadTimeout;
-        $dirs = $pastas ?? [$this->pastaDownload];
-        $downloadsPadrao = rtrim((string) getenv('HOME'), '/').'/Downloads';
-        $resolved = array_map(static fn (string $d): string => realpath($d) ?: $d, $dirs);
-        if (! in_array(realpath($downloadsPadrao) ?: $downloadsPadrao, $resolved, true)) {
-            $dirs[] = $downloadsPadrao;
-        }
-
-        $fim = microtime(true) + $timeout;
-        while (microtime(true) < $fim) {
-            $atuais = $this->listarArquivosDownload($dirs);
-            $baixando = [];
-            foreach (array_keys($atuais) as $p) {
-                if (
-                    str_ends_with($p, '.part')
-                    || str_ends_with($p, '.crdownload')
-                    || str_ends_with($p, '.tmp')
-                    || str_ends_with($p, '.download')
-                ) {
-                    $baixando[$p] = true;
+        foreach ($json as $val) {
+            if (is_array($val)) {
+                $nested = $this->extrairUrlDoJson($val);
+                if ($nested !== null) {
+                    return $nested;
                 }
             }
-
-            $novos = [];
-            foreach (array_keys($atuais) as $p) {
-                if (isset($antes[$p]) || isset($baixando[$p])) {
-                    continue;
-                }
-                $name = basename($p);
-                if (str_starts_with($name, '.')) {
-                    continue;
-                }
-                $suffix = strtolower(pathinfo($p, PATHINFO_EXTENSION));
-                if (
-                    $suffix === 'pdf'
-                    || $suffix === ''
-                    || str_contains(strtolower($name), 'relat')
-                ) {
-                    $novos[] = $p;
-                }
-            }
-
-            if ($novos !== [] && $baixando === []) {
-                usort($novos, static fn (string $a, string $b): int => filemtime($b) <=> filemtime($a));
-
-                return $novos[0];
-            }
-            usleep(500_000);
         }
 
         return null;
     }
 
-    private function renomearDownload(string $caminho, string $nomeAluno): string
+    /**
+     * Descobre endpoint de geração a partir do HTML (data-action / forms / scripts).
+     *
+     * @return list<string>
+     */
+    private function descobrirEndpointsGeracao(string $html): array
     {
-        $origem = $caminho;
+        $candidatos = [];
+        if (preg_match_all('/\/intent\/[a-zA-Z0-9_\/-]*relat[a-zA-Z0-9_\/-]*/i', $html, $m)) {
+            foreach ($m[0] as $path) {
+                $candidatos[] = $path;
+            }
+        }
+        if (preg_match_all('/\/intent\/[a-zA-Z0-9_\/-]*report[a-zA-Z0-9_\/-]*/i', $html, $m)) {
+            foreach ($m[0] as $path) {
+                $candidatos[] = $path;
+            }
+        }
+        if (preg_match_all('/\/intent\/[a-zA-Z0-9_\/-]*coach[a-zA-Z0-9_\/-]*/i', $html, $m)) {
+            foreach ($m[0] as $path) {
+                $candidatos[] = $path;
+            }
+        }
+        $xp = $this->loadDom($html);
+        $nodes = $xp->query("//a[contains(@class,'btn-generate-my-report')]|//*[@data-action]|//form[@data-action]");
+        if ($nodes !== false) {
+            foreach ($nodes as $node) {
+                if (! $node instanceof DOMElement) {
+                    continue;
+                }
+                foreach (['data-action', 'href', 'action'] as $attr) {
+                    $val = $node->getAttribute($attr);
+                    if ($val !== '' && str_contains($val, '/intent/')) {
+                        $candidatos[] = parse_url($this->absolutizar($val), PHP_URL_PATH) ?: $val;
+                    }
+                }
+            }
+        }
+
+        $envEndpoint = trim((string) env('TUTORY_REPORT_GENERATE_URL', ''));
+        if ($envEndpoint !== '') {
+            array_unshift($candidatos, $envEndpoint);
+        }
+
+        // Fallbacks comuns observados em painéis Tutory/mentoria
+        $candidatos = array_merge($candidatos, [
+            '/intent/gerar-relatorio-coach',
+            '/intent/relatorio-coach',
+            '/intent/generate-report',
+            '/intent/gerar-relatorio',
+            '/intent/aluno/relatorio',
+        ]);
+
+        return array_values(array_unique($candidatos));
+    }
+
+    /**
+     * @param  array{nome: string, id: ?string, href: ?string, attrs: array<string, string>}  $aluno
+     */
+    private function processarAluno(array $aluno): ?string
+    {
+        $nome = $aluno['nome'];
+        [$dataInicio, $dataFim] = $this->datasPeriodo();
+        $this->log("[{$nome}] Datas: {$dataInicio} → {$dataFim}");
+
+        $htmlContexto = '';
+        if (! empty($aluno['href'])) {
+            $this->log("[{$nome}] Abrindo href do relatório...");
+            $htmlContexto = $this->client()->get($aluno['href'])->body();
+        } else {
+            // Reabre a consulta (garante contexto de sessão/modais embutidos na página)
+            $htmlContexto = $this->client()->get('/alunos/consulta', ['status' => 'ativos'])->body();
+        }
+
+        $endpoints = $this->descobrirEndpointsGeracao($htmlContexto);
+        $this->log("[{$nome}] Endpoints candidatos: ".implode(', ', array_slice($endpoints, 0, 6)));
+
+        $payloadBase = [
+            'tipo' => 'questoes',
+            'type' => 'questoes',
+            'periodo' => 'mes',
+            'period' => 'mes',
+            'data_ini' => $dataInicio,
+            'data_fim' => $dataFim,
+            'relDataIni' => $dataInicio,
+            'relDataFim' => $dataFim,
+            'ini' => $dataInicio,
+            'fim' => $dataFim,
+            'filtro' => 'questoes',
+            'agrupamento' => 'mes',
+        ];
+        if (! empty($aluno['id'])) {
+            $payloadBase['id'] = $aluno['id'];
+            $payloadBase['aluno'] = $aluno['id'];
+            $payloadBase['aluno_id'] = $aluno['id'];
+            $payloadBase['id_aluno'] = $aluno['id'];
+        }
+        foreach ($aluno['attrs'] as $k => $v) {
+            if (str_starts_with($k, 'data-') && $k !== 'data-action') {
+                $payloadBase[substr($k, 5)] = $v;
+            }
+        }
+
+        $reportUrl = null;
+        $ultimaResposta = '';
+        foreach ($endpoints as $endpoint) {
+            try {
+                $path = str_starts_with($endpoint, 'http')
+                    ? $endpoint
+                    : $endpoint;
+                $resp = $this->client()->asForm()->post($path, $payloadBase);
+                $ultimaResposta = substr($resp->body(), 0, 500);
+                if ($resp->status() === 404) {
+                    continue;
+                }
+                $json = $resp->json();
+                if (is_array($json)) {
+                    if (! empty($json['error']) && empty($json['result'])) {
+                        $this->log("[{$nome}] {$endpoint}: ".$json['error']);
+                        continue;
+                    }
+                    $reportUrl = $this->extrairUrlDoJson($json);
+                    if ($reportUrl !== null) {
+                        $this->log("[{$nome}] Relatório gerado via {$endpoint}");
+                        break;
+                    }
+                    // Alguns retornos só trazem HTML embutido / id
+                    if (! empty($json['result']) && ! empty($json['html'])) {
+                        $reportUrl = $this->salvarPdfDeHtml($nome, (string) $json['html']);
+                        if ($reportUrl !== null) {
+                            return $reportUrl;
+                        }
+                    }
+                }
+
+                $ct = strtolower((string) $resp->header('Content-Type'));
+                if (str_contains($ct, 'pdf') || str_starts_with($resp->body(), '%PDF')) {
+                    return $this->salvarBytesPdf($nome, $resp->body());
+                }
+
+                // Resposta HTML com link de acesso
+                if (str_contains($resp->body(), 'btn_save') || str_contains($resp->body(), 'chart_questoes_dia')) {
+                    $baixado = $this->baixarPdfDaPaginaRelatorio($nome, $resp->body(), $this->absolutizar($path));
+                    if ($baixado !== null) {
+                        return $baixado;
+                    }
+                }
+            } catch (Throwable $exc) {
+                $this->log("[{$nome}] {$endpoint} erro: ".$exc->getMessage());
+            }
+        }
+
+        if ($reportUrl === null && ! empty($aluno['href'])) {
+            $reportUrl = $this->absolutizar((string) $aluno['href']);
+        }
+
+        if ($reportUrl === null) {
+            $this->log("[{$nome}] Não foi possível gerar/localizar URL do relatório. Última resposta: {$ultimaResposta}");
+
+            return null;
+        }
+
+        $this->log("[{$nome}] Acessando relatório: {$reportUrl}");
+        $pagina = $this->client()
+            ->withHeaders(['Accept' => 'text/html,application/pdf,*/*'])
+            ->get($reportUrl);
+
+        $ct = strtolower((string) $pagina->header('Content-Type'));
+        if (str_contains($ct, 'pdf') || str_starts_with($pagina->body(), '%PDF')) {
+            return $this->salvarBytesPdf($nome, $pagina->body());
+        }
+
+        return $this->baixarPdfDaPaginaRelatorio($nome, $pagina->body(), $reportUrl);
+    }
+
+    private function baixarPdfDaPaginaRelatorio(string $nome, string $html, string $paginaUrl): ?string
+    {
+        // 1) links diretos para PDF
+        if (preg_match_all('/href=["\']([^"\']+\.pdf[^"\']*)["\']/i', $html, $m)) {
+            foreach ($m[1] as $href) {
+                $url = $this->absolutizar($href, $paginaUrl);
+                $pdf = $this->client()->get($url);
+                if (str_starts_with($pdf->body(), '%PDF')) {
+                    $this->log("[{$nome}] PDF via link {$url}");
+
+                    return $this->salvarBytesPdf($nome, $pdf->body());
+                }
+            }
+        }
+
+        // 2) data-url / onclick no #btn_save
+        $xp = $this->loadDom($html);
+        $btn = $xp->query("//*[@id='btn_save']")->item(0);
+        if ($btn instanceof DOMElement) {
+            foreach (['data-url', 'data-href', 'href', 'data-file', 'data-download'] as $attr) {
+                $val = $btn->getAttribute($attr);
+                if ($val === '') {
+                    continue;
+                }
+                $url = $this->absolutizar($val, $paginaUrl);
+                $pdf = $this->client()->get($url);
+                if (str_starts_with($pdf->body(), '%PDF') || str_contains(strtolower((string) $pdf->header('Content-Type')), 'pdf')) {
+                    $this->log("[{$nome}] PDF via #btn_save[{$attr}]");
+
+                    return $this->salvarBytesPdf($nome, $pdf->body());
+                }
+            }
+        }
+
+        // 3) endpoints /intent de download citados na página
+        if (preg_match_all('/\/intent\/[a-zA-Z0-9_\/-]*(download|baixar|pdf|export)[a-zA-Z0-9_\/-]*/i', $html, $m)) {
+            foreach (array_unique($m[0]) as $path) {
+                $pdf = $this->client()->asForm()->post($path, []);
+                if (str_starts_with($pdf->body(), '%PDF')) {
+                    $this->log("[{$nome}] PDF via {$path}");
+
+                    return $this->salvarBytesPdf($nome, $pdf->body());
+                }
+            }
+        }
+
+        $envDownload = trim((string) env('TUTORY_REPORT_DOWNLOAD_URL', ''));
+        if ($envDownload !== '') {
+            $pdf = $this->client()->get($envDownload);
+            if (str_starts_with($pdf->body(), '%PDF')) {
+                return $this->salvarBytesPdf($nome, $pdf->body());
+            }
+        }
+
+        $this->log(
+            "[{$nome}] Página do relatório aberta, mas não há endpoint HTTP de PDF ".
+            '(o botão Baixar do painel gera o arquivo no navegador). '.
+            'Defina TUTORY_REPORT_GENERATE_URL / TUTORY_REPORT_DOWNLOAD_URL no .env se souber as rotas.'
+        );
+
+        // Guarda HTML para inspeção manual
+        $dump = $this->pastaDownload.'/debug_'.preg_replace('/\s+/', '_', $nome).'.html';
+        file_put_contents($dump, $html);
+        $this->log("[{$nome}] HTML salvo em: {$dump}");
+
+        return null;
+    }
+
+    private function salvarBytesPdf(string $nomeAluno, string $bytes): string
+    {
         $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
         $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
         $mes = date('Y-m');
-        $ext = pathinfo($origem, PATHINFO_EXTENSION);
-        $ext = $ext !== '' ? '.'.$ext : '.pdf';
-        $dir = dirname($origem);
-        $destino = $dir.'/'.$seguro.'_'.$mes.$ext;
+        $destino = $this->pastaDownload.'/'.$seguro.'_'.$mes.'.pdf';
         $contador = 1;
         while (file_exists($destino)) {
-            $destino = $dir.'/'.$seguro.'_'.$mes.'_'.$contador.$ext;
+            $destino = $this->pastaDownload.'/'.$seguro.'_'.$mes.'_'.$contador.'.pdf';
             $contador++;
         }
-        rename($origem, $destino);
+        file_put_contents($destino, $bytes);
+        $this->log("[{$nomeAluno}] Arquivo salvo: {$destino}");
 
         return $destino;
     }
 
-    private function prepararGraficosParaPdf(string $nome): int
+    private function salvarPdfDeHtml(string $nome, string $html): ?string
     {
-        $this->log("[{$nome}] Aguardando #chart_questoes_dia para o PDF...");
+        // Sem engine de browser: só salva HTML de debug (PDF real vem do download HTTP).
+        $dump = $this->pastaDownload.'/debug_'.preg_replace('/\s+/', '_', $nome).'_embed.html';
+        file_put_contents($dump, $html);
+        $this->log("[{$nome}] HTML embutido salvo em: {$dump}");
 
-        $chartWait = new WebDriverWait($this->driver, $this->chartWait);
-        $chartWait->until(function (RemoteWebDriver $d): bool {
-            return (bool) $d->executeScript(<<<'JS'
-                const target = document.getElementById('chart_questoes_dia');
-                if (!target) return false;
-                const canvas = target.tagName === 'CANVAS'
-                  ? target
-                  : target.querySelector('canvas');
-                return !!(canvas && canvas.width > 10 && canvas.height > 10);
-            JS);
-        });
-        sleep(5);
-
-        $convertido = $this->driver->executeAsyncScript(<<<'JS'
-            const done = arguments[0];
-            (async () => {
-              document.querySelectorAll('.tutory-chart-questoes-dia-overlay')
-                .forEach(el => el.remove());
-
-              async function imageReady(url) {
-                const img = new Image();
-                img.src = url;
-                await new Promise((resolve, reject) => {
-                  img.onload = resolve;
-                  img.onerror = reject;
-                });
-                return img;
-              }
-
-              try {
-                const target = document.getElementById('chart_questoes_dia');
-                if (!target) return done(0);
-                const canvas = target.tagName === 'CANVAS'
-                  ? target
-                  : target.querySelector('canvas');
-                if (!canvas) return done(0);
-
-                try {
-                  const chart = window.Chart && Chart.getChart
-                    ? Chart.getChart(canvas)
-                    : null;
-                  if (chart) {
-                    if (chart.options) chart.options.animation = false;
-                    if (typeof chart.stop === 'function') chart.stop();
-                    if (typeof chart.update === 'function') chart.update('none');
-                    if (typeof chart.draw === 'function') chart.draw();
-                  }
-                } catch (e) {}
-                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-                const url = canvas.toDataURL('image/png', 1.0);
-                const check = await imageReady(url);
-                if (!check.naturalWidth) return done(0);
-
-                const parent = canvas.parentElement;
-                if (!parent) return done(0);
-                const originalPosition = getComputedStyle(parent).position;
-                if (originalPosition === 'static') parent.style.position = 'relative';
-
-                const overlay = document.createElement('img');
-                overlay.className = 'tutory-chart-questoes-dia-overlay';
-                overlay.src = url;
-                overlay.alt = '';
-                overlay.setAttribute('aria-hidden', 'true');
-                overlay.style.cssText = [
-                  'position:absolute',
-                  'left:' + canvas.offsetLeft + 'px',
-                  'top:' + canvas.offsetTop + 'px',
-                  'width:' + canvas.offsetWidth + 'px',
-                  'height:' + canvas.offsetHeight + 'px',
-                  'z-index:10',
-                  'pointer-events:none',
-                  'display:block'
-                ].join(';');
-                parent.appendChild(overlay);
-                done(1);
-              } catch (e) {
-                done(0);
-              }
-            })().catch(() => done(0));
-        JS);
-
-        usleep(800_000);
-        $this->log("[{$nome}] PNG sobreposto a #chart_questoes_dia: ".(int) $convertido);
-
-        return (int) $convertido;
-    }
-
-    private function acessarBaixarRelatorio(string $abaPrincipal, string $nome): ?string
-    {
-        $this->log("[{$nome}] Aguardando popup do relatório...");
-        $pastasMonitor = [$this->pastaDownload, rtrim((string) getenv('HOME'), '/').'/Downloads'];
-        $antes = $this->listarArquivosDownload($pastasMonitor);
-
-        $acessar = $this->wait->until(
-            WebDriverExpectedCondition::elementToBeClickable(
-                WebDriverBy::cssSelector('button.swal-button--confirm')
-            )
-        );
-        $this->jsClick($acessar);
-        $this->log("[{$nome}] Clicou em Acessar Relatório");
-
-        $this->wait->until(fn (RemoteWebDriver $d): bool => count($d->getWindowHandles()) > 1);
-        foreach ($this->driver->getWindowHandles() as $aba) {
-            if ($aba !== $abaPrincipal) {
-                $this->driver->switchTo()->window($aba);
-                break;
-            }
-        }
-
-        $this->log("[{$nome}] Aba do relatório: ".$this->driver->getCurrentURL());
-        $baixar = $this->wait->until(
-            WebDriverExpectedCondition::elementToBeClickable(WebDriverBy::id('btn_save'))
-        );
-        $this->prepararGraficosParaPdf($nome);
-
-        try {
-            $baixar->click();
-        } catch (Throwable) {
-            $this->jsClick($baixar);
-        }
-        $this->log("[{$nome}] Download iniciado");
-
-        $arquivo = $this->aguardarNovoDownload($antes, $pastasMonitor);
-        $final = null;
-        if ($arquivo !== null) {
-            $destinoDir = realpath($this->pastaDownload) ?: $this->pastaDownload;
-            $origemDir = realpath(dirname($arquivo)) ?: dirname($arquivo);
-            if ($origemDir !== $destinoDir) {
-                if (! is_dir($destinoDir)) {
-                    mkdir($destinoDir, 0775, true);
-                }
-                $movido = $destinoDir.'/'.basename($arquivo);
-                $contador = 1;
-                while (file_exists($movido)) {
-                    $info = pathinfo($arquivo);
-                    $movido = $destinoDir.'/'.$info['filename'].'_'.$contador.
-                        (isset($info['extension']) ? '.'.$info['extension'] : '');
-                    $contador++;
-                }
-                rename($arquivo, $movido);
-                $arquivo = $movido;
-                $this->log("[{$nome}] Movido de Downloads → {$arquivo}");
-            }
-            $final = $this->renomearDownload($arquivo, $nome);
-            $this->log("[{$nome}] Arquivo salvo: {$final}");
-        } else {
-            $this->log("[{$nome}] AVISO: não detectei arquivo novo em {$this->pastaDownload}");
-            try {
-                $amostra = glob(rtrim($this->pastaDownload, '/').'/*') ?: [];
-                usort($amostra, static fn ($a, $b) => filemtime($a) <=> filemtime($b));
-                $ultimos = array_slice($amostra, -5);
-                $this->log("[{$nome}] Últimos arquivos na pasta: ".json_encode(
-                    array_map('basename', $ultimos),
-                    JSON_UNESCAPED_UNICODE
-                ));
-            } catch (Throwable) {
-                // ignore
-            }
-        }
-
-        $this->fecharAbasExtras($abaPrincipal);
-
-        return $final;
-    }
-
-    private function processarAluno(string $abaPrincipal, string $nome): ?string
-    {
-        try {
-            $this->fecharAbasExtras($abaPrincipal);
-            $this->limparOverlays();
-            $card = $this->localizarCardPorNome($nome);
-            $this->abrirRelatorioCoachDoCard($card, $nome);
-            $this->configurarFiltrosRelatorio($nome);
-            $arquivo = $this->acessarBaixarRelatorio($abaPrincipal, $nome);
-            $this->limparOverlays();
-
-            return $arquivo;
-        } catch (
-            TimeoutException|
-            ElementClickInterceptedException|
-            RuntimeException|
-            StaleElementReferenceException|
-            NoSuchElementException $exc
-        ) {
-            $this->log("[{$nome}] ERRO: ".$exc->getMessage());
-            try {
-                $shotNome = preg_replace('/\s+/', '_', $nome) ?? 'aluno';
-                $shot = $this->pastaDownload.'/erro_'.substr($shotNome, 0, 40).'.png';
-                $this->driver->takeScreenshot($shot);
-                $this->log("[{$nome}] Screenshot: {$shot}");
-            } catch (Throwable) {
-                // ignore
-            }
-            try {
-                $this->limparOverlays();
-                $this->fecharAbasExtras($abaPrincipal);
-            } catch (Throwable) {
-                // ignore
-            }
-
-            return null;
-        }
+        return null;
     }
 
     private function formatarDuracao(float $segundos): string
@@ -1115,7 +835,7 @@ class CoachReportDownloader
     ): string {
         $caminho = $this->pastaDownload.'/log_download_'.$inicio->format('Ymd_His').'.txt';
         $linhas = [
-            'Relatórios Tutory - resumo da execução',
+            'Relatórios Tutory - resumo da execução (CLI/HTTP)',
             'Início: '.$inicio->format('d/m/Y H:i:s'),
             'Fim:    '.$fim->format('d/m/Y H:i:s'),
             'Duração: '.$this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()),
@@ -1162,25 +882,19 @@ class CoachReportDownloader
     {
         $inicio = new \DateTimeImmutable('now');
         $this->log('Processo iniciado em: '.$inicio->format('d/m/Y H:i:s'));
+        $this->log('Modo: CLI/HTTP (sem Selenium/Firefox)');
 
-        $abaPrincipal = $this->driver->getWindowHandle();
-
+        $alunos = $this->coletarTodosAlunos();
         if ($this->teste) {
-            $nomeTeste = $this->encontrarAlunoPorTrecho(self::ALUNA_TESTE);
-            $nomes = $nomeTeste !== null ? [$nomeTeste] : [];
-            if ($nomes !== []) {
-                $this->log(
-                    "Modo --teste: processando apenas {$nomes[0]} ".
-                    'para validar o PDF com gráficos'
-                );
+            $alunos = $this->filtrarAlunaTeste($alunos);
+            if ($alunos !== []) {
+                $this->log('Modo --teste: processando apenas '.$alunos[0]['nome']);
             } else {
                 $this->log("Modo --teste: aluna '".self::ALUNA_TESTE."' não encontrada na lista.");
             }
-        } else {
-            $nomes = $this->coletarTodosAlunos();
         }
 
-        if ($nomes === []) {
+        if ($alunos === []) {
             $fim = new \DateTimeImmutable('now');
             $this->log('Nenhum aluno encontrado em /alunos/consulta.');
             $log = $this->gravarLogResumo($inicio, $fim, 0, [], [], []);
@@ -1189,18 +903,20 @@ class CoachReportDownloader
             return;
         }
 
-        /** @var array<string, array{nome: string, sucesso: bool, arquivo: ?string, tentativas: int}> $resultados */
+        /** @var array<string, array{nome: string, sucesso: bool, arquivo: ?string, tentativas: int, meta: array<string, mixed>}> $resultados */
         $resultados = [];
-        foreach ($nomes as $nome) {
-            $resultados[$nome] = [
-                'nome' => $nome,
+        foreach ($alunos as $aluno) {
+            $resultados[$aluno['nome']] = [
+                'nome' => $aluno['nome'],
                 'sucesso' => false,
                 'arquivo' => null,
                 'tentativas' => 0,
+                'meta' => $aluno,
             ];
         }
+        $nomes = array_keys($resultados);
 
-        $processarLote = function (array $lista, int $rodada) use (&$resultados, $abaPrincipal): void {
+        $processarLote = function (array $lista, int $rodada) use (&$resultados): void {
             $total = count($lista);
             foreach ($lista as $i => $nome) {
                 $resultados[$nome]['tentativas']++;
@@ -1209,9 +925,16 @@ class CoachReportDownloader
                 $this->log(str_repeat('=', 50));
                 $this->log(
                     "[rodada {$rodada}] Aluno {$n}/{$total}: {$nome} ".
-                    "(tentativa {$tentativa}/".self::MAX_TENTATIVAS.')'
+                    '(tentativa '.$tentativa.'/'.self::MAX_TENTATIVAS.')'
                 );
-                $arquivo = $this->processarAluno($abaPrincipal, $nome);
+                try {
+                    /** @var array{nome: string, id: ?string, href: ?string, attrs: array<string, string>} $meta */
+                    $meta = $resultados[$nome]['meta'];
+                    $arquivo = $this->processarAluno($meta);
+                } catch (Throwable $exc) {
+                    $this->log("[{$nome}] ERRO: ".$exc->getMessage());
+                    $arquivo = null;
+                }
                 if ($arquivo !== null) {
                     $resultados[$nome]['sucesso'] = true;
                     $resultados[$nome]['arquivo'] = $arquivo;
@@ -1239,7 +962,7 @@ class CoachReportDownloader
             $this->log(str_repeat('=', 50));
             $this->log(
                 'Reprocessando '.count($pendentes).' aluno(s) com erro '.
-                "(rodada {$rodada}/".self::MAX_TENTATIVAS.')...'
+                '(rodada '.$rodada.'/'.self::MAX_TENTATIVAS.')...'
             );
             $processarLote($pendentes, $rodada);
         }
