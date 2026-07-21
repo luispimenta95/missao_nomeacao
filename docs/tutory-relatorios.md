@@ -50,7 +50,25 @@ php scripts/baixar_relatorios_tutory.php --periodo=2 --teste
 php artisan tutory:baixar-relatorios --periodo=1 --teste
 ```
 
-Arquivo gerado (exemplo): `relatorio-371041-Marianny_Carvalho-20072026.pdf`
+Arquivo gerado: `relatorio_{aluno}_{periodo}.pdf`  
+Exemplo: `relatorio_Marianny_Carvalho_1.pdf`
+
+## Agendamento (Laravel Scheduler)
+
+Em `routes/console.php`:
+
+| Job | Comando | Quando |
+|-----|---------|--------|
+| Periodo 1 | `tutory:baixar-relatorios --periodo=1` | Dia **16** de cada mês, **00:00** |
+| Periodo 2 | `tutory:baixar-relatorios --periodo=2` | **Último dia** do mês, **00:00** |
+
+No servidor (cron):
+
+```cron
+* * * * * cd /caminho/do/projeto && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Conferir: `php artisan schedule:list`
 
 ## Segurança
 
