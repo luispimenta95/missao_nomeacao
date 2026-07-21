@@ -907,7 +907,7 @@ HTML;
     {
         $inicio = new \DateTimeImmutable('now');
         $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
-        $this->log('Modo: CLI/HTTP → /intent/cadastrar-relatorio-coach + Dompdf');
+        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + Puppeteer/PDFWriter (fallback Dompdf)');
 
         $alunos = $this->coletarAlunosAtivos();
         if ($this->teste) {
