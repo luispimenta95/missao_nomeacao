@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Baixa o Relatório do Coach no Tutory para alunos ATIVOS (CLI/HTTP).
+ * Baixa o Relatório do Coach no Tutory e envia por e-mail aos alunos cadastrados.
  *
  * 1. Login (/intent/login) → sessão + Bearer
  * 2. /alunos/consulta?status=ativos (cards com data-id)
@@ -9,10 +9,13 @@
  * 4. GET /documentos/relatorios/questoes?key=...
  * 5. PDF oficial via Puppeteer + PDFWriter/jsPDF do painel (fallback: Dompdf)
  * 6. Reprocessa falhas (até 3x)
+ * 7. Lista alunos do banco → localiza PDF em public/pdfs → e-mail se recebe_email
  */
 
 namespace App\Services\Tutory;
 
+use App\Http\Util\MailHelper;
+use App\Models\Aluno;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
@@ -21,6 +24,7 @@ use Dompdf\Options;
 use GuzzleHttp\Cookie\FileCookieJar;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -98,6 +102,7 @@ class CoachReportDownloader
         try {
             $this->login();
             $this->baixarTodos();
+            $this->enviarEmailsDosAlunos();
 
             return 0;
         } catch (Throwable $exc) {
@@ -604,11 +609,7 @@ class CoachReportDownloader
 
     private function caminhoDestinoPdf(string $nomeAluno, ?string $id = null): string
     {
-        // Mantém acentos (Laíra, José, etc.); remove só caracteres inválidos para arquivo
-        $seguro = preg_replace('/[^\p{L}\p{N} ._\\-]/u', '', $nomeAluno) ?? 'aluno';
-        $seguro = preg_replace('/\s+/u', '_', trim($seguro)) ?? 'aluno';
-        $seguro = preg_replace('/_+/u', '_', $seguro) ?? 'aluno';
-        $seguro = trim($seguro, '._-') ?: 'aluno';
+        $seguro = $this->sanitizarNomeArquivo($nomeAluno);
         $data = date('Ymd_Hi');
         // Formato: relatorio_$data_$aluno_$periodo.pdf
         $destino = $this->pastaDownload.'/relatorio_'.$data.'_'.$seguro.'_'.$this->periodo.'.pdf';
@@ -619,6 +620,143 @@ class CoachReportDownloader
         }
 
         return $destino;
+    }
+
+    private function sanitizarNomeArquivo(string $nomeAluno): string
+    {
+        // Mantém acentos (Laíra, José, etc.); remove só caracteres inválidos para arquivo
+        $seguro = preg_replace('/[^\p{L}\p{N} ._\\-]/u', '', $nomeAluno) ?? 'aluno';
+        $seguro = preg_replace('/\s+/u', '_', trim($seguro)) ?? 'aluno';
+        $seguro = preg_replace('/_+/u', '_', $seguro) ?? 'aluno';
+
+        return trim($seguro, '._-') ?: 'aluno';
+    }
+
+    /**
+     * Localiza o PDF mais recente do aluno na pasta de download para o período atual.
+     */
+    private function encontrarPdfAluno(string $nomeAluno): ?string
+    {
+        if (! is_dir($this->pastaDownload)) {
+            return null;
+        }
+
+        $seguro = $this->sanitizarNomeArquivo($nomeAluno);
+        $periodo = preg_quote($this->periodo, '/');
+        $seguroQuoted = preg_quote($seguro, '/');
+
+        $candidatos = [];
+        foreach (scandir($this->pastaDownload) ?: [] as $arquivo) {
+            if (! str_ends_with(mb_strtolower($arquivo), '.pdf')) {
+                continue;
+            }
+            // Atual: relatorio_{data}_{Nome}_{periodo}.pdf ou ..._{periodo}_{n}.pdf
+            if (preg_match('/^relatorio_.+_'.$seguroQuoted.'_'.$periodo.'(?:_\d+)?\.pdf$/ui', $arquivo)) {
+                $candidatos[] = $this->pastaDownload.'/'.$arquivo;
+
+                continue;
+            }
+            // Legado: relatorio-{id}-{Nome}-{ddmmyyyy}.pdf
+            if (preg_match('/^relatorio-\d+-'.$seguroQuoted.'-\d{8}(?:_\d+)?\.pdf$/ui', $arquivo)) {
+                $candidatos[] = $this->pastaDownload.'/'.$arquivo;
+
+                continue;
+            }
+            // Legado simples: {Nome}_{Ym}.pdf
+            if (preg_match('/^'.$seguroQuoted.'_\d{4}-\d{2}(?:_\d+)?\.pdf$/ui', $arquivo)) {
+                $candidatos[] = $this->pastaDownload.'/'.$arquivo;
+            }
+        }
+
+        if ($candidatos === []) {
+            return null;
+        }
+
+        usort($candidatos, static fn (string $a, string $b): int => filemtime($b) <=> filemtime($a));
+
+        return $candidatos[0];
+    }
+
+    /**
+     * Lista alunos do admin e envia o PDF por e-mail quando recebe_email=true.
+     */
+    private function enviarEmailsDosAlunos(): void
+    {
+        $this->log(str_repeat('=', 50));
+        $this->log('Enviando relatórios por e-mail (alunos cadastrados no admin)...');
+
+        $query = Aluno::query()->orderBy('nome');
+        $alunos = $query->get();
+        if ($this->teste) {
+            $alvo = mb_strtolower(self::ALUNA_TESTE);
+            $alunos = $alunos
+                ->filter(static fn (Aluno $a) => str_contains(mb_strtolower($a->nome), $alvo))
+                ->values();
+        }
+
+        if ($alunos->isEmpty()) {
+            $this->log('Nenhum aluno cadastrado no admin para envio.');
+
+            return;
+        }
+
+        [$dtIni, $dtFim] = $this->datasPeriodoBr();
+        $periodoLabel = $dtIni.' a '.$dtFim.' (período '.$this->periodo.')';
+
+        $enviados = 0;
+        $pulados = 0;
+        $falhas = 0;
+
+        foreach ($alunos as $aluno) {
+            $this->log("[{$aluno->nome}] e-mail={$aluno->email} | recebe_email=".($aluno->recebe_email ? 'sim' : 'não'));
+
+            $pdf = $this->encontrarPdfAluno($aluno->nome);
+            if ($pdf === null) {
+                $this->log("[{$aluno->nome}] PDF não encontrado em {$this->pastaDownload}");
+                $falhas++;
+
+                continue;
+            }
+            $this->log("[{$aluno->nome}] PDF: ".basename($pdf));
+
+            if (! $aluno->recebe_email) {
+                $this->log("[{$aluno->nome}] E-mail não enviado (recebe_email=false)");
+                $pulados++;
+
+                continue;
+            }
+
+            if (! filter_var($aluno->email, FILTER_VALIDATE_EMAIL)) {
+                $this->log("[{$aluno->nome}] E-mail inválido: {$aluno->email}");
+                $falhas++;
+
+                continue;
+            }
+
+            try {
+                MailHelper::emailRelatorioCoach(
+                    [
+                        'nome' => $aluno->nome,
+                        'periodoLabel' => $periodoLabel,
+                    ],
+                    $aluno->email,
+                    $pdf
+                );
+                $this->log("[{$aluno->nome}] E-mail enviado para {$aluno->email}");
+                $enviados++;
+            } catch (Throwable $exc) {
+                $falhas++;
+                $this->log("[{$aluno->nome}] Falha ao enviar e-mail: ".$exc->getMessage());
+                Log::warning('Falha ao enviar relatório do coach', [
+                    'aluno_id' => $aluno->id,
+                    'email' => $aluno->email,
+                    'erro' => $exc->getMessage(),
+                ]);
+            }
+        }
+
+        $this->log(str_repeat('=', 50));
+        $this->log("E-mails enviados: {$enviados} | pulados: {$pulados} | falhas: {$falhas}");
     }
 
     private function gerarPdfDoHtml(

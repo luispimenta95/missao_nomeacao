@@ -12,7 +12,7 @@ class BaixarRelatoriosTutoryCommand extends Command
                             {--periodo= : 1 = dias 01–15; 2 = dia 16 até o último dia do mês}
                             {--teste : Baixa só o relatório da aluna Laíra Larceda}';
 
-    protected $description = 'Baixa o Relatório do Coach no Tutory (CLI/HTTP, alunos ativos)';
+    protected $description = 'Baixa o Relatório do Coach (Tutory) e envia por e-mail aos alunos com recebe_email';
 
     public function handle(): int
     {
