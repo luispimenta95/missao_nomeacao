@@ -70,16 +70,19 @@ class CoachReportDownloader
         };
 
         $loginUrl = trim((string) env('LOGIN_URL', ''));
-        $this->urlLogin = 'https://admin.tutory.com.br/login';
+        $this->urlLogin = $loginUrl !== '' ? $loginUrl : 'https://admin.tutory.com.br/login';
+        // TEMP (teste): credenciais hardcoded — trocar por .env depois
         $this->senha = '05473793150';
         $this->email = 'missaonomeacao';
-        $pastaEnv = public_path('pdfs/');
-        $defaultPasta = function_exists('storage_path')
-            ? storage_path('app/tutory-relatorios')
-            : rtrim((string) getenv('HOME'), '/') . '/Relatorios_Tutory';
+        $pastaEnv = trim((string) env('PASTA_DOWNLOAD', ''));
+        $defaultPasta = function_exists('public_path')
+            ? public_path('pdfs')
+            : (function_exists('storage_path')
+                ? storage_path('app/tutory-relatorios')
+                : rtrim((string) getenv('HOME'), '/') . '/Relatorios_Tutory');
         $this->pastaDownload = $this->expandHome($pastaEnv !== '' ? $pastaEnv : $defaultPasta);
 
-        $this->timeout = (int) (env('TIMEOUT') ?: 60);
+        $this->timeout = (int) (env('TIMEOUT') ?: 120);
         $this->cookieFile = sys_get_temp_dir() . '/tutory_cookies_' . getmypid() . '.json';
         $this->cookieJar = new FileCookieJar($this->cookieFile, true);
 
@@ -115,18 +118,7 @@ class CoachReportDownloader
 
     private function validarConfig(): void
     {
-        $faltando = [];
-        if ($this->email === '') {
-            $faltando[] = 'LOGIN_USER';
-        }
-        if ($this->senha === '') {
-            $faltando[] = 'LOGIN_PASSWORD';
-        }
-        if ($faltando !== []) {
-            throw new RuntimeException(
-                'Configure no .env: ' . implode(', ', $faltando) . '. Use .env.example como modelo.'
-            );
-        }
+        // TEMP: credenciais hardcoded para teste — validação de .env desativada
         if (! in_array($this->periodo, ['1', '2'], true)) {
             throw new RuntimeException('--periodo deve ser 1 ou 2.');
         }
@@ -453,11 +445,12 @@ class CoachReportDownloader
         }
 
         $this->log("[{$nome}] Gerando via {$endpoint}...");
-        // Backend PHP espera alunos[]=ID (como o jQuery do painel)
+        // PDF de referência do painel usa agrupamento diário (gráficos por dia)
+        $agrupamento = trim((string) env('TUTORY_REPORT_AGRUPAMENTO', 'dia')) ?: 'dia';
         $body = 'alunos[]=' . rawurlencode($id)
             . '&dt_ini=' . rawurlencode($dtIni)
             . '&dt_fim=' . rawurlencode($dtFim)
-            . '&agrupamento=mes';
+            . '&agrupamento=' . rawurlencode($agrupamento);
 
         $resp = $this->client()
             ->withHeaders(['Content-Type' => 'application/x-www-form-urlencoded; charset=UTF-8'])
