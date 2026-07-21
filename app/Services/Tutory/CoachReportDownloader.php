@@ -28,7 +28,7 @@ class CoachReportDownloader
 {
     private const BASE = 'https://admin.tutory.com.br';
 
-    private const ALUNA_TESTE = 'Marianny Carvalho';
+    private const ALUNA_TESTE = 'Laíra Larceda';
 
     private const MAX_TENTATIVAS = 3;
 
@@ -604,14 +604,17 @@ class CoachReportDownloader
 
     private function caminhoDestinoPdf(string $nomeAluno, ?string $id = null): string
     {
-        $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
-        $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
+        // Mantém acentos (Laíra, José, etc.); remove só caracteres inválidos para arquivo
+        $seguro = preg_replace('/[^\p{L}\p{N} ._\\-]/u', '', $nomeAluno) ?? 'aluno';
+        $seguro = preg_replace('/\s+/u', '_', trim($seguro)) ?? 'aluno';
+        $seguro = preg_replace('/_+/u', '_', $seguro) ?? 'aluno';
+        $seguro = trim($seguro, '._-') ?: 'aluno';
         $data = date('Ymd_Hi');
-        // Formato pedido: relatorio_$aluno_$periodo.pdf
-        $destino = $this->pastaDownload . '/relatorio_' . $data . '_' . $seguro . '_' . $this->periodo . '.pdf';
+        // Formato: relatorio_$data_$aluno_$periodo.pdf
+        $destino = $this->pastaDownload.'/relatorio_'.$data.'_'.$seguro.'_'.$this->periodo.'.pdf';
         $n = 1;
         while (file_exists($destino)) {
-            $destino = $this->pastaDownload . '/relatorio_' . $data . '_' . $seguro . '_' . $this->periodo . '.pdf';
+            $destino = $this->pastaDownload.'/relatorio_'.$data.'_'.$seguro.'_'.$this->periodo.'_'.$n.'.pdf';
             $n++;
         }
 
