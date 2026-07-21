@@ -535,7 +535,7 @@ class CoachReportDownloader
 
         $parts = [];
         foreach ($this->cookieJar as $cookie) {
-            $parts[] = $cookie->getName().'='.$cookie->getValue();
+            $parts[] = $cookie->getName() . '=' . $cookie->getValue();
         }
 
         return implode('; ', $parts);
@@ -548,7 +548,7 @@ class CoachReportDownloader
     {
         $script = function_exists('base_path')
             ? base_path('scripts/tutory-render-pdf.mjs')
-            : dirname(__DIR__, 3).'/scripts/tutory-render-pdf.mjs';
+            : dirname(__DIR__, 3) . '/scripts/tutory-render-pdf.mjs';
 
         if (! is_file($script)) {
             $this->log("[{$nome}] Script Puppeteer ausente: {$script}");
@@ -592,7 +592,7 @@ class CoachReportDownloader
 
         if ($code !== 0 || ! is_file($destino) || filesize($destino) < 500) {
             $detail = trim($stderr !== '' ? $stderr : $stdout);
-            $this->log("[{$nome}] Puppeteer falhou (exit {$code}): ".$detail);
+            $this->log("[{$nome}] Puppeteer falhou (exit {$code}): " . $detail);
 
             return false;
         }
@@ -606,11 +606,12 @@ class CoachReportDownloader
     {
         $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
         $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
+        $data = date('Ymd_Hi');
         // Formato pedido: relatorio_$aluno_$periodo.pdf
-        $destino = $this->pastaDownload.'/relatorio_'.$seguro.'_'.$this->periodo.'.pdf';
+        $destino = $this->pastaDownload . '/relatorio_' . $data . '_' . $seguro . '_' . $this->periodo . '.pdf';
         $n = 1;
         while (file_exists($destino)) {
-            $destino = $this->pastaDownload.'/relatorio_'.$seguro.'_'.$this->periodo.'_'.$n.'.pdf';
+            $destino = $this->pastaDownload . '/relatorio_' . $data . '_' . $seguro . '_' . $this->periodo . '.pdf';
             $n++;
         }
 
@@ -766,15 +767,15 @@ HTML;
             if ($label === '' && $value === '') {
                 continue;
             }
-            $cells .= '<td><div class="label">'.htmlspecialchars($label, ENT_QUOTES, 'UTF-8').'</div>'
-                .'<div class="value">'.htmlspecialchars($value, ENT_QUOTES, 'UTF-8').'</div></td>';
+            $cells .= '<td><div class="label">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</div>'
+                . '<div class="value">' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '</div></td>';
         }
 
         if ($cells === '') {
             return '<p style="color:#888;">(Breve Panorama vazio)</p>';
         }
 
-        return '<table class="panorama"><tr>'.$cells.'</tr></table>';
+        return '<table class="panorama"><tr>' . $cells . '</tr></table>';
     }
 
     private function montarHtmlAssuntos(DOMXPath $xp): string
@@ -805,22 +806,22 @@ HTML;
                 $color = trim($m[1]);
             }
             $body .= '<tr>'
-                .'<td>'.$disciplina.'</td>'
-                .'<td>'.$assunto.'</td>'
-                .'<td class="taxa" style="color:'.htmlspecialchars($color, ENT_QUOTES, 'UTF-8').';">'.$taxa.'</td>'
-                .'</tr>';
+                . '<td>' . $disciplina . '</td>'
+                . '<td>' . $assunto . '</td>'
+                . '<td class="taxa" style="color:' . htmlspecialchars($color, ENT_QUOTES, 'UTF-8') . ';">' . $taxa . '</td>'
+                . '</tr>';
         }
 
         return '<table class="assuntos"><thead><tr>'
-            .'<td>Disciplina</td><td>Assunto</td><td>Taxa de Acertos</td>'
-            .'</tr></thead><tbody>'.$body.'</tbody></table>';
+            . '<td>Disciplina</td><td>Assunto</td><td>Taxa de Acertos</td>'
+            . '</tr></thead><tbody>' . $body . '</tbody></table>';
     }
 
     private function chartImgHtml(string $html, string $chartId, ?string $titulo): string
     {
         if (! extension_loaded('gd')) {
             return $titulo
-                ? '<p style="color:#888;">('.$titulo.' omitido: instale php-gd)</p>'
+                ? '<p style="color:#888;">(' . $titulo . ' omitido: instale php-gd)</p>'
                 : '';
         }
         $cfg = $this->extrairChartConfig($html, $chartId);
@@ -834,9 +835,9 @@ HTML;
         $out = '';
         if ($titulo !== null && $titulo !== '') {
             $out .= '<p style="text-align:center;font-weight:bold;margin:8px 0;">'
-                .htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</p>';
+                . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</p>';
         }
-        $out .= '<img class="chart" src="'.$img.'" />';
+        $out .= '<img class="chart" src="' . $img . '" />';
 
         return $out;
     }
@@ -862,7 +863,7 @@ HTML;
         // new Chart(elFoo, { ... });
         $elVar = null;
         if (preg_match(
-            '/var\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*document\.getElementById\(\s*[\'"]'.preg_quote($canvasId, '/').'[\'"]\s*\)/',
+            '/var\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*document\.getElementById\(\s*[\'"]' . preg_quote($canvasId, '/') . '[\'"]\s*\)/',
             $html,
             $vm
         )) {
@@ -871,14 +872,14 @@ HTML;
 
         $jsonish = null;
         if ($elVar !== null) {
-            $needle = 'new Chart('.$elVar;
+            $needle = 'new Chart(' . $elVar;
             $pos = strpos($html, $needle);
             if ($pos === false) {
-                $pos = strpos($html, 'new Chart( '.$elVar);
+                $pos = strpos($html, 'new Chart( ' . $elVar);
             }
             if ($pos !== false) {
                 $slice = substr($html, $pos, 20000);
-                if (preg_match('/new\s+Chart\s*\(\s*'.preg_quote($elVar, '/').'\s*,\s*(\{)/', $slice, $m, PREG_OFFSET_CAPTURE)) {
+                if (preg_match('/new\s+Chart\s*\(\s*' . preg_quote($elVar, '/') . '\s*,\s*(\{)/', $slice, $m, PREG_OFFSET_CAPTURE)) {
                     $jsonish = $this->extrairObjetoJsBalanceado($slice, (int) $m[1][1]);
                 }
             }
@@ -887,7 +888,7 @@ HTML;
         // Fallback: new Chart(document.getElementById('id'), { ... })
         if ($jsonish === null) {
             if (preg_match(
-                '/new\s+Chart\s*\(\s*document\.getElementById\(\s*[\'"]'.preg_quote($canvasId, '/').'[\'"]\s*\)\s*,\s*(\{)/',
+                '/new\s+Chart\s*\(\s*document\.getElementById\(\s*[\'"]' . preg_quote($canvasId, '/') . '[\'"]\s*\)\s*,\s*(\{)/',
                 $html,
                 $m,
                 PREG_OFFSET_CAPTURE
@@ -912,7 +913,7 @@ HTML;
                 $c = $colors[$colorIdx % count($colors)];
                 $colorIdx++;
 
-                return "'".$c."'";
+                return "'" . $c . "'";
             },
             $json
         ) ?? $json;
@@ -941,9 +942,21 @@ HTML;
     private function extrairChartColors(string $html): array
     {
         $defaults = [
-            '#00ACED', '#FF595E', '#FFCA3A', '#8AC926', '#6A4C93', '#FF70A6',
-            '#6D4C3D', '#0D0221', '#5CF64A', '#F94144', '#F3722C', '#F9C74F',
-            '#90BE6D', '#43AA8B', '#577590',
+            '#00ACED',
+            '#FF595E',
+            '#FFCA3A',
+            '#8AC926',
+            '#6A4C93',
+            '#FF70A6',
+            '#6D4C3D',
+            '#0D0221',
+            '#5CF64A',
+            '#F94144',
+            '#F3722C',
+            '#F9C74F',
+            '#90BE6D',
+            '#43AA8B',
+            '#577590',
         ];
         if (! preg_match('/var\s+chartColors\s*=\s*\[(.*?)\]/s', $html, $m)) {
             return $defaults;
@@ -1133,21 +1146,21 @@ HTML;
                 $body = $resp->body();
                 $ctype = (string) ($resp->header('Content-Type') ?? '');
                 if (str_starts_with($body, "\x89PNG") || str_contains($ctype, 'image')) {
-                    return 'data:image/png;base64,'.base64_encode($body);
+                    return 'data:image/png;base64,' . base64_encode($body);
                 }
-                $this->log('QuickChart resposta inesperada: '.substr($body, 0, 180));
+                $this->log('QuickChart resposta inesperada: ' . substr($body, 0, 180));
             }
 
             // GET fallback (sem function — só útil se não houver formatter)
             if (! str_contains($chartJs, 'function(value)')) {
-                $url = 'https://quickchart.io/chart?c='.rawurlencode($chartJs).'&w=900&h=420&bkg=white&f=png&v=2.9.4';
+                $url = 'https://quickchart.io/chart?c=' . rawurlencode($chartJs) . '&w=900&h=420&bkg=white&f=png&v=2.9.4';
                 $get = Http::timeout(45)->get($url);
                 if ($get->successful() && strlen($get->body()) > 100) {
-                    return 'data:image/png;base64,'.base64_encode($get->body());
+                    return 'data:image/png;base64,' . base64_encode($get->body());
                 }
             }
         } catch (Throwable $exc) {
-            $this->log('QuickChart erro: '.$exc->getMessage());
+            $this->log('QuickChart erro: ' . $exc->getMessage());
         }
 
         return null;
