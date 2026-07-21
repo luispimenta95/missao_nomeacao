@@ -1,15 +1,14 @@
 <?php
 
 /**
- * Baixa o Relatório do Coach no Tutory para os alunos ATIVOS da consulta.
+ * Baixa o Relatório do Coach no Tutory para alunos ATIVOS (CLI/HTTP).
  *
- * Fluxo CLI/HTTP (sem browser):
- * 1. Login em /intent/login (sessão + Bearer token)
- * 2. GET/POST /alunos/consulta com status=ativos
- * 3. Para cada aluno: abre Relatório do Coach → gera com filtros → baixa PDF
- * 4. Reprocessa falhas (até 3 tentativas por aluno)
- *
- * Credenciais e pastas vêm do .env (veja .env.example).
+ * 1. Login (/intent/login) → sessão + Bearer
+ * 2. /alunos/consulta?status=ativos (cards com data-id)
+ * 3. POST /intent/cadastrar-relatorio-coach
+ * 4. GET /documentos/relatorios/questoes?key=...
+ * 5. Gera PDF via Dompdf (gráficos via QuickChart a partir do Chart.js embutido)
+ * 6. Reprocessa falhas (até 3x)
  */
 
 namespace App\Services\Tutory;
@@ -17,6 +16,8 @@ namespace App\Services\Tutory;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use GuzzleHttp\Cookie\FileCookieJar;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
@@ -26,8 +27,6 @@ use Throwable;
 class CoachReportDownloader
 {
     private const BASE = 'https://admin.tutory.com.br';
-
-    private const URL_CONSULTA = self::BASE . '/alunos/consulta';
 
     private const ALUNA_TESTE = 'Marianny Carvalho';
 
@@ -53,6 +52,9 @@ class CoachReportDownloader
 
     private ?string $bearerToken = null;
 
+    /** @var list<string> */
+    private array $endpointsGeracao = [];
+
     /** @var callable(string): void */
     private $logger;
 
@@ -68,15 +70,15 @@ class CoachReportDownloader
         };
 
         $loginUrl = trim((string) env('LOGIN_URL', ''));
-        $this->urlLogin = $loginUrl !== '' ? $loginUrl : self::BASE . '/login';
+        $this->urlLogin = 'https://admin.tutory.com.br/login';
         $this->senha = '05473793150';
         $this->email = 'missaonomeacao';
         $pastaEnv = public_path('pdfs/');
-        $this->pastaDownload = $this->expandHome(
-            $pastaEnv !== ''
-                ? $pastaEnv
-                : rtrim((string) getenv('HOME'), '/') . '/Relatorios_Tutory'
-        );
+        $defaultPasta = function_exists('storage_path')
+            ? storage_path('app/tutory-relatorios')
+            : rtrim((string) getenv('HOME'), '/') . '/Relatorios_Tutory';
+        $this->pastaDownload = $this->expandHome($pastaEnv !== '' ? $pastaEnv : $defaultPasta);
+
         $this->timeout = (int) (env('TIMEOUT') ?: 60);
         $this->cookieFile = sys_get_temp_dir() . '/tutory_cookies_' . getmypid() . '.json';
         $this->cookieJar = new FileCookieJar($this->cookieFile, true);
@@ -149,11 +151,11 @@ class CoachReportDownloader
             'http_errors' => false,
         ])
             ->withHeaders([
-                'User-Agent' => 'MissaoNomeacao-TutoryCLI/1.0',
+                'User-Agent' => 'MissaoNomeacao-TutoryCLI/2.0',
                 'Accept' => 'application/json, text/html, */*;q=0.8',
                 'X-Requested-With' => 'XMLHttpRequest',
                 'Origin' => self::BASE,
-                'Referer' => self::BASE . '/',
+                'Referer' => self::BASE . '/alunos/consulta',
             ])
             ->baseUrl(self::BASE);
 
@@ -187,25 +189,33 @@ class CoachReportDownloader
             throw new RuntimeException('Falha no login: ' . $erro);
         }
 
-        $index = $this->client()->get('/index');
-        $this->bearerToken = $this->extrairToken($index->body())
-            ?? $this->extrairToken(json_encode($json) ?: '');
-
+        $index = $this->client()
+            ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
+            ->get('/index');
+        $this->bearerToken = $this->extrairToken($index->body());
+        if ($this->bearerToken === null) {
+            // Fallback: algumas contas só embutem adminUser na consulta
+            $consulta = $this->client()
+                ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
+                ->get('/alunos/consulta', ['status' => 'ativos']);
+            $this->bearerToken = $this->extrairToken($consulta->body());
+        }
         if ($this->bearerToken !== null) {
             $this->log('Login realizado (Bearer token obtido)');
         } else {
-            $this->log('Login realizado (sessão por cookie; token Bearer não encontrado no HTML)');
+            $this->log('Login realizado (sessão por cookie; token Bearer não encontrado — intents autenticadas podem falhar)');
         }
     }
 
     private function extrairToken(string $html): ?string
     {
         if (preg_match('/adminUser\s*=\s*\{(.*?)\}\s*;/s', $html, $m)) {
-            if (preg_match('/["\']token["\']\s*:\s*["\']([^"\']+)["\']/', $m[1], $t)) {
+            // Formato do painel: token: '...'  (chave sem aspas)
+            if (preg_match('/["\']?token["\']?\s*:\s*["\']([^"\']+)["\']/', $m[1], $t)) {
                 return $t[1];
             }
         }
-        if (preg_match('/["\']token["\']\s*:\s*["\']([A-Za-z0-9._\-+/=]+)["\']/', $html, $t)) {
+        if (preg_match('#["\']?token["\']?\s*:\s*["\']([A-Za-z0-9._\-+/=]+)["\']#', $html, $t)) {
             return $t[1];
         }
 
@@ -213,9 +223,9 @@ class CoachReportDownloader
     }
 
     /**
-     * @return array{0: string, 1: string} [dataInicio, dataFim] Y-m-d
+     * @return array{0: string, 1: string} Y-m-d
      */
-    private function datasPeriodo(): array
+    private function datasPeriodoIso(): array
     {
         $hoje = new \DateTimeImmutable('now');
         if ($this->periodo === '1') {
@@ -226,6 +236,19 @@ class CoachReportDownloader
         return [$hoje->format('Y-m-16'), $hoje->format('Y-m-') . str_pad((string) $ultimo, 2, '0', STR_PAD_LEFT)];
     }
 
+    /**
+     * @return array{0: string, 1: string} d/m/Y (API Tutory)
+     */
+    private function datasPeriodoBr(): array
+    {
+        [$ini, $fim] = $this->datasPeriodoIso();
+
+        return [
+            \DateTimeImmutable::createFromFormat('Y-m-d', $ini)->format('d/m/Y'),
+            \DateTimeImmutable::createFromFormat('Y-m-d', $fim)->format('d/m/Y'),
+        ];
+    }
+
     private function loadDom(string $html): DOMXPath
     {
         $dom = new DOMDocument;
@@ -234,8 +257,77 @@ class CoachReportDownloader
         return new DOMXPath($dom);
     }
 
+    private function hrefInutil(?string $href): bool
+    {
+        if ($href === null || $href === '') {
+            return true;
+        }
+        $h = strtolower(trim($href));
+
+        return $h === '#'
+            || $h === '#!'
+            || str_starts_with($h, '#')
+            || str_starts_with($h, 'javascript:');
+    }
+
     /**
-     * @return list<array{nome: string, id: ?string, href: ?string, attrs: array<string, string>}>
+     * @return list<array{nome: string, id: string}>
+     */
+    private function coletarAlunosAtivos(): array
+    {
+        $this->log("Abrindo /alunos/consulta com status=ativos...");
+        $resp = $this->client()->get('/alunos/consulta', ['status' => 'ativos']);
+        $html = $resp->body();
+        if (! str_contains($html, 'pesquisa-aluno-container')) {
+            $resp = $this->client()->asForm()->post('/alunos/consulta', ['status' => 'ativos']);
+            $html = $resp->body();
+        }
+        if (! str_contains($html, 'pesquisa-aluno-container')) {
+            throw new RuntimeException('Lista de alunos ativos não encontrada em /alunos/consulta.');
+        }
+
+        // Endpoints reais da página (ex.: /intent/cadastrar-relatorio-coach)
+        if (preg_match_all('#/intent/[a-zA-Z0-9_./-]+#', $html, $m)) {
+            $this->endpointsGeracao = array_values(array_unique($m[0]));
+            $this->log('Intents na página: ' . implode(', ', $this->endpointsGeracao));
+        }
+
+        $alunos = [];
+        $vistos = [];
+        $pagina = 1;
+        $urlAtual = self::BASE . '/alunos/consulta?status=ativos';
+
+        while (true) {
+            $paginaAlunos = $this->parseAlunosDaPagina($html);
+            $this->log("Coletando página {$pagina}: " . count($paginaAlunos) . ' aluno(s)');
+            foreach ($paginaAlunos as $aluno) {
+                if ($aluno['id'] === '' || isset($vistos[$aluno['id']])) {
+                    continue;
+                }
+                $vistos[$aluno['id']] = true;
+                $alunos[] = $aluno;
+            }
+
+            $proxima = $this->proximaPaginaUrl($html, $urlAtual);
+            if ($proxima === null) {
+                break;
+            }
+            $this->log('Próxima página: ' . $proxima);
+            $html = $this->client()->get($proxima)->body();
+            $urlAtual = $proxima;
+            $pagina++;
+            if ($pagina > 100) {
+                break;
+            }
+        }
+
+        $this->log('Total de alunos ativos: ' . count($alunos));
+
+        return $alunos;
+    }
+
+    /**
+     * @return list<array{nome: string, id: string}>
      */
     private function parseAlunosDaPagina(string $html): array
     {
@@ -246,86 +338,57 @@ class CoachReportDownloader
             return [];
         }
 
-        /** @var DOMElement $card */
         foreach ($cards as $card) {
-            $nomeNodes = $xp->query(".//*[contains(concat(' ', normalize-space(@class), ' '), ' pesquisa-aluno-nome ')]", $card);
-            $nome = '';
-            if ($nomeNodes !== false && $nomeNodes->length > 0) {
-                $nome = trim($nomeNodes->item(0)?->textContent ?? '');
+            if (! $card instanceof DOMElement) {
+                continue;
             }
+            $nomeNodes = $xp->query(".//*[contains(concat(' ', normalize-space(@class), ' '), ' pesquisa-aluno-nome ')]", $card);
+            $nome = ($nomeNodes !== false && $nomeNodes->length > 0)
+                ? trim((string) $nomeNodes->item(0)?->textContent)
+                : '';
             if ($nome === '') {
                 continue;
             }
 
-            $link = null;
-            $links = $xp->query(
-                ".//a[contains(concat(' ', normalize-space(@class), ' '), ' btn-generate-report ')
-                    or contains(translate(normalize-space(.), 'RELATÓRIO', 'relatorio'), 'relatorio do coach')
-                    or contains(translate(normalize-space(.), 'RELATORIO', 'relatorio'), 'relatorio do coach')]",
-                $card
-            );
-            $attrs = [];
-            $href = null;
-            $id = null;
-            if ($links !== false && $links->length > 0) {
-                /** @var DOMElement $link */
-                $link = $links->item(0);
-                foreach (['href', 'data-id', 'data-aluno', 'data-aluno-id', 'data-student', 'data-url', 'data-href', 'data-action', 'onclick'] as $attr) {
-                    $val = $link->getAttribute($attr);
-                    if ($val !== '') {
-                        $attrs[$attr] = $val;
-                    }
-                }
-                $href = $attrs['href'] ?? $attrs['data-url'] ?? $attrs['data-href'] ?? null;
-                if ($href === '#' || $href === 'javascript:;' || $href === 'javascript:void(0)') {
-                    $href = null;
-                }
-                $id = $attrs['data-id'] ?? $attrs['data-aluno'] ?? $attrs['data-aluno-id'] ?? $attrs['data-student'] ?? null;
-                if ($id === null && isset($attrs['onclick']) && preg_match('/(\d{2,})/', $attrs['onclick'], $m)) {
-                    $id = $m[1];
-                }
-                if ($id === null && is_string($href) && preg_match('/(?:aluno|id|student)[=\/](\d+)/i', $href, $m)) {
-                    $id = $m[1];
-                }
+            $id = '';
+            $links = $xp->query(".//a[contains(concat(' ', normalize-space(@class), ' '), ' btn-generate-report ')]", $card);
+            if ($links !== false && $links->length > 0 && $links->item(0) instanceof DOMElement) {
+                $id = trim($links->item(0)->getAttribute('data-id'));
             }
-
-            // fallback: qualquer data-id no card
-            if ($id === null) {
-                foreach (['data-id', 'data-aluno', 'data-aluno-id'] as $attr) {
-                    $nodes = $xp->query('.//*[@' . $attr . ']', $card);
-                    if ($nodes !== false && $nodes->length > 0) {
-                        /** @var DOMElement $el */
-                        $el = $nodes->item(0);
-                        $id = $el->getAttribute($attr) ?: null;
-                        if ($id !== null) {
+            if ($id === '') {
+                // fallback: value hidden / painel
+                $vals = $xp->query('.//*[@value]', $card);
+                if ($vals !== false) {
+                    foreach ($vals as $el) {
+                        if (! $el instanceof DOMElement) {
+                            continue;
+                        }
+                        $v = trim($el->getAttribute('value'));
+                        if (preg_match('/^\d{4,}$/', $v)) {
+                            $id = $v;
                             break;
                         }
                     }
                 }
             }
+            if ($id === '') {
+                $this->log("AVISO: sem data-id para {$nome} — ignorado");
 
-            $alunos[] = [
-                'nome' => $nome,
-                'id' => $id,
-                'href' => $href,
-                'attrs' => $attrs,
-            ];
+                continue;
+            }
+
+            $alunos[] = ['nome' => $nome, 'id' => $id];
         }
 
         return $alunos;
     }
 
-    /**
-     * @return list<string> URLs absolutas de próximas páginas
-     */
-    private function parseLinksProximaPagina(string $html, string $paginaAtual): array
+    private function proximaPaginaUrl(string $html, string $urlAtual): ?string
     {
         $xp = $this->loadDom($html);
-        $urls = [];
         $queries = [
             "//li[contains(@class,'page-item') and not(contains(@class,'disabled'))]/a[@rel='next']",
-            "//a[contains(@class,'page-link') and (@rel='next' or normalize-space()='›' or normalize-space()='»' or normalize-space()='>')]",
-            "//a[contains(translate(normalize-space(.),'PRÓXIMOPROXIMO','proximoproximo'),'proximo')]",
+            "//a[contains(@class,'page-link') and (@rel='next' or normalize-space()='›' or normalize-space()='»')]",
         ];
         foreach ($queries as $q) {
             $nodes = $xp->query($q);
@@ -337,14 +400,17 @@ class CoachReportDownloader
                     continue;
                 }
                 $href = trim($node->getAttribute('href'));
-                if ($href === '' || str_starts_with($href, '#')) {
+                if ($this->hrefInutil($href)) {
                     continue;
                 }
-                $urls[] = $this->absolutizar($href, $paginaAtual);
+                $abs = $this->absolutizar($href, $urlAtual);
+                if ($abs !== $urlAtual) {
+                    return $abs;
+                }
             }
         }
 
-        return array_values(array_unique($urls));
+        return null;
     }
 
     private function absolutizar(string $url, string $base = self::BASE): string
@@ -362,430 +428,321 @@ class CoachReportDownloader
         return rtrim($base, '/') . '/' . ltrim($url, '/');
     }
 
-    private function filtrarAlunosAtivosHtml(): string
-    {
-        $this->log("Filtrando alunos com status 'ativos'...");
-
-        // Alguns painéis usam GET, outros POST — tentamos ambos.
-        $get = $this->client()->get('/alunos/consulta', ['status' => 'ativos']);
-        $html = $get->body();
-        if (str_contains($html, 'pesquisa-aluno-container')) {
-            $this->log('Filtro aplicados via GET');
-
-            return $html;
-        }
-
-        $post = $this->client()->asForm()->post('/alunos/consulta', ['status' => 'ativos']);
-        $html = $post->body();
-        if (str_contains($html, 'pesquisa-aluno-container')) {
-            $this->log('Filtro aplicados via POST');
-
-            return $html;
-        }
-
-        // Página base + formulário Buscar
-        $base = $this->client()->get('/alunos/consulta');
-        $htmlBase = $base->body();
-        $action = '/alunos/consulta';
-        $xp = $this->loadDom($htmlBase);
-        $forms = $xp->query('//form[.//select[@name="status"] or .//input[@name="status"]]');
-        if ($forms !== false && $forms->length > 0) {
-            /** @var DOMElement $form */
-            $form = $forms->item(0);
-            $formAction = $form->getAttribute('data-action') ?: $form->getAttribute('action');
-            if ($formAction !== '') {
-                $action = $formAction;
-            }
-            $method = strtoupper($form->getAttribute('method') ?: 'GET');
-            $payload = ['status' => 'ativos'];
-            $inputs = $xp->query('.//input[@name]|.//select[@name]|.//textarea[@name]', $form);
-            if ($inputs !== false) {
-                foreach ($inputs as $input) {
-                    if (! $input instanceof DOMElement) {
-                        continue;
-                    }
-                    $name = $input->getAttribute('name');
-                    if ($name === '' || $name === 'status') {
-                        continue;
-                    }
-                    $type = strtolower($input->getAttribute('type'));
-                    if (in_array($type, ['submit', 'button', 'image'], true)) {
-                        continue;
-                    }
-                    $payload[$name] = $input->getAttribute('value');
-                }
-            }
-            $resp = $method === 'POST'
-                ? $this->client()->asForm()->post($action, $payload)
-                : $this->client()->get($action, $payload);
-            $html = $resp->body();
-            if (str_contains($html, 'pesquisa-aluno-container')) {
-                $this->log("Filtro aplicados via formulário ({$method} {$action})");
-
-                return $html;
-            }
-        }
-
-        throw new RuntimeException(
-            'Não encontrei a lista de alunos ativos em /alunos/consulta. ' .
-                'Confira LOGIN_USER/LOGIN_PASSWORD e se a conta tem acesso à pesquisa.'
-        );
-    }
-
     /**
-     * @return list<array{nome: string, id: ?string, href: ?string, attrs: array<string, string>}>
-     */
-    private function coletarTodosAlunos(): array
-    {
-        $html = $this->filtrarAlunosAtivosHtml();
-        $vistos = [];
-        $alunos = [];
-        $pagina = 1;
-        $urlAtual = self::URL_CONSULTA . '?status=ativos';
-
-        while (true) {
-            $paginaAtual = $this->parseAlunosDaPagina($html);
-            $this->log("Coletando página {$pagina}: " . count($paginaAtual) . ' aluno(s)');
-            foreach ($paginaAtual as $aluno) {
-                $chave = $aluno['id'] ?? $aluno['nome'];
-                if (isset($vistos[$chave])) {
-                    continue;
-                }
-                $vistos[$chave] = true;
-                $alunos[] = $aluno;
-            }
-
-            $proximas = $this->parseLinksProximaPagina($html, $urlAtual);
-            $proxima = null;
-            foreach ($proximas as $cand) {
-                if ($cand !== $urlAtual) {
-                    $proxima = $cand;
-                    break;
-                }
-            }
-            if ($proxima === null) {
-                break;
-            }
-            $this->log('Próxima página de alunos: ' . $proxima);
-            $resp = $this->client()->get($proxima);
-            $html = $resp->body();
-            $urlAtual = $proxima;
-            $pagina++;
-            if ($pagina > 200) {
-                $this->log('AVISO: limite de 200 páginas atingido');
-                break;
-            }
-        }
-
-        $this->log('Total de alunos encontrados: ' . count($alunos));
-
-        return $alunos;
-    }
-
-    /**
-     * @param  list<array{nome: string, id: ?string, href: ?string, attrs: array<string, string>}>  $alunos
-     * @return list<array{nome: string, id: ?string, href: ?string, attrs: array<string, string>}>
-     */
-    private function filtrarAlunaTeste(array $alunos): array
-    {
-        $alvo = mb_strtolower(self::ALUNA_TESTE);
-        foreach ($alunos as $aluno) {
-            if (str_contains(mb_strtolower($aluno['nome']), $alvo)) {
-                return [$aluno];
-            }
-        }
-
-        return [];
-    }
-
-    /**
-     * Extrai URL de relatório de um JSON arbitrário da API Tutory.
-     *
-     * @param  array<mixed>  $json
-     */
-    private function extrairUrlDoJson(array $json): ?string
-    {
-        $keys = ['url', 'link', 'href', 'report_url', 'relatorio', 'redirect', 'data'];
-        foreach ($keys as $key) {
-            if (! array_key_exists($key, $json)) {
-                continue;
-            }
-            $val = $json[$key];
-            if (is_string($val) && (str_starts_with($val, 'http') || str_starts_with($val, '/'))) {
-                return $this->absolutizar($val);
-            }
-            if (is_array($val)) {
-                $nested = $this->extrairUrlDoJson($val);
-                if ($nested !== null) {
-                    return $nested;
-                }
-            }
-        }
-        foreach ($json as $val) {
-            if (is_array($val)) {
-                $nested = $this->extrairUrlDoJson($val);
-                if ($nested !== null) {
-                    return $nested;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Descobre endpoint de geração a partir do HTML (data-action / forms / scripts).
-     *
-     * @return list<string>
-     */
-    private function descobrirEndpointsGeracao(string $html): array
-    {
-        $candidatos = [];
-        if (preg_match_all('/\/intent\/[a-zA-Z0-9_\/-]*relat[a-zA-Z0-9_\/-]*/i', $html, $m)) {
-            foreach ($m[0] as $path) {
-                $candidatos[] = $path;
-            }
-        }
-        if (preg_match_all('/\/intent\/[a-zA-Z0-9_\/-]*report[a-zA-Z0-9_\/-]*/i', $html, $m)) {
-            foreach ($m[0] as $path) {
-                $candidatos[] = $path;
-            }
-        }
-        if (preg_match_all('/\/intent\/[a-zA-Z0-9_\/-]*coach[a-zA-Z0-9_\/-]*/i', $html, $m)) {
-            foreach ($m[0] as $path) {
-                $candidatos[] = $path;
-            }
-        }
-        $xp = $this->loadDom($html);
-        $nodes = $xp->query("//a[contains(@class,'btn-generate-my-report')]|//*[@data-action]|//form[@data-action]");
-        if ($nodes !== false) {
-            foreach ($nodes as $node) {
-                if (! $node instanceof DOMElement) {
-                    continue;
-                }
-                foreach (['data-action', 'href', 'action'] as $attr) {
-                    $val = $node->getAttribute($attr);
-                    if ($val !== '' && str_contains($val, '/intent/')) {
-                        $candidatos[] = parse_url($this->absolutizar($val), PHP_URL_PATH) ?: $val;
-                    }
-                }
-            }
-        }
-
-        $envEndpoint = trim((string) env('TUTORY_REPORT_GENERATE_URL', ''));
-        if ($envEndpoint !== '') {
-            array_unshift($candidatos, $envEndpoint);
-        }
-
-        // Fallbacks comuns observados em painéis Tutory/mentoria
-        $candidatos = array_merge($candidatos, [
-            '/intent/gerar-relatorio-coach',
-            '/intent/relatorio-coach',
-            '/intent/generate-report',
-            '/intent/gerar-relatorio',
-            '/intent/aluno/relatorio',
-        ]);
-
-        return array_values(array_unique($candidatos));
-    }
-
-    /**
-     * @param  array{nome: string, id: ?string, href: ?string, attrs: array<string, string>}  $aluno
+     * @param  array{nome: string, id: string}  $aluno
      */
     private function processarAluno(array $aluno): ?string
     {
         $nome = $aluno['nome'];
-        [$dataInicio, $dataFim] = $this->datasPeriodo();
-        $this->log("[{$nome}] Datas: {$dataInicio} → {$dataFim}");
+        $id = $aluno['id'];
+        [$dtIniIso, $dtFimIso] = $this->datasPeriodoIso();
+        [$dtIni, $dtFim] = $this->datasPeriodoBr();
+        $this->log("[{$nome}] id={$id} | Datas: {$dtIniIso} → {$dtFimIso} ({$dtIni} → {$dtFim})");
 
-        $htmlContexto = '';
-        if (! empty($aluno['href'])) {
-            $this->log("[{$nome}] Abrindo href do relatório...");
-            $htmlContexto = $this->client()->get($aluno['href'])->body();
-        } else {
-            // Reabre a consulta (garante contexto de sessão/modais embutidos na página)
-            $htmlContexto = $this->client()->get('/alunos/consulta', ['status' => 'ativos'])->body();
+        $endpoint = trim((string) env('TUTORY_REPORT_GENERATE_URL', ''));
+        if ($endpoint === '') {
+            $endpoint = '/intent/cadastrar-relatorio-coach';
         }
-
-        $endpoints = $this->descobrirEndpointsGeracao($htmlContexto);
-        $this->log("[{$nome}] Endpoints candidatos: " . implode(', ', array_slice($endpoints, 0, 6)));
-
-        $payloadBase = [
-            'tipo' => 'questoes',
-            'type' => 'questoes',
-            'periodo' => 'mes',
-            'period' => 'mes',
-            'data_ini' => $dataInicio,
-            'data_fim' => $dataFim,
-            'relDataIni' => $dataInicio,
-            'relDataFim' => $dataFim,
-            'ini' => $dataInicio,
-            'fim' => $dataFim,
-            'filtro' => 'questoes',
-            'agrupamento' => 'mes',
-        ];
-        if (! empty($aluno['id'])) {
-            $payloadBase['id'] = $aluno['id'];
-            $payloadBase['aluno'] = $aluno['id'];
-            $payloadBase['aluno_id'] = $aluno['id'];
-            $payloadBase['id_aluno'] = $aluno['id'];
-        }
-        foreach ($aluno['attrs'] as $k => $v) {
-            if (str_starts_with($k, 'data-') && $k !== 'data-action') {
-                $payloadBase[substr($k, 5)] = $v;
+        if ($this->endpointsGeracao !== [] && ! in_array($endpoint, $this->endpointsGeracao, true)) {
+            foreach ($this->endpointsGeracao as $cand) {
+                if (str_contains($cand, 'relatorio-coach') || str_contains($cand, 'cadastrar-relatorio')) {
+                    $endpoint = $cand;
+                    break;
+                }
             }
         }
 
-        $reportUrl = null;
-        $ultimaResposta = '';
-        foreach ($endpoints as $endpoint) {
-            try {
-                $path = str_starts_with($endpoint, 'http')
-                    ? $endpoint
-                    : $endpoint;
-                $resp = $this->client()->asForm()->post($path, $payloadBase);
-                $ultimaResposta = substr($resp->body(), 0, 500);
-                if ($resp->status() === 404) {
-                    continue;
-                }
-                $json = $resp->json();
-                if (is_array($json)) {
-                    if (! empty($json['error']) && empty($json['result'])) {
-                        $this->log("[{$nome}] {$endpoint}: " . $json['error']);
-                        continue;
-                    }
-                    $reportUrl = $this->extrairUrlDoJson($json);
-                    if ($reportUrl !== null) {
-                        $this->log("[{$nome}] Relatório gerado via {$endpoint}");
-                        break;
-                    }
-                    // Alguns retornos só trazem HTML embutido / id
-                    if (! empty($json['result']) && ! empty($json['html'])) {
-                        $reportUrl = $this->salvarPdfDeHtml($nome, (string) $json['html']);
-                        if ($reportUrl !== null) {
-                            return $reportUrl;
-                        }
-                    }
-                }
+        $this->log("[{$nome}] Gerando via {$endpoint}...");
+        // Backend PHP espera alunos[]=ID (como o jQuery do painel)
+        $body = 'alunos[]=' . rawurlencode($id)
+            . '&dt_ini=' . rawurlencode($dtIni)
+            . '&dt_fim=' . rawurlencode($dtFim)
+            . '&agrupamento=mes';
 
-                $ct = strtolower((string) $resp->header('Content-Type'));
-                if (str_contains($ct, 'pdf') || str_starts_with($resp->body(), '%PDF')) {
-                    return $this->salvarBytesPdf($nome, $resp->body());
-                }
+        $resp = $this->client()
+            ->withHeaders(['Content-Type' => 'application/x-www-form-urlencoded; charset=UTF-8'])
+            ->withBody($body, 'application/x-www-form-urlencoded; charset=UTF-8')
+            ->post($endpoint);
 
-                // Resposta HTML com link de acesso
-                if (str_contains($resp->body(), 'btn_save') || str_contains($resp->body(), 'chart_questoes_dia')) {
-                    $baixado = $this->baixarPdfDaPaginaRelatorio($nome, $resp->body(), $this->absolutizar($path));
-                    if ($baixado !== null) {
-                        return $baixado;
-                    }
-                }
-            } catch (Throwable $exc) {
-                $this->log("[{$nome}] {$endpoint} erro: " . $exc->getMessage());
-            }
-        }
-
-        if ($reportUrl === null && ! empty($aluno['href'])) {
-            $reportUrl = $this->absolutizar((string) $aluno['href']);
-        }
-
-        if ($reportUrl === null) {
-            $this->log("[{$nome}] Não foi possível gerar/localizar URL do relatório. Última resposta: {$ultimaResposta}");
+        $json = $resp->json();
+        if (! is_array($json) || empty($json['result'])) {
+            $erro = is_array($json) ? (string) ($json['error'] ?? $resp->body()) : $resp->body();
+            $this->log("[{$nome}] Falha ao gerar: " . $erro);
 
             return null;
         }
 
-        $this->log("[{$nome}] Acessando relatório: {$reportUrl}");
-        $pagina = $this->client()
-            ->withHeaders(['Accept' => 'text/html,application/pdf,*/*'])
-            ->get($reportUrl);
+        $lista = $json['data'] ?? null;
+        if (! is_array($lista) || $lista === [] || empty($lista[0]['token'])) {
+            $this->log("[{$nome}] Resposta sem token de relatório: " . $resp->body());
 
-        $ct = strtolower((string) $pagina->header('Content-Type'));
-        if (str_contains($ct, 'pdf') || str_starts_with($pagina->body(), '%PDF')) {
-            return $this->salvarBytesPdf($nome, $pagina->body());
+            return null;
         }
 
-        return $this->baixarPdfDaPaginaRelatorio($nome, $pagina->body(), $reportUrl);
+        $key = (string) $lista[0]['token'];
+        $model = trim((string) env('TUTORY_REPORT_MODEL', 'questoes')) ?: 'questoes';
+        $reportUrl = self::BASE . '/documentos/relatorios/' . $model . '?key=' . rawurlencode($key);
+        $this->log("[{$nome}] Abrindo relatório...");
+
+        $pagina = $this->client()
+            ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
+            ->get('/documentos/relatorios/' . $model, ['key' => $key]);
+
+        if ($pagina->status() >= 400 || ! str_contains($pagina->body(), 'btn_save')) {
+            $this->log("[{$nome}] Página do relatório inválida (HTTP {$pagina->status()})");
+
+            return null;
+        }
+
+        return $this->gerarPdfDoHtml($nome, $id, $pagina->body(), $dtIniIso, $dtFimIso);
     }
 
-    private function baixarPdfDaPaginaRelatorio(string $nome, string $html, string $paginaUrl): ?string
-    {
-        // 1) links diretos para PDF
-        if (preg_match_all('/href=["\']([^"\']+\.pdf[^"\']*)["\']/i', $html, $m)) {
-            foreach ($m[1] as $href) {
-                $url = $this->absolutizar($href, $paginaUrl);
-                $pdf = $this->client()->get($url);
-                if (str_starts_with($pdf->body(), '%PDF')) {
-                    $this->log("[{$nome}] PDF via link {$url}");
+    private function gerarPdfDoHtml(
+        string $nome,
+        string $id,
+        string $html,
+        string $dtIniIso,
+        string $dtFimIso,
+    ): ?string {
+        $this->log("[{$nome}] Montando PDF (Dompdf + gráficos QuickChart)...");
 
-                    return $this->salvarBytesPdf($nome, $pdf->body());
-                }
-            }
-        }
-
-        // 2) data-url / onclick no #btn_save
         $xp = $this->loadDom($html);
-        $btn = $xp->query("//*[@id='btn_save']")->item(0);
-        if ($btn instanceof DOMElement) {
-            foreach (['data-url', 'data-href', 'href', 'data-file', 'data-download'] as $attr) {
-                $val = $btn->getAttribute($attr);
-                if ($val === '') {
+        $periodo = $this->xpathText($xp, "//*[contains(@class,'report-header')]//p")
+            ?: "Período do relatório: de {$dtIniIso} a {$dtFimIso}";
+        $curso = $this->xpathText($xp, "//*[contains(@class,'report-aluno-desc')]//p")
+            ?: '';
+
+        $chartsHtml = '';
+        if (extension_loaded('gd')) {
+            $chartIds = [
+                'chart_questoes_dia' => 'Acertos e Erros',
+                'chart_bolha_questoes' => 'Bolha de Questões',
+                'chart_top_melhores' => 'Top Melhores',
+                'chart_top_piores' => 'Top Piores',
+                'chart_evolucao_materia' => 'Evolução por Matéria',
+                'chart_questoes_disciplina' => 'Questões por Disciplina',
+            ];
+            foreach ($chartIds as $chartId => $titulo) {
+                $cfg = $this->extrairChartConfig($html, $chartId);
+                if ($cfg === null) {
                     continue;
                 }
-                $url = $this->absolutizar($val, $paginaUrl);
-                $pdf = $this->client()->get($url);
-                if (str_starts_with($pdf->body(), '%PDF') || str_contains(strtolower((string) $pdf->header('Content-Type')), 'pdf')) {
-                    $this->log("[{$nome}] PDF via #btn_save[{$attr}]");
+                $img = $this->quickChartPngDataUri($cfg);
+                if ($img === null) {
+                    continue;
+                }
+                $chartsHtml .= '<h3 style="color:#00aced;margin:18px 0 8px;">' . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</h3>';
+                $chartsHtml .= '<img src="' . $img . '" style="width:100%;max-width:700px;" />';
+            }
+        } else {
+            $this->log("[{$nome}] AVISO: extensão GD ausente — PDF sem imagens de gráfico");
+            $chartsHtml = '<p style="color:#888;">(Gráficos omitidos: instale php-gd no servidor)</p>';
+        }
 
-                    return $this->salvarBytesPdf($nome, $pdf->body());
+        $seguroNome = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
+        $seguroCurso = htmlspecialchars($curso, ENT_QUOTES, 'UTF-8');
+        $seguroPeriodo = htmlspecialchars($periodo, ENT_QUOTES, 'UTF-8');
+
+        $pdfHtml = <<<HTML
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
+h1{font-size:20px; margin:0 0 6px;}
+h3{font-size:14px;}
+.sub{color:#555; margin-bottom:16px;}
+.rule{border:0;border-top:1px solid #eaeaea; margin:12px 0;}
+</style></head><body>
+<h1>Relatório de Questões</h1>
+<div class="sub">{$seguroPeriodo}</div>
+<hr class="rule" />
+<h2 style="margin:0 0 4px;">{$seguroNome}</h2>
+<div class="sub">{$seguroCurso}</div>
+{$chartsHtml}
+<p style="margin-top:24px;color:#888;font-size:10px;">Gerado via CLI HTTP · aluno id {$id}</p>
+</body></html>
+HTML;
+
+        try {
+            $options = new Options;
+            $options->set('isRemoteEnabled', true);
+            $options->set('defaultFont', 'DejaVu Sans');
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($pdfHtml, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            return $this->salvarBytesPdf($nome, $dompdf->output() ?? '');
+        } catch (Throwable $exc) {
+            $this->log("[{$nome}] Erro Dompdf: " . $exc->getMessage());
+
+            return null;
+        }
+    }
+
+    private function xpathText(DOMXPath $xp, string $query): string
+    {
+        $nodes = $xp->query($query);
+        if ($nodes === false || $nodes->length === 0) {
+            return '';
+        }
+
+        return trim(preg_replace('/\s+/', ' ', (string) $nodes->item(0)?->textContent) ?? '');
+    }
+
+    /**
+     * Extrai o objeto passado a `new Chart(el, { ... })` para o canvas informado.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function extrairChartConfig(string $html, string $canvasId): ?array
+    {
+        // new Chart(elChartQuestoesDia, { ... });
+        // ou new Chart(document.getElementById('chart_...'), { ... });
+        $patterns = [
+            '/new\s+Chart\s*\(\s*[^,]+,\s*(\{.*?)\s*\)\s*;\s*(?:var\s+chart|\$\("#btn_save"\)|var\s+elChart|<\/script>)/s',
+        ];
+
+        // Mais preciso: achar getElementById('id') e o new Chart seguinte
+        $pos = strpos($html, "getElementById('{$canvasId}')");
+        if ($pos === false) {
+            $pos = strpos($html, 'getElementById("' . $canvasId . '")');
+        }
+        if ($pos === false) {
+            return null;
+        }
+
+        $slice = substr($html, $pos, 12000);
+        if (! preg_match('/new\s+Chart\s*\(\s*[^,]+,\s*(\{)/', $slice, $m, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+        $start = (int) $m[1][1];
+        $jsonish = $this->extrairObjetoJsBalanceado($slice, $start);
+        if ($jsonish === null) {
+            return null;
+        }
+
+        // JS object → JSON aproximado
+        $json = $jsonish;
+        $json = preg_replace('/([{\[,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/', '$1"$2":', $json) ?? $json;
+        $json = str_replace("'", '"', $json);
+        $json = preg_replace('/,\s*([}\]])/', '$1', $json) ?? $json;
+        // remove functions (datalabels formatter etc.)
+        $json = preg_replace('/"formatter"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
+        $json = preg_replace('/"function"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
+        $json = preg_replace('/function\s*\(.*?\)\s*\{.*?\},?/s', 'null,', $json) ?? $json;
+        $json = preg_replace('/,\s*([}\]])/', '$1', $json) ?? $json;
+
+        $data = json_decode($json, true);
+        if (! is_array($data)) {
+            // fallback mínimo só com type/data se parse falhar
+            if (
+                preg_match('/type:\s*[\'"](\w+)[\'"]/', $jsonish, $tm)
+                && preg_match('/labels:\s*(\[[^\]]*\])/', $jsonish, $lm)
+            ) {
+                return [
+                    'type' => $tm[1],
+                    'data' => [
+                        'labels' => json_decode(str_replace("'", '"', $lm[1]), true) ?: [],
+                        'datasets' => [],
+                    ],
+                    'options' => ['plugins' => ['legend' => ['display' => true]]],
+                ];
+            }
+
+            return null;
+        }
+
+        // QuickChart usa Chart.js v3+ em parte; simplifica options
+        unset($data['options']['plugins']['datalabels']);
+
+        return $data;
+    }
+
+    private function extrairObjetoJsBalanceado(string $source, int $start): ?string
+    {
+        if (! isset($source[$start]) || $source[$start] !== '{') {
+            return null;
+        }
+        $depth = 0;
+        $inStr = null;
+        $escape = false;
+        $len = strlen($source);
+        for ($i = $start; $i < $len; $i++) {
+            $ch = $source[$i];
+            if ($inStr !== null) {
+                if ($escape) {
+                    $escape = false;
+                } elseif ($ch === '\\') {
+                    $escape = true;
+                } elseif ($ch === $inStr) {
+                    $inStr = null;
+                }
+
+                continue;
+            }
+            if ($ch === '"' || $ch === "'") {
+                $inStr = $ch;
+
+                continue;
+            }
+            if ($ch === '{') {
+                $depth++;
+            } elseif ($ch === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    return substr($source, $start, $i - $start + 1);
                 }
             }
         }
-
-        // 3) endpoints /intent de download citados na página
-        if (preg_match_all('/\/intent\/[a-zA-Z0-9_\/-]*(download|baixar|pdf|export)[a-zA-Z0-9_\/-]*/i', $html, $m)) {
-            foreach (array_unique($m[0]) as $path) {
-                $pdf = $this->client()->asForm()->post($path, []);
-                if (str_starts_with($pdf->body(), '%PDF')) {
-                    $this->log("[{$nome}] PDF via {$path}");
-
-                    return $this->salvarBytesPdf($nome, $pdf->body());
-                }
-            }
-        }
-
-        $envDownload = trim((string) env('TUTORY_REPORT_DOWNLOAD_URL', ''));
-        if ($envDownload !== '') {
-            $pdf = $this->client()->get($envDownload);
-            if (str_starts_with($pdf->body(), '%PDF')) {
-                return $this->salvarBytesPdf($nome, $pdf->body());
-            }
-        }
-
-        $this->log(
-            "[{$nome}] Página do relatório aberta, mas não há endpoint HTTP de PDF " .
-                '(o botão Baixar do painel gera o arquivo no navegador). ' .
-                'Defina TUTORY_REPORT_GENERATE_URL / TUTORY_REPORT_DOWNLOAD_URL no .env se souber as rotas.'
-        );
-
-        // Guarda HTML para inspeção manual
-        $dump = $this->pastaDownload . '/debug_' . preg_replace('/\s+/', '_', $nome) . '.html';
-        file_put_contents($dump, $html);
-        $this->log("[{$nome}] HTML salvo em: {$dump}");
 
         return null;
     }
 
-    private function salvarBytesPdf(string $nomeAluno, string $bytes): string
+    /**
+     * @param  array<string, mixed>  $chartConfig
+     */
+    private function quickChartPngDataUri(array $chartConfig): ?string
     {
+        try {
+            $resp = Http::timeout(30)
+                ->asJson()
+                ->post('https://quickchart.io/chart', [
+                    'width' => 800,
+                    'height' => 400,
+                    'format' => 'png',
+                    'backgroundColor' => 'white',
+                    'chart' => $chartConfig,
+                ]);
+            if ($resp->successful() && strlen($resp->body()) > 100) {
+                return 'data:image/png;base64,' . base64_encode($resp->body());
+            }
+
+            // GET fallback
+            $url = 'https://quickchart.io/chart?c=' . rawurlencode(json_encode($chartConfig, JSON_UNESCAPED_UNICODE) ?: '{}') . '&w=800&h=400&bkg=white&f=png';
+            $get = Http::timeout(30)->get($url);
+            if ($get->successful() && strlen($get->body()) > 100) {
+                return 'data:image/png;base64,' . base64_encode($get->body());
+            }
+        } catch (Throwable $exc) {
+            $this->log('QuickChart erro: ' . $exc->getMessage());
+        }
+
+        return null;
+    }
+
+    private function salvarBytesPdf(string $nomeAluno, string $bytes): ?string
+    {
+        if ($bytes === '') {
+            return null;
+        }
         $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
         $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
         $mes = date('Y-m');
         $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '.pdf';
-        $contador = 1;
+        $n = 1;
         while (file_exists($destino)) {
-            $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '_' . $contador . '.pdf';
-            $contador++;
+            $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '_' . $n . '.pdf';
+            $n++;
         }
         file_put_contents($destino, $bytes);
         $this->log("[{$nomeAluno}] Arquivo salvo: {$destino}");
@@ -793,86 +750,61 @@ class CoachReportDownloader
         return $destino;
     }
 
-    private function salvarPdfDeHtml(string $nome, string $html): ?string
-    {
-        // Sem engine de browser: só salva HTML de debug (PDF real vem do download HTTP).
-        $dump = $this->pastaDownload . '/debug_' . preg_replace('/\s+/', '_', $nome) . '_embed.html';
-        file_put_contents($dump, $html);
-        $this->log("[{$nome}] HTML embutido salvo em: {$dump}");
-
-        return null;
-    }
-
     private function formatarDuracao(float $segundos): string
     {
         $total = (int) round($segundos);
-        $horas = intdiv($total, 3600);
-        $resto = $total % 3600;
-        $minutos = intdiv($resto, 60);
-        $segs = $resto % 60;
-        if ($horas > 0) {
-            return "{$horas}h {$minutos}min {$segs}s";
+        $h = intdiv($total, 3600);
+        $m = intdiv($total % 3600, 60);
+        $s = $total % 60;
+        if ($h > 0) {
+            return "{$h}h {$m}min {$s}s";
         }
-        if ($minutos > 0) {
-            return "{$minutos}min {$segs}s";
+        if ($m > 0) {
+            return "{$m}min {$s}s";
         }
 
-        return "{$segs}s";
+        return "{$s}s";
     }
 
     /**
      * @param  list<string>  $pdfs
      * @param  list<string>  $falhas
-     * @param  list<array{nome: string, sucesso: bool, tentativas: int}>|null  $resultados
+     * @param  list<array{nome: string, sucesso: bool, tentativas: int}>  $resultados
      */
     private function gravarLogResumo(
         \DateTimeImmutable $inicio,
         \DateTimeImmutable $fim,
-        int $totalAlunos,
+        int $total,
         array $pdfs,
         array $falhas,
-        ?array $resultados = null,
+        array $resultados,
     ): string {
         $caminho = $this->pastaDownload . '/log_download_' . $inicio->format('Ymd_His') . '.txt';
         $linhas = [
-            'Relatórios Tutory - resumo da execução (CLI/HTTP)',
+            'Relatórios Tutory - CLI/HTTP',
             'Início: ' . $inicio->format('d/m/Y H:i:s'),
             'Fim:    ' . $fim->format('d/m/Y H:i:s'),
             'Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()),
-            "Alunos processados: {$totalAlunos}",
-            'PDFs baixados: ' . count($pdfs),
-            'Falhas finais: ' . count($falhas),
+            "Alunos: {$total}",
+            'PDFs: ' . count($pdfs),
+            'Falhas: ' . count($falhas),
             "Pasta: {$this->pastaDownload}",
             '',
             'Arquivos:',
         ];
-        if ($pdfs !== []) {
-            foreach ($pdfs as $p) {
-                $linhas[] = '- ' . basename($p);
-            }
-        } else {
-            $linhas[] = '- (nenhum)';
-        }
-
+        $linhas = array_merge($linhas, $pdfs !== [] ? array_map(static fn($p) => '- ' . basename($p), $pdfs) : ['- (nenhum)']);
         $linhas[] = '';
-        $linhas[] = 'Status por aluno:';
-        if ($resultados !== null && $resultados !== []) {
-            foreach ($resultados as $r) {
-                $status = $r['sucesso'] ? 'OK' : 'FALHA';
-                $linhas[] = "- [{$status}] {$r['nome']} (tentativas: {$r['tentativas']})";
-            }
-        } else {
-            $linhas[] = '- (nenhum)';
+        $linhas[] = 'Status:';
+        foreach ($resultados as $r) {
+            $linhas[] = '- [' . ($r['sucesso'] ? 'OK' : 'FALHA') . "] {$r['nome']} (tentativas: {$r['tentativas']})";
         }
-
         if ($falhas !== []) {
             $linhas[] = '';
-            $linhas[] = 'Alunos com falha após todas as tentativas:';
-            foreach ($falhas as $nome) {
-                $linhas[] = "- {$nome}";
+            $linhas[] = 'Falhas finais:';
+            foreach ($falhas as $f) {
+                $linhas[] = "- {$f}";
             }
         }
-
         file_put_contents($caminho, implode("\n", $linhas) . "\n");
 
         return $caminho;
@@ -882,36 +814,39 @@ class CoachReportDownloader
     {
         $inicio = new \DateTimeImmutable('now');
         $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
-        $this->log('Modo: CLI/HTTP (sem Selenium/Firefox)');
+        $this->log('Modo: CLI/HTTP → /intent/cadastrar-relatorio-coach + Dompdf');
 
-        $alunos = $this->coletarTodosAlunos();
+        $alunos = $this->coletarAlunosAtivos();
         if ($this->teste) {
-            $alunos = $this->filtrarAlunaTeste($alunos);
+            $alvo = mb_strtolower(self::ALUNA_TESTE);
+            $alunos = array_values(array_filter(
+                $alunos,
+                static fn(array $a) => str_contains(mb_strtolower($a['nome']), $alvo)
+            ));
             if ($alunos !== []) {
-                $this->log('Modo --teste: processando apenas ' . $alunos[0]['nome']);
+                $this->log('Modo --teste: ' . $alunos[0]['nome'] . ' (id ' . $alunos[0]['id'] . ')');
             } else {
-                $this->log("Modo --teste: aluna '" . self::ALUNA_TESTE . "' não encontrada na lista.");
+                $this->log("Modo --teste: '" . self::ALUNA_TESTE . "' não encontrada.");
             }
         }
 
         if ($alunos === []) {
             $fim = new \DateTimeImmutable('now');
-            $this->log('Nenhum aluno encontrado em /alunos/consulta.');
             $log = $this->gravarLogResumo($inicio, $fim, 0, [], [], []);
-            $this->log("Log salvo em: {$log}");
+            $this->log("Nenhum aluno. Log: {$log}");
 
             return;
         }
 
-        /** @var array<string, array{nome: string, sucesso: bool, arquivo: ?string, tentativas: int, meta: array<string, mixed>}> $resultados */
+        /** @var array<string, array{nome: string, sucesso: bool, arquivo: ?string, tentativas: int, meta: array{nome: string, id: string}}> $resultados */
         $resultados = [];
-        foreach ($alunos as $aluno) {
-            $resultados[$aluno['nome']] = [
-                'nome' => $aluno['nome'],
+        foreach ($alunos as $a) {
+            $resultados[$a['nome']] = [
+                'nome' => $a['nome'],
                 'sucesso' => false,
                 'arquivo' => null,
                 'tentativas' => 0,
-                'meta' => $aluno,
+                'meta' => $a,
             ];
         }
         $nomes = array_keys($resultados);
@@ -920,17 +855,11 @@ class CoachReportDownloader
             $total = count($lista);
             foreach ($lista as $i => $nome) {
                 $resultados[$nome]['tentativas']++;
-                $tentativa = $resultados[$nome]['tentativas'];
-                $n = $i + 1;
+                $t = $resultados[$nome]['tentativas'];
                 $this->log(str_repeat('=', 50));
-                $this->log(
-                    "[rodada {$rodada}] Aluno {$n}/{$total}: {$nome} " .
-                        '(tentativa ' . $tentativa . '/' . self::MAX_TENTATIVAS . ')'
-                );
+                $this->log("[rodada {$rodada}] Aluno " . ($i + 1) . "/{$total}: {$nome} (tentativa {$t}/" . self::MAX_TENTATIVAS . ')');
                 try {
-                    /** @var array{nome: string, id: ?string, href: ?string, attrs: array<string, string>} $meta */
-                    $meta = $resultados[$nome]['meta'];
-                    $arquivo = $this->processarAluno($meta);
+                    $arquivo = $this->processarAluno($resultados[$nome]['meta']);
                 } catch (Throwable $exc) {
                     $this->log("[{$nome}] ERRO: " . $exc->getMessage());
                     $arquivo = null;
@@ -948,39 +877,31 @@ class CoachReportDownloader
         };
 
         $processarLote($nomes, 1);
-
         for ($rodada = 2; $rodada <= self::MAX_TENTATIVAS; $rodada++) {
-            $pendentes = array_values(array_filter(
-                $nomes,
-                static fn(string $n) => ! $resultados[$n]['sucesso']
-            ));
+            $pendentes = array_values(array_filter($nomes, static fn($n) => ! $resultados[$n]['sucesso']));
             if ($pendentes === []) {
                 $this->log(str_repeat('=', 50));
-                $this->log('Nenhuma falha restante — sem reprocessamento.');
+                $this->log('Nenhuma falha restante.');
                 break;
             }
             $this->log(str_repeat('=', 50));
-            $this->log(
-                'Reprocessando ' . count($pendentes) . ' aluno(s) com erro ' .
-                    '(rodada ' . $rodada . '/' . self::MAX_TENTATIVAS . ')...'
-            );
+            $this->log('Reprocessando ' . count($pendentes) . " falha(s) (rodada {$rodada}/" . self::MAX_TENTATIVAS . ')...');
             $processarLote($pendentes, $rodada);
         }
 
         $pdfs = [];
         $falhas = [];
         foreach ($resultados as $r) {
-            if ($r['sucesso'] && $r['arquivo'] !== null) {
+            if ($r['sucesso'] && $r['arquivo']) {
                 $pdfs[] = $r['arquivo'];
             }
             if (! $r['sucesso']) {
                 $falhas[] = $r['nome'];
             }
         }
-        $listaResultados = array_map(static fn(string $n) => $resultados[$n], $nomes);
-
+        $lista = array_map(static fn($n) => $resultados[$n], $nomes);
         $fim = new \DateTimeImmutable('now');
-        $log = $this->gravarLogResumo($inicio, $fim, count($nomes), $pdfs, $falhas, $listaResultados);
+        $log = $this->gravarLogResumo($inicio, $fim, count($nomes), $pdfs, $falhas, $lista);
 
         $this->log(str_repeat('=', 50));
         $this->log('Início: ' . $inicio->format('d/m/Y H:i:s'));
@@ -988,11 +909,8 @@ class CoachReportDownloader
         $this->log('Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()));
         $this->log('PDFs baixados: ' . count($pdfs));
         $this->log('Falhas finais: ' . count($falhas));
-        if ($falhas !== []) {
-            $this->log('Alunos com falha:');
-            foreach ($falhas as $nome) {
-                $this->log("- {$nome} (tentativas: {$resultados[$nome]['tentativas']})");
-            }
+        foreach ($falhas as $f) {
+            $this->log("- {$f} (tentativas: {$resultados[$f]['tentativas']})");
         }
         $this->log("Arquivos em: {$this->pastaDownload}");
         $this->log("Log salvo em: {$log}");
