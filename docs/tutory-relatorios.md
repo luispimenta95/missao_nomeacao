@@ -51,7 +51,7 @@ php artisan tutory:baixar-relatorios --periodo=1 --teste
 ```
 
 Arquivo gerado: `relatorio_{aluno}_{periodo}.pdf`  
-Exemplo: `relatorio_Marianny_Carvalho_1.pdf`
+Exemplo: `relatorio_Laíra_Larceda_1.pdf`
 
 ## Agendamento (Laravel Scheduler)
 

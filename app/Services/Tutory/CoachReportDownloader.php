@@ -28,7 +28,7 @@ class CoachReportDownloader
 {
     private const BASE = 'https://admin.tutory.com.br';
 
-    private const ALUNA_TESTE = 'Marianny Carvalho';
+    private const ALUNA_TESTE = 'Laíra Larceda';
 
     private const MAX_TENTATIVAS = 3;
 
