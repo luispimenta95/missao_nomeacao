@@ -863,11 +863,14 @@ class CoachReportDownloader
         $seguroSec3 = htmlspecialchars($sec3Desc, ENT_QUOTES, 'UTF-8');
         $seguroMelhores = htmlspecialchars($melhoresTitulo, ENT_QUOTES, 'UTF-8');
         $seguroPiores = htmlspecialchars($pioresTitulo, ENT_QUOTES, 'UTF-8');
+        $logoHtml = $this->montarHtmlLogoPdf();
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
+.logo{text-align:center; margin:0 0 10px;}
+.logo img{width:120px; height:auto;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .periodo{color:#555; margin-bottom:14px; text-align:center;}
 .aluno{margin:10px 0 18px;}
@@ -894,6 +897,7 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .assuntos .taxa{text-align:right; font-weight:bold;}
 .rule{border:0;border-top:1px solid #eaeaea; margin:12px 0;}
 </style></head><body>
+{$logoHtml}
 <h1>Relatório de Questões</h1>
 <div class="periodo">{$seguroPeriodo}</div>
 <hr class="rule" />
@@ -943,6 +947,26 @@ HTML;
 
             return null;
         }
+    }
+
+    /**
+     * Logo no topo do PDF (Dompdf). Usa data-URI para funcionar sem acesso remoto.
+     */
+    private function montarHtmlLogoPdf(): string
+    {
+        $path = public_path('img/logo-missao-nomeacao.png');
+        if (! is_file($path)) {
+            return '';
+        }
+
+        $bytes = @file_get_contents($path);
+        if ($bytes === false || $bytes === '') {
+            return '';
+        }
+
+        $src = 'data:image/png;base64,' . base64_encode($bytes);
+
+        return '<div class="logo"><img src="' . $src . '" alt="Missão Nomeação" /></div>';
     }
 
     private function montarHtmlPanorama(DOMXPath $xp): string
