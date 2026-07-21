@@ -1,49 +1,50 @@
 # Relatórios do Coach (Tutory)
 
-CLI PHP **somente HTTP** (sem Selenium, sem Firefox, sem php-webdriver) que baixa o **Relatório do Coach** dos alunos **ativos** no admin Tutory.
+CLI PHP **somente HTTP** (sem Selenium/Firefox) que baixa o Relatório do Coach dos alunos **ativos**.
+
+## Fluxo
+
+1. `POST /intent/login` → sessão + Bearer (`adminUser.token`)
+2. `GET /alunos/consulta?status=ativos` → `data-id` de cada aluno
+3. `POST /intent/cadastrar-relatorio-coach` (`alunos[]`, `dt_ini`, `dt_fim`, `agrupamento=mes`)
+4. `GET /documentos/relatorios/questoes?key=...`
+5. PDF via **Dompdf** (gráficos renderizados com QuickChart a partir do Chart.js da página)
+6. Reprocessa falhas (até 3 tentativas)
 
 ## Requisitos
 
-- PHP 8.2+
+- PHP 8.2+ com extensão **gd** (`php-gd`) — necessária para imagens no PDF
 - Credenciais no `.env`
-- Acesso de rede a `admin.tutory.com.br`
+- Rede para `admin.tutory.com.br` e `quickchart.io`
 
-## Variáveis no `.env`
+## `.env`
 
 ```env
 LOGIN_URL=https://admin.tutory.com.br/login
 LOGIN_USER=
 LOGIN_PASSWORD=
+# Preferível fora de public/ (evita expor HTML/token)
 PASTA_DOWNLOAD=
 TIMEOUT=60
-
-# Opcional: se a descoberta automática falhar, force as rotas
-# TUTORY_REPORT_GENERATE_URL=/intent/gerar-relatorio-coach
-# TUTORY_REPORT_DOWNLOAD_URL=
+# Opcional:
+# TUTORY_REPORT_GENERATE_URL=/intent/cadastrar-relatorio-coach
+# TUTORY_REPORT_MODEL=questoes
 ```
+
+Se `PASTA_DOWNLOAD` estiver vazio, usa `storage/app/tutory-relatorios`.
 
 ## Uso
 
 ```bash
-# Período 1–15 do mês atual
 php scripts/baixar_relatorios_tutory.php --periodo=1
+php scripts/baixar_relatorios_tutory.php --periodo=2 --teste
 
-# Período 16–último dia
-php scripts/baixar_relatorios_tutory.php --periodo=2
-
-# Teste com uma aluna
-php scripts/baixar_relatorios_tutory.php --periodo=1 --teste
-
-# Alternativa Artisan (mesmo serviço)
-php artisan tutory:baixar-relatorios --periodo=1
+# ou
+php artisan tutory:baixar-relatorios --periodo=1 --teste
 ```
 
-## Fluxo
+## Segurança
 
-1. `POST /intent/login` (cookie de sessão + Bearer token do HTML, se existir)
-2. `/alunos/consulta` com `status=ativos` (GET/POST/form)
-3. Para cada aluno: descobre endpoint de geração → solicita relatório (questões + mês + datas) → baixa PDF via HTTP
-4. Reprocessa falhas (até 3 tentativas por aluno)
-5. Grava `log_download_YYYYMMDD_HHMMSS.txt` na pasta de download
-
-Se o painel só gerar PDF no navegador (botão Baixar/jsPDF), o CLI salva o HTML em `debug_*.html` para inspeção e permite forçar rotas com `TUTORY_REPORT_*`.
+- **Não** salve dumps de HTML do admin em `public/` (o `adminUser.token` vaza).
+- Use sempre `LOGIN_USER` / `LOGIN_PASSWORD` no `.env` (nunca hardcode no código).
+- Se um `debug_*.html` já ficou público, revogue a sessão no Tutory e apague o arquivo.
