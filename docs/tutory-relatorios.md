@@ -1,6 +1,6 @@
 # Relatórios do Coach (Tutory)
 
-CLI PHP **HTTP + Puppeteer** que baixa o Relatório do Coach dos alunos **ativos**, gerando o **mesmo PDF** do botão "Baixar" do painel (PDFWriter/jsPDF).
+CLI PHP **HTTP + Puppeteer** que baixa o Relatório do Coach dos alunos **ativos** no Tutory e envia o PDF por e-mail aos alunos cadastrados no admin (`recebe_email=true`).
 
 ## Fluxo
 
@@ -11,6 +11,7 @@ CLI PHP **HTTP + Puppeteer** que baixa o Relatório do Coach dos alunos **ativos
 5. PDF oficial via **Puppeteer** (`scripts/tutory-render-pdf.mjs` → `PDFWriter.output()`)
 6. Fallback: Dompdf + QuickChart (se Node/Chromium indisponível)
 7. Reprocessa falhas (até 3 tentativas)
+8. Lista alunos do **admin** (`alunos`) → localiza PDF em `public/pdfs` pelo nome → envia e-mail se `recebe_email=true` (PDF em anexo)
 
 ## Requisitos
 
@@ -18,6 +19,8 @@ CLI PHP **HTTP + Puppeteer** que baixa o Relatório do Coach dos alunos **ativos
 - Node.js 18+ com `puppeteer` (`npm install`) — Chromium baixado pelo Puppeteer
 - Rede para `admin.tutory.com.br`
 - (Fallback Dompdf) extensão **gd** + acesso a `quickchart.io`
+- SMTP configurado (`MAIL_*`) para envio dos relatórios
+- Alunos cadastrados em `/admin/alunos` com o **mesmo nome** usado no Tutory (para casar o PDF)
 
 ## `.env`
 
@@ -28,6 +31,7 @@ LOGIN_PASSWORD=
 # Preferível fora de public/ (evita expor HTML/token)
 PASTA_DOWNLOAD=
 TIMEOUT=120
+APP_TIMEZONE=America/Sao_Paulo
 # NODE_BINARY=node
 # TUTORY_REPORT_GENERATE_URL=/intent/cadastrar-relatorio-coach
 # TUTORY_REPORT_MODEL=questoes
@@ -36,22 +40,21 @@ TIMEOUT=120
 
 Em teste, o serviço pode usar credenciais hardcoded. Em produção, use `LOGIN_USER` / `LOGIN_PASSWORD`.
 
-Se `PASTA_DOWNLOAD` estiver vazio, usa `public/pdfs` (ou `storage/app/tutory-relatorios` fora do Laravel).
+Se `PASTA_DOWNLOAD` estiver vazio, usa `public/pdfs`.
 
 ## Uso
 
 ```bash
 npm install   # puppeteer + Chromium
 
-php scripts/baixar_relatorios_tutory.php --periodo=1
-php scripts/baixar_relatorios_tutory.php --periodo=2 --teste
-
-# ou
-php artisan tutory:baixar-relatorios --periodo=1 --teste
+php artisan tutory:baixar-relatorios --periodo=1
+php artisan tutory:baixar-relatorios --periodo=2 --teste
 ```
 
-Arquivo gerado: `relatorio_{aluno}_{periodo}.pdf`  
-Exemplo: `relatorio_Laíra_Larceda_1.pdf`
+Arquivo gerado: `relatorio_{Ymd_Hi}_{aluno}_{periodo}.pdf`  
+Exemplo: `relatorio_20260721_1830_Laíra_Larceda_1.pdf`
+
+O envio de e-mail usa o PDF mais recente do aluno na pasta para o `--periodo` informado.
 
 ## Agendamento (Laravel Scheduler)
 
