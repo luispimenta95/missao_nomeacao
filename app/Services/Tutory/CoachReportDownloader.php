@@ -746,15 +746,24 @@ class CoachReportDownloader
 
         $query = Aluno::query()->orderBy('nome');
         $alunos = $query->get();
+        $totalAdmin = $alunos->count();
         if ($this->teste) {
-            $alvo = mb_strtolower(self::ALUNA_TESTE);
+            $alvo = self::ALUNA_TESTE;
             $alunos = $alunos
-                ->filter(static fn (Aluno $a) => str_contains(mb_strtolower($a->nome), $alvo))
+                ->filter(fn (Aluno $a) => $this->nomesArquivoSaoCompativeis(
+                    $this->sanitizarNomeArquivo($a->nome),
+                    $this->sanitizarNomeArquivo($alvo)
+                ))
                 ->values();
+            $this->log('Modo --teste: filtrando alunos do admin compatíveis com "'.$alvo.'" ('.$alunos->count().' de '.$totalAdmin.')');
         }
 
         if ($alunos->isEmpty()) {
-            $this->log('Nenhum aluno cadastrado no admin para envio.');
+            if ($totalAdmin === 0) {
+                $this->log('Nenhum aluno cadastrado no admin (/admin/alunos) para envio.');
+            } else {
+                $this->log('Nenhum aluno do admin corresponde ao filtro de teste. Confira o nome em /admin/alunos.');
+            }
 
             return;
         }
