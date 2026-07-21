@@ -5,9 +5,9 @@
  *
  * 1. Login (/intent/login) → sessão + Bearer
  * 2. /alunos/consulta?status=ativos (cards com data-id)
- * 3. POST /intent/cadastrar-relatorio-coach
+ * 3. POST /intent/cadastrar-relatorio-coach (agrupamento=dia)
  * 4. GET /documentos/relatorios/questoes?key=...
- * 5. Gera PDF via Dompdf (gráficos via QuickChart a partir do Chart.js embutido)
+ * 5. PDF oficial via Puppeteer + PDFWriter/jsPDF do painel (fallback: Dompdf)
  * 6. Reprocessa falhas (até 3x)
  */
 
@@ -70,16 +70,19 @@ class CoachReportDownloader
         };
 
         $loginUrl = trim((string) env('LOGIN_URL', ''));
-        $this->urlLogin = 'https://admin.tutory.com.br/login';
+        $this->urlLogin = $loginUrl !== '' ? $loginUrl : 'https://admin.tutory.com.br/login';
+        // TEMP (teste): credenciais hardcoded — trocar por .env depois
         $this->senha = '05473793150';
         $this->email = 'missaonomeacao';
-        $pastaEnv = public_path('pdfs/');
-        $defaultPasta = function_exists('storage_path')
-            ? storage_path('app/tutory-relatorios')
-            : rtrim((string) getenv('HOME'), '/') . '/Relatorios_Tutory';
+        $pastaEnv = trim((string) env('PASTA_DOWNLOAD', ''));
+        $defaultPasta = function_exists('public_path')
+            ? public_path('pdfs')
+            : (function_exists('storage_path')
+                ? storage_path('app/tutory-relatorios')
+                : rtrim((string) getenv('HOME'), '/') . '/Relatorios_Tutory');
         $this->pastaDownload = $this->expandHome($pastaEnv !== '' ? $pastaEnv : $defaultPasta);
 
-        $this->timeout = (int) (env('TIMEOUT') ?: 60);
+        $this->timeout = (int) (env('TIMEOUT') ?: 120);
         $this->cookieFile = sys_get_temp_dir() . '/tutory_cookies_' . getmypid() . '.json';
         $this->cookieJar = new FileCookieJar($this->cookieFile, true);
 
@@ -115,18 +118,7 @@ class CoachReportDownloader
 
     private function validarConfig(): void
     {
-        $faltando = [];
-        if ($this->email === '') {
-            $faltando[] = 'LOGIN_USER';
-        }
-        if ($this->senha === '') {
-            $faltando[] = 'LOGIN_PASSWORD';
-        }
-        if ($faltando !== []) {
-            throw new RuntimeException(
-                'Configure no .env: ' . implode(', ', $faltando) . '. Use .env.example como modelo.'
-            );
-        }
+        // TEMP: credenciais hardcoded para teste — validação de .env desativada
         if (! in_array($this->periodo, ['1', '2'], true)) {
             throw new RuntimeException('--periodo deve ser 1 ou 2.');
         }
@@ -453,11 +445,12 @@ class CoachReportDownloader
         }
 
         $this->log("[{$nome}] Gerando via {$endpoint}...");
-        // Backend PHP espera alunos[]=ID (como o jQuery do painel)
+        // PDF de referência do painel usa agrupamento diário (gráficos por dia)
+        $agrupamento = trim((string) env('TUTORY_REPORT_AGRUPAMENTO', 'dia')) ?: 'dia';
         $body = 'alunos[]=' . rawurlencode($id)
             . '&dt_ini=' . rawurlencode($dtIni)
             . '&dt_fim=' . rawurlencode($dtFim)
-            . '&agrupamento=mes';
+            . '&agrupamento=' . rawurlencode($agrupamento);
 
         $resp = $this->client()
             ->withHeaders(['Content-Type' => 'application/x-www-form-urlencoded; charset=UTF-8'])
@@ -484,6 +477,8 @@ class CoachReportDownloader
         $reportUrl = self::BASE . '/documentos/relatorios/' . $model . '?key=' . rawurlencode($key);
         $this->log("[{$nome}] Abrindo relatório...");
 
+        $destino = $this->caminhoDestinoPdf($nome, $id);
+
         $pagina = $this->client()
             ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
             ->get('/documentos/relatorios/' . $model, ['key' => $key]);
@@ -494,7 +489,132 @@ class CoachReportDownloader
             return null;
         }
 
-        return $this->gerarPdfDoHtml($nome, $id, $pagina->body(), $dtIniIso, $dtFimIso);
+        $html = $pagina->body();
+        if (! str_contains($html, 'main-numbers') || ! str_contains($html, 'tabela_questoes')) {
+            $this->log("[{$nome}] AVISO: página sem Breve Panorama ou Performance por assunto");
+        }
+
+        // Réplica do PDF do painel (mesmo PDFWriter/jsPDF do botão Baixar)
+        if ($this->gerarPdfComPuppeteer($nome, $reportUrl, $destino)) {
+            if ($this->pdfContemSecoesObrigatorias($destino)) {
+                return $destino;
+            }
+            $this->log("[{$nome}] PDF Puppeteer sem panorama/assuntos — regenerando via Dompdf");
+            @unlink($destino);
+        }
+
+        $this->log("[{$nome}] Fallback Dompdf (panorama + assuntos + gráficos)...");
+
+        return $this->gerarPdfDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso);
+    }
+
+    private function pdfContemSecoesObrigatorias(string $caminho): bool
+    {
+        if (! is_file($caminho) || filesize($caminho) < 500) {
+            return false;
+        }
+        $bytes = file_get_contents($caminho);
+        if ($bytes === false) {
+            return false;
+        }
+        // jsPDF grava texto em literais PDF; aceita com ou sem acentos escapados
+        $temPanorama = str_contains($bytes, 'Breve Panorama') || str_contains($bytes, 'Breve');
+        $temAssuntos = str_contains($bytes, 'Performance por assunto')
+            || str_contains($bytes, 'Performance por')
+            || str_contains($bytes, 'tabela_questoes')
+            || str_contains($bytes, 'Taxa de');
+
+        return $temPanorama && $temAssuntos;
+    }
+
+    private function cookieHeader(): string
+    {
+        if ($this->cookieJar === null) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ($this->cookieJar as $cookie) {
+            $parts[] = $cookie->getName().'='.$cookie->getValue();
+        }
+
+        return implode('; ', $parts);
+    }
+
+    /**
+     * Usa o PDFWriter/jsPDF do painel via Puppeteer → PDF idêntico ao "Baixar".
+     */
+    private function gerarPdfComPuppeteer(string $nome, string $reportUrl, string $destino): bool
+    {
+        $script = function_exists('base_path')
+            ? base_path('scripts/tutory-render-pdf.mjs')
+            : dirname(__DIR__, 3).'/scripts/tutory-render-pdf.mjs';
+
+        if (! is_file($script)) {
+            $this->log("[{$nome}] Script Puppeteer ausente: {$script}");
+
+            return false;
+        }
+
+        $node = trim((string) env('NODE_BINARY', 'node')) ?: 'node';
+        $cmd = [$node, $script, '--url', $reportUrl, '--out', $destino];
+        $cookie = $this->cookieHeader();
+        if ($cookie !== '') {
+            $cmd[] = '--cookie';
+            $cmd[] = $cookie;
+        }
+        if ($this->bearerToken !== null && $this->bearerToken !== '') {
+            $cmd[] = '--token';
+            $cmd[] = $this->bearerToken;
+        }
+
+        $this->log("[{$nome}] Renderizando PDF oficial (PDFWriter/jsPDF via Puppeteer)...");
+
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $cwd = function_exists('base_path') ? base_path() : dirname($script, 2);
+        $proc = @proc_open($cmd, $descriptors, $pipes, $cwd, null);
+        if (! is_resource($proc)) {
+            $this->log("[{$nome}] Não foi possível iniciar Node/Puppeteer");
+
+            return false;
+        }
+
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]) ?: '';
+        $stderr = stream_get_contents($pipes[2]) ?: '';
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+
+        if ($code !== 0 || ! is_file($destino) || filesize($destino) < 500) {
+            $detail = trim($stderr !== '' ? $stderr : $stdout);
+            $this->log("[{$nome}] Puppeteer falhou (exit {$code}): ".$detail);
+
+            return false;
+        }
+
+        $this->log("[{$nome}] Arquivo salvo: {$destino}");
+
+        return true;
+    }
+
+    private function caminhoDestinoPdf(string $nomeAluno, ?string $id = null): string
+    {
+        $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
+        $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
+        // Formato pedido: relatorio_$aluno_$periodo.pdf
+        $destino = $this->pastaDownload.'/relatorio_'.$seguro.'_'.$this->periodo.'.pdf';
+        $n = 1;
+        while (file_exists($destino)) {
+            $destino = $this->pastaDownload.'/relatorio_'.$seguro.'_'.$this->periodo.'_'.$n.'.pdf';
+            $n++;
+        }
+
+        return $destino;
     }
 
     private function gerarPdfDoHtml(
@@ -504,7 +624,7 @@ class CoachReportDownloader
         string $dtIniIso,
         string $dtFimIso,
     ): ?string {
-        $this->log("[{$nome}] Montando PDF (Dompdf + gráficos QuickChart)...");
+        $this->log("[{$nome}] Montando PDF (Dompdf: panorama + gráficos + assuntos)...");
 
         $xp = $this->loadDom($html);
         $periodo = $this->xpathText($xp, "//*[contains(@class,'report-header')]//p")
@@ -512,53 +632,91 @@ class CoachReportDownloader
         $curso = $this->xpathText($xp, "//*[contains(@class,'report-aluno-desc')]//p")
             ?: '';
 
-        $chartsHtml = '';
-        if (extension_loaded('gd')) {
-            $chartIds = [
-                'chart_questoes_dia' => 'Acertos e Erros',
-                'chart_bolha_questoes' => 'Bolha de Questões',
-                'chart_top_melhores' => 'Top Melhores',
-                'chart_top_piores' => 'Top Piores',
-                'chart_evolucao_materia' => 'Evolução por Matéria',
-                'chart_questoes_disciplina' => 'Questões por Disciplina',
-            ];
-            foreach ($chartIds as $chartId => $titulo) {
-                $cfg = $this->extrairChartConfig($html, $chartId);
-                if ($cfg === null) {
-                    continue;
-                }
-                $img = $this->quickChartPngDataUri($cfg);
-                if ($img === null) {
-                    continue;
-                }
-                $chartsHtml .= '<h3 style="color:#00aced;margin:18px 0 8px;">' . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</h3>';
-                $chartsHtml .= '<img src="' . $img . '" style="width:100%;max-width:700px;" />';
-            }
-        } else {
-            $this->log("[{$nome}] AVISO: extensão GD ausente — PDF sem imagens de gráfico");
-            $chartsHtml = '<p style="color:#888;">(Gráficos omitidos: instale php-gd no servidor)</p>';
-        }
+        $panoramaHtml = $this->montarHtmlPanorama($xp);
+        $assuntosHtml = $this->montarHtmlAssuntos($xp);
+
+        $chartDia = $this->chartImgHtml($html, 'chart_questoes_dia', 'Acertos e Erros por Dia');
+        $chartBolha = $this->chartImgHtml($html, 'chart_bolha_questoes', null);
+        $chartMelhores = $this->chartImgHtml($html, 'chart_top_melhores', null);
+        $chartPiores = $this->chartImgHtml($html, 'chart_top_piores', null);
+        $chartEvolucao = $this->chartImgHtml($html, 'chart_evolucao_materia', null);
+
+        $sec2Desc = $this->xpathText($xp, "//h2[contains(@class,'section-2')]/following-sibling::p[1]")
+            ?: 'Confira o seu desempenho por disciplinas';
+        $sec3Desc = $this->xpathText($xp, "//h2[contains(@class,'section-3')]/following-sibling::p[1]")
+            ?: 'Agora, vamos acompanhar sua evolução no tempo por matéria';
+        $melhoresTitulo = $this->xpathText($xp, "//*[contains(@class,'section-2-1')]") ?: 'Suas 3 melhores matérias';
+        $pioresTitulo = $this->xpathText($xp, "//*[contains(@class,'section-2-2')]") ?: 'Suas 3 piores matérias';
 
         $seguroNome = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
         $seguroCurso = htmlspecialchars($curso, ENT_QUOTES, 'UTF-8');
         $seguroPeriodo = htmlspecialchars($periodo, ENT_QUOTES, 'UTF-8');
+        $seguroSec2 = htmlspecialchars($sec2Desc, ENT_QUOTES, 'UTF-8');
+        $seguroSec3 = htmlspecialchars($sec3Desc, ENT_QUOTES, 'UTF-8');
+        $seguroMelhores = htmlspecialchars($melhoresTitulo, ENT_QUOTES, 'UTF-8');
+        $seguroPiores = htmlspecialchars($pioresTitulo, ENT_QUOTES, 'UTF-8');
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-h1{font-size:20px; margin:0 0 6px;}
-h3{font-size:14px;}
-.sub{color:#555; margin-bottom:16px;}
+h1{font-size:20px; margin:0 0 6px; text-align:center;}
+.periodo{color:#555; margin-bottom:14px; text-align:center;}
+.aluno{margin:10px 0 18px;}
+.aluno h2{margin:0 0 4px; font-size:16px;}
+.section{margin:22px 0 8px; padding-left:10px; border-left:4px solid #00aced; font-size:15px;}
+.section-desc{color:#555; margin:0 0 12px;}
+.panorama{width:100%; border-collapse:separate; border-spacing:10px 0; margin:6px 0 14px; table-layout:fixed;}
+.panorama td{
+  width:33%;
+  border:0.4pt solid #cdcdcd;
+  padding:6pt 8pt 10pt;
+  height:52pt;
+  vertical-align:top;
+  background:#ffffff;
+}
+.panorama .label{color:#cccccc; font-size:9pt; margin:0 0 12pt; line-height:1.1;}
+.panorama .value{font-size:12pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
+.chart{width:100%; max-width:700px; margin:8px 0 16px;}
+.two-col{width:100%; border-collapse:collapse;}
+.two-col td{width:50%; vertical-align:top; padding:4px;}
+.assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
+.assuntos thead td{background:#00aced; color:#fff; font-weight:bold; padding:8px;}
+.assuntos tbody td{border-bottom:1px solid #eee; padding:8px; vertical-align:top;}
+.assuntos .taxa{text-align:right; font-weight:bold;}
 .rule{border:0;border-top:1px solid #eaeaea; margin:12px 0;}
 </style></head><body>
 <h1>Relatório de Questões</h1>
-<div class="sub">{$seguroPeriodo}</div>
+<div class="periodo">{$seguroPeriodo}</div>
 <hr class="rule" />
-<h2 style="margin:0 0 4px;">{$seguroNome}</h2>
-<div class="sub">{$seguroCurso}</div>
-{$chartsHtml}
-<p style="margin-top:24px;color:#888;font-size:10px;">Gerado via CLI HTTP · aluno id {$id}</p>
+<div class="aluno">
+  <h2>{$seguroNome}</h2>
+  <div class="periodo" style="text-align:left;margin:0;">{$seguroCurso}</div>
+</div>
+
+<h2 class="section">Breve Panorama</h2>
+<p class="section-desc">Confira o seu desempenho de questões no período</p>
+{$panoramaHtml}
+{$chartDia}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Desempenho por Disciplina</h2>
+<p class="section-desc">{$seguroSec2}</p>
+{$chartBolha}
+<table class="two-col"><tr>
+  <td><p><b>{$seguroMelhores}</b></p>{$chartMelhores}</td>
+  <td><p><b>{$seguroPiores}</b></p>{$chartPiores}</td>
+</tr></table>
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Evolução do Desempenho por Disciplina</h2>
+<p class="section-desc">{$seguroSec3}</p>
+{$chartEvolucao}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Performance por assunto</h2>
+<p class="section-desc">Confira o desempenho de questões por assunto no período do relatório:</p>
+{$assuntosHtml}
 </body></html>
 HTML;
 
@@ -571,12 +729,116 @@ HTML;
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
 
-            return $this->salvarBytesPdf($nome, $dompdf->output() ?? '');
+            return $this->salvarBytesPdf($nome, $dompdf->output() ?? '', $id);
         } catch (Throwable $exc) {
             $this->log("[{$nome}] Erro Dompdf: " . $exc->getMessage());
 
             return null;
         }
+    }
+
+    private function montarHtmlPanorama(DOMXPath $xp): string
+    {
+        $nodes = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' main-numbers ')]");
+        if ($nodes === false || $nodes->length === 0) {
+            return '<p style="color:#888;">(Breve Panorama indisponível na página)</p>';
+        }
+
+        $cells = '';
+        foreach ($nodes as $node) {
+            if (! $node instanceof DOMElement) {
+                continue;
+            }
+            $label = '';
+            $value = '';
+            foreach ($node->childNodes as $child) {
+                if (! $child instanceof DOMElement) {
+                    continue;
+                }
+                $tag = strtolower($child->tagName);
+                if ($tag === 'p') {
+                    $label = trim((string) $child->textContent);
+                }
+                if ($tag === 'h3') {
+                    $value = trim((string) $child->textContent);
+                }
+            }
+            if ($label === '' && $value === '') {
+                continue;
+            }
+            $cells .= '<td><div class="label">'.htmlspecialchars($label, ENT_QUOTES, 'UTF-8').'</div>'
+                .'<div class="value">'.htmlspecialchars($value, ENT_QUOTES, 'UTF-8').'</div></td>';
+        }
+
+        if ($cells === '') {
+            return '<p style="color:#888;">(Breve Panorama vazio)</p>';
+        }
+
+        return '<table class="panorama"><tr>'.$cells.'</tr></table>';
+    }
+
+    private function montarHtmlAssuntos(DOMXPath $xp): string
+    {
+        $rows = $xp->query("//*[@id='tabela_questoes']//tbody/tr");
+        if ($rows === false || $rows->length === 0) {
+            return '<p style="color:#888;">(Performance por assunto indisponível na página)</p>';
+        }
+
+        $body = '';
+        foreach ($rows as $tr) {
+            if (! $tr instanceof DOMElement) {
+                continue;
+            }
+            $tds = [];
+            foreach ($tr->getElementsByTagName('td') as $td) {
+                $tds[] = $td;
+            }
+            if (count($tds) < 3) {
+                continue;
+            }
+            $disciplina = htmlspecialchars(trim((string) $tds[0]->textContent), ENT_QUOTES, 'UTF-8');
+            $assunto = htmlspecialchars(trim((string) $tds[1]->textContent), ENT_QUOTES, 'UTF-8');
+            $taxa = htmlspecialchars(trim((string) $tds[2]->textContent), ENT_QUOTES, 'UTF-8');
+            $style = trim($tds[2]->getAttribute('style'));
+            $color = '#d09611';
+            if (preg_match('/color\s*:\s*([^;]+)/i', $style, $m)) {
+                $color = trim($m[1]);
+            }
+            $body .= '<tr>'
+                .'<td>'.$disciplina.'</td>'
+                .'<td>'.$assunto.'</td>'
+                .'<td class="taxa" style="color:'.htmlspecialchars($color, ENT_QUOTES, 'UTF-8').';">'.$taxa.'</td>'
+                .'</tr>';
+        }
+
+        return '<table class="assuntos"><thead><tr>'
+            .'<td>Disciplina</td><td>Assunto</td><td>Taxa de Acertos</td>'
+            .'</tr></thead><tbody>'.$body.'</tbody></table>';
+    }
+
+    private function chartImgHtml(string $html, string $chartId, ?string $titulo): string
+    {
+        if (! extension_loaded('gd')) {
+            return $titulo
+                ? '<p style="color:#888;">('.$titulo.' omitido: instale php-gd)</p>'
+                : '';
+        }
+        $cfg = $this->extrairChartConfig($html, $chartId);
+        if ($cfg === null) {
+            return '';
+        }
+        $img = $this->quickChartPngDataUri($cfg);
+        if ($img === null) {
+            return '';
+        }
+        $out = '';
+        if ($titulo !== null && $titulo !== '') {
+            $out .= '<p style="text-align:center;font-weight:bold;margin:8px 0;">'
+                .htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</p>';
+        }
+        $out .= '<img class="chart" src="'.$img.'" />';
+
+        return $out;
     }
 
     private function xpathText(DOMXPath $xp, string $query): string
@@ -596,63 +858,197 @@ HTML;
      */
     private function extrairChartConfig(string $html, string $canvasId): ?array
     {
-        // new Chart(elChartQuestoesDia, { ... });
-        // ou new Chart(document.getElementById('chart_...'), { ... });
-        $patterns = [
-            '/new\s+Chart\s*\(\s*[^,]+,\s*(\{.*?)\s*\)\s*;\s*(?:var\s+chart|\$\("#btn_save"\)|var\s+elChart|<\/script>)/s',
-        ];
-
-        // Mais preciso: achar getElementById('id') e o new Chart seguinte
-        $pos = strpos($html, "getElementById('{$canvasId}')");
-        if ($pos === false) {
-            $pos = strpos($html, 'getElementById("' . $canvasId . '")');
-        }
-        if ($pos === false) {
-            return null;
+        // var elFoo = document.getElementById('chart_...');
+        // new Chart(elFoo, { ... });
+        $elVar = null;
+        if (preg_match(
+            '/var\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*document\.getElementById\(\s*[\'"]'.preg_quote($canvasId, '/').'[\'"]\s*\)/',
+            $html,
+            $vm
+        )) {
+            $elVar = $vm[1];
         }
 
-        $slice = substr($html, $pos, 12000);
-        if (! preg_match('/new\s+Chart\s*\(\s*[^,]+,\s*(\{)/', $slice, $m, PREG_OFFSET_CAPTURE)) {
-            return null;
+        $jsonish = null;
+        if ($elVar !== null) {
+            $needle = 'new Chart('.$elVar;
+            $pos = strpos($html, $needle);
+            if ($pos === false) {
+                $pos = strpos($html, 'new Chart( '.$elVar);
+            }
+            if ($pos !== false) {
+                $slice = substr($html, $pos, 20000);
+                if (preg_match('/new\s+Chart\s*\(\s*'.preg_quote($elVar, '/').'\s*,\s*(\{)/', $slice, $m, PREG_OFFSET_CAPTURE)) {
+                    $jsonish = $this->extrairObjetoJsBalanceado($slice, (int) $m[1][1]);
+                }
+            }
         }
-        $start = (int) $m[1][1];
-        $jsonish = $this->extrairObjetoJsBalanceado($slice, $start);
+
+        // Fallback: new Chart(document.getElementById('id'), { ... })
+        if ($jsonish === null) {
+            if (preg_match(
+                '/new\s+Chart\s*\(\s*document\.getElementById\(\s*[\'"]'.preg_quote($canvasId, '/').'[\'"]\s*\)\s*,\s*(\{)/',
+                $html,
+                $m,
+                PREG_OFFSET_CAPTURE
+            )) {
+                $jsonish = $this->extrairObjetoJsBalanceado($html, (int) $m[1][1]);
+            }
+        }
+
         if ($jsonish === null) {
             return null;
         }
 
+        $colors = $this->extrairChartColors($html);
+
         // JS object → JSON aproximado
         $json = $jsonish;
+        // Substitui chartColors[Math.floor(Math.random()*chartColors.length)] por cores fixas
+        $colorIdx = 0;
+        $json = preg_replace_callback(
+            '/chartColors\s*\[\s*Math\.floor\s*\(\s*Math\.random\s*\(\s*\)\s*\*\s*chartColors\.length\s*\)\s*\]/',
+            static function () use (&$colorIdx, $colors): string {
+                $c = $colors[$colorIdx % count($colors)];
+                $colorIdx++;
+
+                return "'".$c."'";
+            },
+            $json
+        ) ?? $json;
+
         $json = preg_replace('/([{\[,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/', '$1"$2":', $json) ?? $json;
         $json = str_replace("'", '"', $json);
         $json = preg_replace('/,\s*([}\]])/', '$1', $json) ?? $json;
         // remove functions (datalabels formatter etc.)
         $json = preg_replace('/"formatter"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
+        $json = preg_replace('/"label"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
         $json = preg_replace('/"function"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
         $json = preg_replace('/function\s*\(.*?\)\s*\{.*?\},?/s', 'null,', $json) ?? $json;
         $json = preg_replace('/,\s*([}\]])/', '$1', $json) ?? $json;
 
         $data = json_decode($json, true);
         if (! is_array($data)) {
-            // fallback mínimo só com type/data se parse falhar
-            if (
-                preg_match('/type:\s*[\'"](\w+)[\'"]/', $jsonish, $tm)
-                && preg_match('/labels:\s*(\[[^\]]*\])/', $jsonish, $lm)
-            ) {
-                return [
-                    'type' => $tm[1],
-                    'data' => [
-                        'labels' => json_decode(str_replace("'", '"', $lm[1]), true) ?: [],
-                        'datasets' => [],
-                    ],
-                    'options' => ['plugins' => ['legend' => ['display' => true]]],
-                ];
-            }
-
             return null;
         }
 
-        // QuickChart usa Chart.js v3+ em parte; simplifica options
+        return $this->aplicarDatalabelsOficiais($data, $canvasId);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extrairChartColors(string $html): array
+    {
+        $defaults = [
+            '#00ACED', '#FF595E', '#FFCA3A', '#8AC926', '#6A4C93', '#FF70A6',
+            '#6D4C3D', '#0D0221', '#5CF64A', '#F94144', '#F3722C', '#F9C74F',
+            '#90BE6D', '#43AA8B', '#577590',
+        ];
+        if (! preg_match('/var\s+chartColors\s*=\s*\[(.*?)\]/s', $html, $m)) {
+            return $defaults;
+        }
+        preg_match_all('/[\'"](#[0-9A-Fa-f]{3,8})[\'"]/', $m[1], $cm);
+        $colors = array_values(array_unique($cm[1] ?? []));
+
+        return $colors !== [] ? $colors : $defaults;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function aplicarDatalabelsOficiais(array $data, string $canvasId): array
+    {
+        $type = (string) ($data['type'] ?? '');
+
+        // Garante legenda com nomes das disciplinas (bolha / evolução)
+        if (in_array($canvasId, ['chart_bolha_questoes', 'chart_evolucao_materia'], true)) {
+            $data['options']['legend']['display'] = true;
+            $data['options']['legend']['labels'] = [
+                'boxWidth' => 12,
+                'fontSize' => 9,
+            ];
+        }
+
+        // Barras: nomes das disciplinas no eixo X
+        if ($type === 'bar') {
+            $data['options']['scales']['xAxes'] = [[
+                'ticks' => [
+                    'fontSize' => 8,
+                    'autoSkip' => false,
+                    'maxRotation' => 45,
+                    'minRotation' => 45,
+                ],
+            ]];
+            if (! isset($data['options']['scales']['yAxes'])) {
+                $data['options']['scales']['yAxes'] = [[
+                    'ticks' => ['beginAtZero' => true, 'max' => 120],
+                ]];
+            }
+            $data['options']['legend']['display'] = false;
+            $data['options']['plugins']['datalabels'] = [
+                'color' => '#333',
+                'anchor' => 'end',
+                'align' => 'end',
+                'offset' => 6,
+                'font' => ['size' => 10],
+                'formatter' => '__DATALABEL_PERCENT__',
+            ];
+
+            return $data;
+        }
+
+        if ($type === 'bubble') {
+            $data['options']['plugins']['datalabels'] = [
+                'anchor' => 'end',
+                'align' => 'end',
+                'offset' => 8,
+                'color' => '#fff',
+                'backgroundColor' => '#000',
+                'borderRadius' => 0,
+                'padding' => 4,
+                'font' => ['size' => 10],
+                'formatter' => '__DATALABEL_BUBBLE_PERCENT__',
+            ];
+            $padding = is_array($data['options']['layout']['padding'] ?? null)
+                ? $data['options']['layout']['padding']
+                : [];
+            $data['options']['layout']['padding'] = array_merge($padding, [
+                'top' => 20,
+                'right' => 16,
+            ]);
+
+            return $data;
+        }
+
+        if ($type === 'line') {
+            $isQuestoesDia = $canvasId === 'chart_questoes_dia';
+            $data['options']['plugins']['datalabels'] = [
+                'anchor' => 'end',
+                'align' => 'end',
+                'offset' => 8,
+                'color' => '#fff',
+                'backgroundColor' => '#000',
+                'borderRadius' => 0,
+                'padding' => 4,
+                'font' => ['size' => 10],
+                'formatter' => $isQuestoesDia ? '__DATALABEL_QUESTOES__' : '__DATALABEL_PERCENT__',
+            ];
+            $padding = is_array($data['options']['layout']['padding'] ?? null)
+                ? $data['options']['layout']['padding']
+                : [];
+            $data['options']['layout']['padding'] = array_merge($padding, [
+                'top' => 28,
+                'right' => 16,
+            ]);
+            if ($canvasId === 'chart_evolucao_materia') {
+                $data['options']['legend']['display'] = true;
+            }
+
+            return $data;
+        }
+
         unset($data['options']['plugins']['datalabels']);
 
         return $data;
@@ -704,46 +1100,65 @@ HTML;
     private function quickChartPngDataUri(array $chartConfig): ?string
     {
         try {
-            $resp = Http::timeout(30)
+            // chart como string JS para permitir formatter() (caixinhas pretas "N questões" / "N%")
+            $chartJs = json_encode($chartConfig, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($chartJs === false) {
+                return null;
+            }
+            $replacements = [
+                '"__DATALABEL_QUESTOES__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
+                '"__DATALABEL_PERCENT__"' => 'function(value){return Number(value).toFixed(0)+"%";}',
+                '"__DATALABEL_BUBBLE_PERCENT__"' => 'function(value){return value&&value.r!=null?Number(value.r*10).toFixed(0)+"%":"";}',
+                // legado
+                '"__DATALABEL_FORMATTER__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
+            ];
+            $chartJs = str_replace(array_keys($replacements), array_values($replacements), $chartJs);
+
+            $payload = [
+                'width' => 900,
+                'height' => 420,
+                'devicePixelRatio' => 2,
+                'format' => 'png',
+                'backgroundColor' => 'white',
+                'version' => '2.9.4',
+                'plugins' => ['datalabels'],
+                'chart' => $chartJs,
+            ];
+
+            $resp = Http::timeout(45)
                 ->asJson()
-                ->post('https://quickchart.io/chart', [
-                    'width' => 800,
-                    'height' => 400,
-                    'format' => 'png',
-                    'backgroundColor' => 'white',
-                    'chart' => $chartConfig,
-                ]);
+                ->post('https://quickchart.io/chart', $payload);
+
             if ($resp->successful() && strlen($resp->body()) > 100) {
-                return 'data:image/png;base64,' . base64_encode($resp->body());
+                $body = $resp->body();
+                $ctype = (string) ($resp->header('Content-Type') ?? '');
+                if (str_starts_with($body, "\x89PNG") || str_contains($ctype, 'image')) {
+                    return 'data:image/png;base64,'.base64_encode($body);
+                }
+                $this->log('QuickChart resposta inesperada: '.substr($body, 0, 180));
             }
 
-            // GET fallback
-            $url = 'https://quickchart.io/chart?c=' . rawurlencode(json_encode($chartConfig, JSON_UNESCAPED_UNICODE) ?: '{}') . '&w=800&h=400&bkg=white&f=png';
-            $get = Http::timeout(30)->get($url);
-            if ($get->successful() && strlen($get->body()) > 100) {
-                return 'data:image/png;base64,' . base64_encode($get->body());
+            // GET fallback (sem function — só útil se não houver formatter)
+            if (! str_contains($chartJs, 'function(value)')) {
+                $url = 'https://quickchart.io/chart?c='.rawurlencode($chartJs).'&w=900&h=420&bkg=white&f=png&v=2.9.4';
+                $get = Http::timeout(45)->get($url);
+                if ($get->successful() && strlen($get->body()) > 100) {
+                    return 'data:image/png;base64,'.base64_encode($get->body());
+                }
             }
         } catch (Throwable $exc) {
-            $this->log('QuickChart erro: ' . $exc->getMessage());
+            $this->log('QuickChart erro: '.$exc->getMessage());
         }
 
         return null;
     }
 
-    private function salvarBytesPdf(string $nomeAluno, string $bytes): ?string
+    private function salvarBytesPdf(string $nomeAluno, string $bytes, ?string $id = null): ?string
     {
         if ($bytes === '') {
             return null;
         }
-        $seguro = preg_replace('/[^A-Za-z0-9 ._\\-]/u', '_', $nomeAluno) ?? 'aluno';
-        $seguro = trim(str_replace(' ', '_', $seguro)) ?: 'aluno';
-        $mes = date('Y-m');
-        $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '.pdf';
-        $n = 1;
-        while (file_exists($destino)) {
-            $destino = $this->pastaDownload . '/' . $seguro . '_' . $mes . '_' . $n . '.pdf';
-            $n++;
-        }
+        $destino = $this->caminhoDestinoPdf($nomeAluno, $id);
         file_put_contents($destino, $bytes);
         $this->log("[{$nomeAluno}] Arquivo salvo: {$destino}");
 
@@ -814,7 +1229,7 @@ HTML;
     {
         $inicio = new \DateTimeImmutable('now');
         $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
-        $this->log('Modo: CLI/HTTP → /intent/cadastrar-relatorio-coach + Dompdf');
+        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + Puppeteer/PDFWriter (fallback Dompdf)');
 
         $alunos = $this->coletarAlunosAtivos();
         if ($this->teste) {
