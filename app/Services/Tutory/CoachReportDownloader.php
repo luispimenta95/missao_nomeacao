@@ -205,7 +205,8 @@ class CoachReportDownloader
                 return $t[1];
             }
         }
-        if (preg_match('/["\']token["\']\s*:\s*["\']([A-Za-z0-9._\-+/=]+)["\']/', $html, $t)) {
+        // Delimitador # — a classe pode conter "/" (comum em JWTs/base64url)
+        if (preg_match('#["\']token["\']\s*:\s*["\']([A-Za-z0-9._\-+/=]+)["\']#', $html, $t)) {
             return $t[1];
         }
 
