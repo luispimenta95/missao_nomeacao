@@ -106,31 +106,9 @@ class AvaliadorDesempenho
             }
         }
 
-        foreach ($assuntos as $item) {
-            $pct = $this->paraNumero($item['percentual'] ?? null);
-            $assunto = trim((string) ($item['assunto'] ?? ''));
-            if ($pct === null || $assunto === '' || $pct > 75) {
-                continue;
-            }
-            $bloco = $this->avaliarEixo(
-                EixoDesempenho::ASSUNTO,
-                $pct,
-                [
-                    'NOME' => $primeiroNome,
-                    'FULANO' => $primeiroNome,
-                    'ASSUNTO' => $assunto,
-                    'DISCIPLINA' => trim((string) ($item['disciplina'] ?? '')),
-                    'PERCENTUAL' => $this->fmtPct($pct),
-                ]
-            );
-            if ($bloco !== null) {
-                $bloco['meta'] = [
-                    'disciplina' => $item['disciplina'] ?? null,
-                    'assunto' => $assunto,
-                    'percentual' => $pct,
-                ];
-                $blocos[] = $bloco;
-            }
+        $blocoAssuntos = $this->avaliarAssuntos($assuntos, $primeiroNome);
+        if ($blocoAssuntos !== null) {
+            $blocos[] = $blocoAssuntos;
         }
 
         $resumo = null;
@@ -149,10 +127,74 @@ class AvaliadorDesempenho
     }
 
     /**
+     * Um único bloco com N bullets para assuntos ≤ 75%.
+     *
+     * @param  list<array{disciplina?: string, assunto: string, percentual: float|int|null}>  $assuntos
+     * @return array{eixo: string, eixo_nome: string, faixa: string, faixa_nome: string, titulo: string, texto: string, itens: list<string>, meta?: array<string, mixed>}|null
+     */
+    private function avaliarAssuntos(array $assuntos, string $primeiroNome): ?array
+    {
+        $itens = [];
+        $piorPct = null;
+
+        foreach ($assuntos as $item) {
+            $pct = $this->paraNumero($item['percentual'] ?? null);
+            $assunto = trim((string) ($item['assunto'] ?? ''));
+            if ($pct === null || $assunto === '' || $pct > 75) {
+                continue;
+            }
+            $itens[] = [
+                'disciplina' => trim((string) ($item['disciplina'] ?? '')),
+                'assunto' => $assunto,
+                'percentual' => $pct,
+                'linha' => 'No assunto '.$assunto.', você alcançou '.$this->fmtPct($pct).'% de acertos.',
+            ];
+            if ($piorPct === null || $pct < $piorPct) {
+                $piorPct = $pct;
+            }
+        }
+
+        if ($itens === [] || $piorPct === null) {
+            return null;
+        }
+
+        $lista = implode("\n", array_map(
+            static fn (array $i): string => '• '.$i['linha'],
+            $itens
+        ));
+
+        $bloco = $this->avaliarEixo(
+            EixoDesempenho::ASSUNTO,
+            $piorPct,
+            [
+                'NOME' => $primeiroNome,
+                'FULANO' => $primeiroNome,
+                'LISTA_ASSUNTOS' => $lista,
+            ],
+            preserveNewlines: true
+        );
+
+        if ($bloco === null) {
+            return null;
+        }
+
+        $bloco['itens'] = array_values(array_map(
+            static fn (array $i): string => $i['linha'],
+            $itens
+        ));
+        $bloco['meta'] = [
+            'quantidade' => count($itens),
+            'pior_percentual' => $piorPct,
+        ];
+
+        return $bloco;
+    }
+
+    /**
      * @param  array<string, string>  $vars
      * @return array{eixo: string, eixo_nome: string, faixa: string, faixa_nome: string, titulo: string, texto: string}|null
      */
-    private function avaliarEixo(string $eixoCodigo, float $valor, array $vars): ?array
+    private function avaliarEixo(string $eixoCodigo, float $valor, array $vars, bool $preserveNewlines = false): ?array
     {
         $eixo = EixoDesempenho::query()
             ->where('codigo', $eixoCodigo)
@@ -175,7 +217,7 @@ class AvaliadorDesempenho
             'faixa' => $faixa->codigo,
             'faixa_nome' => $faixa->nome,
             'titulo' => $eixo->nome.': '.$faixa->nome,
-            'texto' => $this->aplicarPlaceholders($faixa->texto_email, $vars),
+            'texto' => $this->aplicarPlaceholders($faixa->texto_email, $vars, $preserveNewlines),
         ];
     }
 
@@ -196,7 +238,7 @@ class AvaliadorDesempenho
     /**
      * @param  array<string, string>  $vars
      */
-    public function aplicarPlaceholders(string $texto, array $vars): string
+    public function aplicarPlaceholders(string $texto, array $vars, bool $preserveNewlines = false): string
     {
         $out = $texto;
         foreach ($vars as $chave => $valor) {
@@ -220,7 +262,16 @@ class AvaliadorDesempenho
             $out
         );
 
-        return preg_replace('/\s+/u', ' ', trim($out)) ?? trim($out);
+        $out = trim($out);
+        if ($preserveNewlines) {
+            // Normaliza só espaços horizontais; mantém quebras de linha da lista
+            $out = preg_replace('/[^\S\n]+/u', ' ', $out) ?? $out;
+            $out = preg_replace("/\n{3,}/u", "\n\n", $out) ?? $out;
+
+            return trim($out);
+        }
+
+        return preg_replace('/\s+/u', ' ', $out) ?? $out;
     }
 
     public function paraNumero(mixed $valor): ?float

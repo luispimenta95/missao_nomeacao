@@ -73,7 +73,7 @@ class AvaliadorDesempenhoTest extends TestCase
         $this->assertStringContainsString('Lara', $pct['texto'] ?? '');
     }
 
-    public function test_assuntos_abaixo_da_media(): void
+    public function test_assuntos_em_bloco_unico_com_bullets(): void
     {
         $svc = new AvaliadorDesempenho;
         $out = $svc->avaliarRelatorio([
@@ -89,8 +89,24 @@ class AvaliadorDesempenhoTest extends TestCase
             $out['blocos'],
             static fn ($b) => ($b['eixo'] ?? '') === 'assunto'
         ));
-        $this->assertCount(2, $assuntos);
-        $this->assertSame('critico', $assuntos[0]['faixa']);
-        $this->assertSame('abaixo_media', $assuntos[1]['faixa']);
+        $this->assertCount(1, $assuntos);
+        $this->assertSame('critico', $assuntos[0]['faixa']); // pior % define a faixa
+        $this->assertCount(2, $assuntos[0]['itens'] ?? []);
+        $this->assertStringContainsString('Improbidade', $assuntos[0]['itens'][0] ?? '');
+        $this->assertStringContainsString('Poder Judiciário', $assuntos[0]['itens'][1] ?? '');
+        $this->assertStringContainsString('Improbidade', $assuntos[0]['texto'] ?? '');
+        $this->assertStringContainsString('gargalos', mb_strtolower($assuntos[0]['texto'] ?? ''));
+
+        $soAbaixo = $svc->avaliarRelatorio([
+            'nome' => 'Lara',
+            'assuntos' => [
+                ['disciplina' => 'DIR CONST', 'assunto' => 'Poder Judiciário', 'percentual' => 70],
+                ['disciplina' => 'DIR ADM', 'assunto' => 'Uso e abuso', 'percentual' => 68],
+            ],
+        ]);
+        $bloco = collect($soAbaixo['blocos'])->firstWhere('eixo', 'assunto');
+        $this->assertSame('abaixo_media', $bloco['faixa'] ?? null);
+        $this->assertCount(2, $bloco['itens'] ?? []);
+        $this->assertStringContainsString('acompanhamento', mb_strtolower($bloco['texto'] ?? ''));
     }
 }

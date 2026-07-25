@@ -102,7 +102,8 @@ Faixas padrão (seed):
 - **Constância:** 0 excelente · 1–3 bom · 4–10 brigando · ≥11 crítico  
 - **Volume:** 0–49 crítico · 50–99 baixo · 100–500 suficiente · >500 alto  
 - **% geral:** ≤60 crítico · ≤70 alerta · <80 mediano · <90 muito bom · ≤100 excelente  
-- **Assunto:** ≤60 crítico · ≤75 abaixo da média  
+- **Assunto:** um único bloco com N bullets (≤60 crítico · ≤75 abaixo da média); texto de acompanhamento após a lista  
+
 
 Placeholders nos textos: `{NOME}`, `{X}`, `{Y}`, `{Z}`, `{TOTAL_QUESTOES}`, `{PERCENTUAL_ACERTOS}`, `{ASSUNTO}`, `{PERCENTUAL}`.
 
