@@ -537,21 +537,15 @@ class CoachReportDownloader
             if ($this->pdfContemSecoesObrigatorias($destino, $model)) {
                 return $destino;
             }
-            $this->log("[{$nome}] [{$rotulo}] PDF Puppeteer incompleto");
+            $this->log("[{$nome}] [{$rotulo}] PDF Puppeteer incompleto — tentando Dompdf");
             @unlink($destino);
-            if ($model !== 'questoes') {
-                return null;
-            }
-            $this->log("[{$nome}] [{$rotulo}] Regenerando via Dompdf");
         }
 
-        if ($model !== 'questoes') {
-            $this->log("[{$nome}] [{$rotulo}] Sem fallback Dompdf para este modelo");
+        $this->log("[{$nome}] [{$rotulo}] Fallback Dompdf...");
 
-            return null;
+        if ($model === 'progresso') {
+            return $this->gerarPdfProgressoDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso);
         }
-
-        $this->log("[{$nome}] [{$rotulo}] Fallback Dompdf (panorama + assuntos + gráficos)...");
 
         return $this->gerarPdfDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso, $model);
     }
@@ -835,7 +829,10 @@ class CoachReportDownloader
 
         [$dtIni, $dtFim] = $this->datasPeriodoBr();
         $periodoLabel = $dtIni.' a '.$dtFim.' (período '.$this->periodo.')';
-        $nomesRelatorios = array_column($this->relatorios(), 'nome');
+        $nomePorModelo = [];
+        foreach ($this->relatorios() as $relatorio) {
+            $nomePorModelo[$relatorio['model']] = $relatorio['nome'];
+        }
 
         $enviados = 0;
         $pulados = 0;
@@ -853,8 +850,26 @@ class CoachReportDownloader
                 continue;
             }
 
+            $nomesAnexos = [];
             foreach ($pdfs as $pdf) {
                 $this->log("[{$aluno->nome}] PDF: ".basename($pdf));
+                $meta = $this->extrairMetaDoArquivoPdf(basename($pdf));
+                if ($meta !== null && isset($nomePorModelo[$meta['model']])) {
+                    $nomesAnexos[] = $nomePorModelo[$meta['model']];
+                }
+            }
+
+            $modelosEsperados = array_column($this->relatorios(), 'model');
+            $modelosEncontrados = [];
+            foreach ($pdfs as $pdf) {
+                $meta = $this->extrairMetaDoArquivoPdf(basename($pdf));
+                if ($meta !== null) {
+                    $modelosEncontrados[] = $meta['model'];
+                }
+            }
+            $faltando = array_values(array_diff($modelosEsperados, $modelosEncontrados));
+            if ($faltando !== []) {
+                $this->log("[{$aluno->nome}] AVISO: faltam PDFs dos modelos: ".implode(', ', $faltando));
             }
 
             if (! $aluno->recebe_email) {
@@ -876,7 +891,7 @@ class CoachReportDownloader
                     [
                         'nome' => $aluno->nome,
                         'periodoLabel' => $periodoLabel,
-                        'relatorios' => $nomesRelatorios,
+                        'relatorios' => $nomesAnexos !== [] ? $nomesAnexos : array_values($nomePorModelo),
                     ],
                     $aluno->email,
                     $pdfs
@@ -896,6 +911,200 @@ class CoachReportDownloader
 
         $this->log(str_repeat('=', 50));
         $this->log("E-mails enviados: {$enviados} | pulados: {$pulados} | falhas: {$falhas}");
+    }
+
+    /**
+     * Fallback Dompdf para o modelo progresso (quando Node/Puppeteer falha).
+     */
+    private function gerarPdfProgressoDoHtml(
+        string $nome,
+        string $id,
+        string $html,
+        string $dtIniIso,
+        string $dtFimIso,
+    ): ?string {
+        $this->log("[{$nome}] Montando PDF de Progresso do plano (Dompdf)...");
+
+        $xp = $this->loadDom($html);
+        $periodo = $this->xpathText($xp, "//*[contains(@class,'report-header')]//p")
+            ?: "Período do relatório: de {$dtIniIso} a {$dtFimIso}";
+        $curso = $this->xpathText($xp, "//*[contains(@class,'report-aluno-desc')]//p")
+            ?: '';
+
+        $panoramaHtml = $this->montarHtmlPanoramaProgresso($xp);
+        $motivacaoHtml = $this->montarHtmlMotivacaoProgresso($xp);
+        $assuntosHtml = $this->montarHtmlAssuntos($xp);
+
+        $chartPrincipal = $this->chartImgHtml($html, 'chart_progresso_principal', null);
+        $chartModalidades = $this->chartImgHtml($html, 'chart_progresso_modalidades', 'Progresso por Modalidade');
+        $chartTop = $this->chartImgHtml($html, 'chart_top_disciplinas', null);
+        $chartTx = $this->chartImgHtml($html, 'chart_tx_acerto', 'Taxa de Acerto');
+        $chartBar = $this->chartImgHtml($html, 'chart_bar_questoes_disciplina', null);
+        $chartLinha = $this->chartImgHtml($html, 'chart_linha_evolucao_questoes', 'Evolução de Questões');
+
+        $seguroNome = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
+        $seguroCurso = htmlspecialchars($curso, ENT_QUOTES, 'UTF-8');
+        $seguroPeriodo = htmlspecialchars($periodo, ENT_QUOTES, 'UTF-8');
+        $logoHtml = $this->montarHtmlLogoPdf();
+        $logoFontFace = $this->montarCssFonteLogoPdf();
+
+        $pdfHtml = <<<HTML
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+{$logoFontFace}
+body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
+.logo{text-align:center; margin:0 0 12px; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+.logo .l1{font-size:26pt; letter-spacing:0.2pt;}
+.logo .l2{font-size:22pt; letter-spacing:0.2pt;}
+.logo .icon{width:22pt; height:22pt; vertical-align:middle; margin-left:2pt; margin-top:-4pt;}
+h1{font-size:20px; margin:0 0 6px; text-align:center;}
+.periodo{color:#555; margin-bottom:14px; text-align:center;}
+.aluno{margin:10px 0 18px;}
+.aluno h2{margin:0 0 4px; font-size:16px;}
+.section{margin:22px 0 8px; padding-left:10px; border-left:4px solid #00aced; font-size:15px;}
+.section-desc{color:#555; margin:0 0 12px;}
+.panorama{width:100%; border-collapse:separate; border-spacing:8px 0; margin:6px 0 14px; table-layout:fixed;}
+.panorama td{
+  border:0.4pt solid #cdcdcd;
+  padding:6pt 8pt 10pt;
+  vertical-align:top;
+  background:#ffffff;
+}
+.panorama .label{color:#888; font-size:8pt; margin:0 0 8pt; line-height:1.1;}
+.panorama .value{font-size:11pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
+.chart{width:100%; max-width:700px; margin:8px 0 16px;}
+.assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
+.assuntos thead td{background:#00aced; color:#fff; font-weight:bold; padding:8px;}
+.assuntos tbody td{border-bottom:1px solid #eee; padding:8px; vertical-align:top;}
+.assuntos .taxa{text-align:right; font-weight:bold;}
+.motivacao p{margin:0 0 8px; line-height:1.4;}
+.rule{border:0;border-top:1px solid #eaeaea; margin:12px 0;}
+</style></head><body>
+{$logoHtml}
+<h1>Progresso do plano</h1>
+<div class="periodo">{$seguroPeriodo}</div>
+<hr class="rule" />
+<div class="aluno">
+  <h2>{$seguroNome}</h2>
+  <div class="periodo" style="text-align:left;margin:0;">{$seguroCurso}</div>
+</div>
+
+<h2 class="section">Progresso no Plano</h2>
+{$chartPrincipal}
+{$panoramaHtml}
+
+<h2 class="section">Panorama</h2>
+{$chartModalidades}
+{$chartTop}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Motivação</h2>
+<div class="motivacao">{$motivacaoHtml}</div>
+
+<h2 class="section">Desempenho de Questões</h2>
+{$chartTx}
+{$chartBar}
+{$chartLinha}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Performance por assunto</h2>
+<p class="section-desc">Confira o desempenho de questões por assunto no período do relatório:</p>
+{$assuntosHtml}
+</body></html>
+HTML;
+
+        try {
+            $options = new Options;
+            $options->set('isRemoteEnabled', true);
+            $options->set('isFontSubsettingEnabled', true);
+            $options->set('defaultFont', 'DejaVu Sans');
+            $chroot = array_values(array_filter([
+                base_path(),
+                public_path(),
+                storage_path('fonts'),
+            ], 'is_dir'));
+            if ($chroot !== []) {
+                $options->setChroot($chroot);
+            }
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($pdfHtml, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            return $this->salvarBytesPdf($nome, $dompdf->output() ?? '', 'progresso', $id);
+        } catch (Throwable $exc) {
+            $this->log("[{$nome}] Erro Dompdf (progresso): ".$exc->getMessage());
+
+            return null;
+        }
+    }
+
+    private function montarHtmlPanoramaProgresso(DOMXPath $xp): string
+    {
+        $rows = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' row-numbers ')]");
+        if ($rows === false || $rows->length === 0) {
+            return '<p style="color:#888;">(Panorama de progresso indisponível na página)</p>';
+        }
+
+        $cells = '';
+        $primeiro = $rows->item(0);
+        if (! $primeiro instanceof DOMElement) {
+            return '<p style="color:#888;">(Panorama de progresso indisponível na página)</p>';
+        }
+
+        foreach ($primeiro->getElementsByTagName('div') as $col) {
+            if (! $col instanceof DOMElement) {
+                continue;
+            }
+            $class = ' '.$col->getAttribute('class').' ';
+            if (! str_contains($class, ' col-')) {
+                continue;
+            }
+            $h5 = '';
+            $span = '';
+            foreach ($col->getElementsByTagName('h5') as $el) {
+                $h5 = trim((string) $el->textContent);
+                break;
+            }
+            foreach ($col->getElementsByTagName('span') as $el) {
+                $span = trim((string) $el->textContent);
+                break;
+            }
+            if ($h5 === '' && $span === '') {
+                continue;
+            }
+            $cells .= '<td><div class="label">'.htmlspecialchars($span, ENT_QUOTES, 'UTF-8').'</div>'
+                .'<div class="value">'.htmlspecialchars($h5, ENT_QUOTES, 'UTF-8').'</div></td>';
+        }
+
+        if ($cells === '') {
+            return '<p style="color:#888;">(Panorama de progresso vazio)</p>';
+        }
+
+        return '<table class="panorama"><tr>'.$cells.'</tr></table>';
+    }
+
+    private function montarHtmlMotivacaoProgresso(DOMXPath $xp): string
+    {
+        $nodes = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' insights-panel ')]//p");
+        if ($nodes === false || $nodes->length === 0) {
+            // fallback: parágrafo após h2 Motivação
+            $nodes = $xp->query("//h2[contains(.,'Motiv')]/following-sibling::p[position()<=6]");
+        }
+        if ($nodes === false || $nodes->length === 0) {
+            return '<p style="color:#888;">(Seção Motivação indisponível na página)</p>';
+        }
+
+        $out = '';
+        foreach ($nodes as $node) {
+            $txt = trim(preg_replace('/\s+/', ' ', (string) $node->textContent) ?? '');
+            if ($txt === '') {
+                continue;
+            }
+            $out .= '<p>'.htmlspecialchars($txt, ENT_QUOTES, 'UTF-8').'</p>';
+        }
+
+        return $out !== '' ? $out : '<p style="color:#888;">(Seção Motivação vazia)</p>';
     }
 
     private function gerarPdfDoHtml(

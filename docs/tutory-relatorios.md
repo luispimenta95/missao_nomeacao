@@ -9,8 +9,8 @@ CLI PHP **HTTP + Puppeteer** que baixa os relatórios do Coach dos alunos **ativ
 3. Para **cada modelo** no array `RELATORIOS` (mesmo fluxo):
    1. `POST /intent/cadastrar-relatorio-coach` (`alunos[]`, `dt_ini`, `dt_fim`, `agrupamento=dia`)
    2. `GET /documentos/relatorios/{model}?key=...`
-   3. PDF oficial via **Puppeteer** (`scripts/tutory-render-pdf.mjs` → `PDFWriter.output()`)
-   4. Fallback Dompdf + QuickChart **apenas** para o modelo `questoes`
+   3. PDF oficial via **Puppeteer** (`scripts/tutory-render-pdf.mjs` → `PDFWriter.output()`, com fallback `page.pdf`)
+   4. Fallback **Dompdf** + QuickChart se Node/Puppeteer falhar (`questoes` e `progresso`)
 4. Reprocessa falhas por aluno+modelo (até 3 tentativas)
 5. Lista alunos do **admin** (`alunos`) → localiza PDFs em `public/pdfs` pelo nome → envia **um único e-mail** com todos os PDFs em anexo se `recebe_email=true`
 

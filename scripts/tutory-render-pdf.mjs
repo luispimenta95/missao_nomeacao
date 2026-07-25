@@ -41,6 +41,7 @@ const browser = await puppeteer.launch({
 
 try {
   const page = await browser.newPage();
+  // Paisagem: o botão Baixar do painel bloqueia retrato em alguns modelos
   await page.setViewport({ width: 1400, height: 900, deviceScaleFactor: 1 });
 
   if (cookieHeader) {
@@ -69,17 +70,18 @@ try {
   await page.waitForSelector('#btn_save', { timeout: 60000 });
 
   if (model === 'progresso') {
-    await page.waitForSelector('#chart_progresso_principal', { timeout: 60000 });
     await page.waitForFunction(() => {
       const c = document.getElementById('chart_progresso_principal');
-      return c && c.width > 10 && c.height > 0;
-    }, { timeout: 60000 });
+      const nums = document.querySelectorAll('.row-numbers h5');
+      const hasTitle = !!document.querySelector('h1, h2');
+      const chartReady = c && ((c.width || 0) > 0 || (c.clientWidth || 0) > 0);
+      return hasTitle && (chartReady || nums.length > 0);
+    }, { timeout: 90000 });
   } else {
     await page.waitForSelector('#chart_questoes_dia', { timeout: 60000 });
     await page.waitForSelector('.main-numbers h3', { timeout: 60000 });
     await page.waitForSelector('#tabela_questoes tbody tr', { timeout: 60000 });
 
-    // Espera Chart.js pintar e congela animações (igual ao script Selenium)
     await page.waitForFunction(() => {
       const c = document.getElementById('chart_questoes_dia');
       const rows = document.querySelectorAll('#tabela_questoes tbody tr');
@@ -105,65 +107,95 @@ try {
     });
   });
 
-  // Intercepta jsPDF.save e dispara o mesmo fluxo do botão Baixar
-  const pdfBase64 = await page.evaluate(async (reportModel) => {
-    if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
-      throw new Error('PDFWriter não encontrado na página');
-    }
-
-    if (reportModel === 'progresso') {
-      const progressoOk = !!document.getElementById('chart_progresso_principal');
-      if (!progressoOk) {
-        throw new Error('Seções incompletas no DOM (progresso)');
+  let pdfBase64 = null;
+  let writerError = null;
+  try {
+    pdfBase64 = await page.evaluate(async (reportModel) => {
+      if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
+        throw new Error('PDFWriter não encontrado na página');
       }
-    } else {
-      const panoramaOk = document.querySelectorAll('.main-numbers h3').length >= 3;
-      const assuntosOk = document.querySelectorAll('#tabela_questoes tbody tr').length > 0;
-      if (!panoramaOk || !assuntosOk) {
-        throw new Error(`Seções incompletas no DOM (panorama=${panoramaOk}, assuntos=${assuntosOk})`);
-      }
-    }
 
-    return await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Timeout gerando PDF')), 90000);
-
-      try {
-        PDFWriter.start();
-        if (!PDFWriter.doc || typeof PDFWriter.doc.save !== 'function') {
-          clearTimeout(timeout);
-          reject(new Error('jsPDF não inicializado após PDFWriter.start()'));
-          return;
+      if (reportModel === 'progresso') {
+        const progressoOk = !!document.getElementById('chart_progresso_principal')
+          || document.querySelectorAll('.row-numbers h5').length > 0;
+        if (!progressoOk) {
+          throw new Error('Seções incompletas no DOM (progresso)');
         }
-
-        PDFWriter.doc.save = function patchedSave(filename) {
-          try {
-            const dataUri = this.output('datauristring');
-            const base64 = dataUri.split(',')[1] || '';
-            clearTimeout(timeout);
-            resolve({ filename: filename || 'relatorio.pdf', base64 });
-          } catch (err) {
-            clearTimeout(timeout);
-            reject(err);
-          }
-        };
-
-        PDFWriter.output();
-      } catch (err) {
-        clearTimeout(timeout);
-        reject(err);
+      } else {
+        const panoramaOk = document.querySelectorAll('.main-numbers h3').length >= 3;
+        const assuntosOk = document.querySelectorAll('#tabela_questoes tbody tr').length > 0;
+        if (!panoramaOk || !assuntosOk) {
+          throw new Error(`Seções incompletas no DOM (panorama=${panoramaOk}, assuntos=${assuntosOk})`);
+        }
       }
-    });
-  }, model);
 
-  const buf = Buffer.from(pdfBase64.base64, 'base64');
-  fs.writeFileSync(out, buf);
-  console.log(JSON.stringify({
-    ok: true,
-    out,
-    bytes: buf.length,
-    filename: pdfBase64.filename,
-    model,
-  }));
+      return await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout gerando PDF')), 120000);
+
+        try {
+          PDFWriter.start();
+          if (!PDFWriter.doc || typeof PDFWriter.doc.save !== 'function') {
+            clearTimeout(timeout);
+            reject(new Error('jsPDF não inicializado após PDFWriter.start()'));
+            return;
+          }
+
+          PDFWriter.doc.save = function patchedSave(filename) {
+            try {
+              const dataUri = this.output('datauristring');
+              const base64 = dataUri.split(',')[1] || '';
+              clearTimeout(timeout);
+              resolve({ filename: filename || 'relatorio.pdf', base64, via: 'PDFWriter' });
+            } catch (err) {
+              clearTimeout(timeout);
+              reject(err);
+            }
+          };
+
+          PDFWriter.output();
+        } catch (err) {
+          clearTimeout(timeout);
+          reject(err);
+        }
+      });
+    }, model);
+  } catch (err) {
+    writerError = String(err && err.message ? err.message : err);
+  }
+
+  if (pdfBase64 && pdfBase64.base64) {
+    const buf = Buffer.from(pdfBase64.base64, 'base64');
+    fs.writeFileSync(out, buf);
+    console.log(JSON.stringify({
+      ok: true,
+      out,
+      bytes: buf.length,
+      filename: pdfBase64.filename,
+      model,
+      via: 'PDFWriter',
+    }));
+  } else {
+    // Fallback: print da página (ainda via Chromium) quando PDFWriter falha
+    await page.emulateMediaType('screen');
+    const buf = await page.pdf({
+      path: out,
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '12mm', bottom: '12mm', left: '10mm', right: '10mm' },
+    });
+    if (!buf || buf.length < 500) {
+      throw new Error(writerError || 'Falha ao gerar PDF (PDFWriter e page.pdf)');
+    }
+    console.log(JSON.stringify({
+      ok: true,
+      out,
+      bytes: buf.length,
+      filename: path.basename(out),
+      model,
+      via: 'page.pdf',
+      writerError,
+    }));
+  }
 } catch (err) {
   console.error(JSON.stringify({ ok: false, error: String(err && err.message ? err.message : err), model }));
   process.exit(1);
