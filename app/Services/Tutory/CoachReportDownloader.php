@@ -17,6 +17,7 @@ namespace App\Services\Tutory;
 
 use App\Http\Util\MailHelper;
 use App\Models\Aluno;
+use App\Services\Desempenho\AvaliadorDesempenho;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
@@ -535,6 +536,8 @@ class CoachReportDownloader
         // Réplica do PDF do painel (mesmo PDFWriter/jsPDF do botão Baixar)
         if ($this->gerarPdfComPuppeteer($nome, $reportUrl, $destino, $model, $rotulo)) {
             if ($this->pdfContemSecoesObrigatorias($destino, $model)) {
+                $this->salvarMetricasProgressoSeAplicavel($destino, $model, $html);
+
                 return $destino;
             }
             $this->log("[{$nome}] [{$rotulo}] PDF Puppeteer incompleto — tentando Dompdf");
@@ -544,10 +547,20 @@ class CoachReportDownloader
         $this->log("[{$nome}] [{$rotulo}] Fallback Dompdf...");
 
         if ($model === 'progresso') {
-            return $this->gerarPdfProgressoDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso);
+            $salvo = $this->gerarPdfProgressoDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso);
+            if ($salvo !== null) {
+                $this->salvarMetricasProgressoSeAplicavel($salvo, $model, $html);
+            }
+
+            return $salvo;
         }
 
-        return $this->gerarPdfDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso, $model);
+        $salvo = $this->gerarPdfDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso, $model);
+        if ($salvo !== null) {
+            $this->salvarMetricasProgressoSeAplicavel($salvo, $model, $html);
+        }
+
+        return $salvo;
     }
 
     private function pdfContemSecoesObrigatorias(string $caminho, string $model = 'questoes'): bool
@@ -895,11 +908,23 @@ class CoachReportDownloader
             }
 
             try {
+                $avaliacao = $this->avaliarDesempenhoDoProgresso($pdfs);
+                $nivelNome = $avaliacao['nivel']?->nome;
+                $textoDesempenho = $avaliacao['nivel']?->texto_email;
+                if ($nivelNome !== null) {
+                    $this->log("[{$aluno->nome}] Desempenho: {$nivelNome}");
+                } elseif ($avaliacao['motivo'] !== '') {
+                    $this->log("[{$aluno->nome}] Desempenho: {$avaliacao['motivo']}");
+                }
+
                 MailHelper::emailRelatorioCoach(
                     [
                         'nome' => $aluno->nome,
                         'periodoLabel' => $periodoLabel,
                         'relatorios' => $nomesAnexos !== [] ? $nomesAnexos : array_values($nomePorModelo),
+                        'nivelDesempenho' => $nivelNome,
+                        'textoDesempenho' => $textoDesempenho,
+                        'metricasDesempenho' => $avaliacao['metricas'],
                     ],
                     $aluno->email,
                     $pdfs
@@ -1171,6 +1196,130 @@ HTML;
         }
 
         return '<table class="panorama"><tr>'.$cells.'</tr></table>';
+    }
+
+    /**
+     * Extrai métricas do panorama do Progresso do plano (.row-numbers).
+     *
+     * @return array<string, float|null>
+     */
+    public function extrairMetricasProgresso(string $html): array
+    {
+        $xp = $this->loadDom($html);
+        $avaliador = new AvaliadorDesempenho;
+        $brutos = [
+            'horas_brutas' => null,
+            'horas_liquidas' => null,
+            'dias' => null,
+            'semanas' => null,
+            'pct_questoes' => null,
+        ];
+
+        $mapaLabels = [
+            'horasbrutas' => 'horas_brutas',
+            'horasliquidas' => 'horas_liquidas',
+            'dias' => 'dias',
+            'semanas' => 'semanas',
+            'questoes' => 'pct_questoes',
+            'pctquestoes' => 'pct_questoes',
+        ];
+
+        $rows = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' row-numbers ')]");
+        if ($rows !== false && $rows->length > 0) {
+            $primeiro = $rows->item(0);
+            if ($primeiro instanceof DOMElement) {
+                foreach ($primeiro->getElementsByTagName('div') as $col) {
+                    if (! $col instanceof DOMElement) {
+                        continue;
+                    }
+                    $class = ' '.$col->getAttribute('class').' ';
+                    if (! str_contains($class, ' col-')) {
+                        continue;
+                    }
+                    $valor = '';
+                    $label = '';
+                    foreach ($col->getElementsByTagName('h5') as $el) {
+                        $valor = trim((string) $el->textContent);
+                        break;
+                    }
+                    foreach ($col->getElementsByTagName('span') as $el) {
+                        $label = trim((string) $el->textContent);
+                        break;
+                    }
+                    $labelKey = $this->normalizarParaComparacao($label);
+                    $labelKey = str_replace('%', '', $labelKey);
+                    if (isset($mapaLabels[$labelKey])) {
+                        $brutos[$mapaLabels[$labelKey]] = $valor;
+                    }
+                }
+            }
+        }
+
+        return $avaliador->normalizarMetricas($brutos);
+    }
+
+    private function salvarMetricasProgressoSeAplicavel(string $pdfPath, string $model, string $html): void
+    {
+        if ($model !== 'progresso' || $pdfPath === '' || ! is_file($pdfPath)) {
+            return;
+        }
+
+        $metricas = $this->extrairMetricasProgresso($html);
+        $sidecar = $this->caminhoMetricasSidecar($pdfPath);
+        $payload = [
+            'gerado_em' => date('c'),
+            'periodo' => $this->periodo,
+            'metricas' => $metricas,
+            'metricas_raw' => $metricas,
+        ];
+        file_put_contents($sidecar, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $this->log('Métricas de desempenho salvas: '.$sidecar);
+    }
+
+    private function caminhoMetricasSidecar(string $pdfPath): string
+    {
+        if (str_ends_with(strtolower($pdfPath), '.pdf')) {
+            return substr($pdfPath, 0, -4).'.metricas.json';
+        }
+
+        return $pdfPath.'.metricas.json';
+    }
+
+    /**
+     * @param  list<string>  $pdfs
+     * @return array{nivel: \App\Models\NivelDesempenho|null, metricas: array<string, float|null>, motivo: string}
+     */
+    private function avaliarDesempenhoDoProgresso(array $pdfs): array
+    {
+        $avaliador = new AvaliadorDesempenho;
+        $metricas = null;
+
+        foreach ($pdfs as $pdf) {
+            $meta = $this->extrairMetaDoArquivoPdf(basename($pdf));
+            if ($meta === null || ($meta['model'] ?? '') !== 'progresso') {
+                continue;
+            }
+            $sidecar = $this->caminhoMetricasSidecar($pdf);
+            if (! is_file($sidecar)) {
+                continue;
+            }
+            $json = json_decode((string) file_get_contents($sidecar), true);
+            if (! is_array($json)) {
+                continue;
+            }
+            $metricas = is_array($json['metricas'] ?? null) ? $json['metricas'] : null;
+            break;
+        }
+
+        if ($metricas === null) {
+            return [
+                'nivel' => null,
+                'metricas' => $avaliador->normalizarMetricas([]),
+                'motivo' => 'Sem métricas do Progresso do plano (arquivo .metricas.json ausente).',
+            ];
+        }
+
+        return $avaliador->avaliar($metricas);
     }
 
     private function montarHtmlMotivacaoProgresso(DOMXPath $xp): string

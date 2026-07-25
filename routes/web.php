@@ -4,6 +4,7 @@ use App\Http\Controllers\AlunoController;
 use App\Http\Controllers\AnonymousVisitAdminController;
 use App\Http\Controllers\AnonymousVisitController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\DesempenhoAdminController;
 use App\Http\Controllers\InscricaoAdminController;
 use App\Http\Controllers\InscricaoController;
 use App\Http\Controllers\LeadAdminController;
@@ -69,6 +70,14 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::get('/alunos/{aluno}/edit', [AlunoController::class, 'edit'])->name('alunos.edit');
     Route::put('/alunos/{aluno}', [AlunoController::class, 'update'])->name('alunos.update');
     Route::delete('/alunos/{aluno}', [AlunoController::class, 'destroy'])->name('alunos.destroy');
+
+    // Gestão de desempenho (níveis + critérios do Progresso do plano)
+    Route::get('/desempenho', [DesempenhoAdminController::class, 'index'])->name('desempenho.index');
+    Route::get('/desempenho/create', [DesempenhoAdminController::class, 'create'])->name('desempenho.create');
+    Route::post('/desempenho', [DesempenhoAdminController::class, 'store'])->name('desempenho.store');
+    Route::get('/desempenho/{desempenho}/edit', [DesempenhoAdminController::class, 'edit'])->name('desempenho.edit');
+    Route::put('/desempenho/{desempenho}', [DesempenhoAdminController::class, 'update'])->name('desempenho.update');
+    Route::delete('/desempenho/{desempenho}', [DesempenhoAdminController::class, 'destroy'])->name('desempenho.destroy');
 
     // Leads routes
     Route::get('/leads', [LeadAdminController::class, 'index'])->name('leads.index');
