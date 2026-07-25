@@ -2,7 +2,8 @@
 <?php
 
 /**
- * Baixa o Relatório do Coach no Tutory para os alunos ATIVOS da consulta.
+ * Baixa os Relatórios do Coach no Tutory para os alunos ATIVOS da consulta
+ * (questões + progresso do plano) e envia todos os PDFs em um único e-mail.
  *
  * CLI/HTTP puro — sem Selenium, sem Firefox, sem php-webdriver.
  *
@@ -26,7 +27,7 @@ $options = getopt('', ['periodo:', 'teste', 'help']);
 
 if (isset($options['help']) || ! isset($options['periodo'])) {
     fwrite(STDERR, <<<'HELP'
-Baixa o Relatório do Coach no Tutory para alunos ativos (CLI/HTTP).
+Baixa os Relatórios do Coach no Tutory para alunos ativos (CLI/HTTP).
 
 Uso:
   php scripts/baixar_relatorios_tutory.php --periodo=1
@@ -36,7 +37,7 @@ Opções:
   --periodo=1|2   Obrigatório.
                   1 = Dia inicial: 01 / Dia final: 15
                   2 = Dia inicial: 16 / Dia final: último dia do mês
-  --teste         Baixa só o relatório da aluna Laíra Lacerda
+  --teste         Baixa só os relatórios da aluna Laíra Lacerda
   --help          Mostra esta ajuda
 
 HELP);

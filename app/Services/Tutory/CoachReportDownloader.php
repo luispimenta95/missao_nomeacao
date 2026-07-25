@@ -1,15 +1,16 @@
 <?php
 
 /**
- * Baixa o Relatório do Coach no Tutory e envia por e-mail aos alunos cadastrados.
+ * Baixa os relatórios do Coach no Tutory e envia por e-mail aos alunos cadastrados.
  *
  * 1. Login (/intent/login) → sessão + Bearer
  * 2. /alunos/consulta?status=ativos (cards com data-id)
- * 3. POST /intent/cadastrar-relatorio-coach (agrupamento=dia)
- * 4. GET /documentos/relatorios/questoes?key=...
- * 5. PDF oficial via Puppeteer + PDFWriter/jsPDF do painel (fallback: Dompdf)
- * 6. Reprocessa falhas (até 3x)
- * 7. Lista alunos do banco → localiza PDF em public/pdfs → e-mail se recebe_email
+ * 3. Para cada modelo em RELATORIOS[]:
+ *    POST /intent/cadastrar-relatorio-coach (agrupamento=dia)
+ *    GET /documentos/relatorios/{model}?key=...
+ *    PDF oficial via Puppeteer + PDFWriter/jsPDF (fallback Dompdf só em questões)
+ * 4. Reprocessa falhas (até 3x) por aluno+modelo
+ * 5. Lista alunos do banco → localiza PDFs → um e-mail com todos os anexos se recebe_email
  */
 
 namespace App\Services\Tutory;
@@ -35,6 +36,25 @@ class CoachReportDownloader
     private const ALUNA_TESTE = 'Laíra Lacerda';
 
     private const MAX_TENTATIVAS = 3;
+
+    /**
+     * Modelos de relatório a baixar (mesmo fluxo para cada índice).
+     * model = segmento em /documentos/relatorios/{model}
+     *
+     * @var list<array{model: string, nome: string, slug: string}>
+     */
+    private const RELATORIOS = [
+        [
+            'model' => 'questoes',
+            'nome' => 'Desempenho em Questões',
+            'slug' => 'questoes',
+        ],
+        [
+            'model' => 'progresso',
+            'nome' => 'Progresso do plano',
+            'slug' => 'progresso',
+        ],
+    ];
 
     private string $urlLogin;
 
@@ -426,15 +446,26 @@ class CoachReportDownloader
     }
 
     /**
-     * @param  array{nome: string, id: string}  $aluno
+     * @return list<array{model: string, nome: string, slug: string}>
      */
-    private function processarAluno(array $aluno): ?string
+    private function relatorios(): array
+    {
+        return self::RELATORIOS;
+    }
+
+    /**
+     * @param  array{nome: string, id: string}  $aluno
+     * @param  array{model: string, nome: string, slug: string}  $relatorio
+     */
+    private function processarAluno(array $aluno, array $relatorio): ?string
     {
         $nome = $aluno['nome'];
         $id = $aluno['id'];
+        $model = $relatorio['model'];
+        $rotulo = $relatorio['nome'];
         [$dtIniIso, $dtFimIso] = $this->datasPeriodoIso();
         [$dtIni, $dtFim] = $this->datasPeriodoBr();
-        $this->log("[{$nome}] id={$id} | Datas: {$dtIniIso} → {$dtFimIso} ({$dtIni} → {$dtFim})");
+        $this->log("[{$nome}] [{$rotulo}] id={$id} | Datas: {$dtIniIso} → {$dtFimIso} ({$dtIni} → {$dtFim})");
 
         $endpoint = trim((string) env('TUTORY_REPORT_GENERATE_URL', ''));
         if ($endpoint === '') {
@@ -449,7 +480,7 @@ class CoachReportDownloader
             }
         }
 
-        $this->log("[{$nome}] Gerando via {$endpoint}...");
+        $this->log("[{$nome}] [{$rotulo}] Gerando via {$endpoint}...");
         // PDF de referência do painel usa agrupamento diário (gráficos por dia)
         $agrupamento = trim((string) env('TUTORY_REPORT_AGRUPAMENTO', 'dia')) ?: 'dia';
         $body = 'alunos[]=' . rawurlencode($id)
@@ -465,55 +496,67 @@ class CoachReportDownloader
         $json = $resp->json();
         if (! is_array($json) || empty($json['result'])) {
             $erro = is_array($json) ? (string) ($json['error'] ?? $resp->body()) : $resp->body();
-            $this->log("[{$nome}] Falha ao gerar: " . $erro);
+            $this->log("[{$nome}] [{$rotulo}] Falha ao gerar: " . $erro);
 
             return null;
         }
 
         $lista = $json['data'] ?? null;
         if (! is_array($lista) || $lista === [] || empty($lista[0]['token'])) {
-            $this->log("[{$nome}] Resposta sem token de relatório: " . $resp->body());
+            $this->log("[{$nome}] [{$rotulo}] Resposta sem token de relatório: " . $resp->body());
 
             return null;
         }
 
         $key = (string) $lista[0]['token'];
-        $model = trim((string) env('TUTORY_REPORT_MODEL', 'questoes')) ?: 'questoes';
         $reportUrl = self::BASE . '/documentos/relatorios/' . $model . '?key=' . rawurlencode($key);
-        $this->log("[{$nome}] Abrindo relatório...");
+        $this->log("[{$nome}] [{$rotulo}] Abrindo relatório (/documentos/relatorios/{$model})...");
 
-        $destino = $this->caminhoDestinoPdf($nome, $id);
+        $destino = $this->caminhoDestinoPdf($nome, $model, $id);
 
         $pagina = $this->client()
             ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
             ->get('/documentos/relatorios/' . $model, ['key' => $key]);
 
         if ($pagina->status() >= 400 || ! str_contains($pagina->body(), 'btn_save')) {
-            $this->log("[{$nome}] Página do relatório inválida (HTTP {$pagina->status()})");
+            $this->log("[{$nome}] [{$rotulo}] Página do relatório inválida (HTTP {$pagina->status()})");
 
             return null;
         }
 
         $html = $pagina->body();
-        if (! str_contains($html, 'main-numbers') || ! str_contains($html, 'tabela_questoes')) {
-            $this->log("[{$nome}] AVISO: página sem Breve Panorama ou Performance por assunto");
+        if ($model === 'questoes' && (! str_contains($html, 'main-numbers') || ! str_contains($html, 'tabela_questoes'))) {
+            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem Breve Panorama ou Performance por assunto");
+        }
+        if ($model === 'progresso' && ! str_contains($html, 'chart_progresso_principal')) {
+            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem gráfico principal de progresso");
         }
 
         // Réplica do PDF do painel (mesmo PDFWriter/jsPDF do botão Baixar)
-        if ($this->gerarPdfComPuppeteer($nome, $reportUrl, $destino)) {
-            if ($this->pdfContemSecoesObrigatorias($destino)) {
+        if ($this->gerarPdfComPuppeteer($nome, $reportUrl, $destino, $model, $rotulo)) {
+            if ($this->pdfContemSecoesObrigatorias($destino, $model)) {
                 return $destino;
             }
-            $this->log("[{$nome}] PDF Puppeteer sem panorama/assuntos — regenerando via Dompdf");
+            $this->log("[{$nome}] [{$rotulo}] PDF Puppeteer incompleto");
             @unlink($destino);
+            if ($model !== 'questoes') {
+                return null;
+            }
+            $this->log("[{$nome}] [{$rotulo}] Regenerando via Dompdf");
         }
 
-        $this->log("[{$nome}] Fallback Dompdf (panorama + assuntos + gráficos)...");
+        if ($model !== 'questoes') {
+            $this->log("[{$nome}] [{$rotulo}] Sem fallback Dompdf para este modelo");
 
-        return $this->gerarPdfDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso);
+            return null;
+        }
+
+        $this->log("[{$nome}] [{$rotulo}] Fallback Dompdf (panorama + assuntos + gráficos)...");
+
+        return $this->gerarPdfDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso, $model);
     }
 
-    private function pdfContemSecoesObrigatorias(string $caminho): bool
+    private function pdfContemSecoesObrigatorias(string $caminho, string $model = 'questoes'): bool
     {
         if (! is_file($caminho) || filesize($caminho) < 500) {
             return false;
@@ -522,6 +565,14 @@ class CoachReportDownloader
         if ($bytes === false) {
             return false;
         }
+
+        if ($model === 'progresso') {
+            return str_contains($bytes, 'Progresso')
+                || str_contains($bytes, 'Panorama')
+                || str_contains($bytes, 'Motivação')
+                || str_contains($bytes, 'Motivacao');
+        }
+
         // jsPDF grava texto em literais PDF; aceita com ou sem acentos escapados
         $temPanorama = str_contains($bytes, 'Breve Panorama') || str_contains($bytes, 'Breve');
         $temAssuntos = str_contains($bytes, 'Performance por assunto')
@@ -549,20 +600,25 @@ class CoachReportDownloader
     /**
      * Usa o PDFWriter/jsPDF do painel via Puppeteer → PDF idêntico ao "Baixar".
      */
-    private function gerarPdfComPuppeteer(string $nome, string $reportUrl, string $destino): bool
-    {
+    private function gerarPdfComPuppeteer(
+        string $nome,
+        string $reportUrl,
+        string $destino,
+        string $model = 'questoes',
+        string $rotulo = 'Relatório',
+    ): bool {
         $script = function_exists('base_path')
             ? base_path('scripts/tutory-render-pdf.mjs')
             : dirname(__DIR__, 3) . '/scripts/tutory-render-pdf.mjs';
 
         if (! is_file($script)) {
-            $this->log("[{$nome}] Script Puppeteer ausente: {$script}");
+            $this->log("[{$nome}] [{$rotulo}] Script Puppeteer ausente: {$script}");
 
             return false;
         }
 
         $node = trim((string) env('NODE_BINARY', 'node')) ?: 'node';
-        $cmd = [$node, $script, '--url', $reportUrl, '--out', $destino];
+        $cmd = [$node, $script, '--url', $reportUrl, '--out', $destino, '--model', $model];
         $cookie = $this->cookieHeader();
         if ($cookie !== '') {
             $cmd[] = '--cookie';
@@ -573,7 +629,7 @@ class CoachReportDownloader
             $cmd[] = $this->bearerToken;
         }
 
-        $this->log("[{$nome}] Renderizando PDF oficial (PDFWriter/jsPDF via Puppeteer)...");
+        $this->log("[{$nome}] [{$rotulo}] Renderizando PDF oficial (PDFWriter/jsPDF via Puppeteer)...");
 
         $descriptors = [
             0 => ['pipe', 'r'],
@@ -583,7 +639,7 @@ class CoachReportDownloader
         $cwd = function_exists('base_path') ? base_path() : dirname($script, 2);
         $proc = @proc_open($cmd, $descriptors, $pipes, $cwd, null);
         if (! is_resource($proc)) {
-            $this->log("[{$nome}] Não foi possível iniciar Node/Puppeteer");
+            $this->log("[{$nome}] [{$rotulo}] Não foi possível iniciar Node/Puppeteer");
 
             return false;
         }
@@ -597,25 +653,26 @@ class CoachReportDownloader
 
         if ($code !== 0 || ! is_file($destino) || filesize($destino) < 500) {
             $detail = trim($stderr !== '' ? $stderr : $stdout);
-            $this->log("[{$nome}] Puppeteer falhou (exit {$code}): " . $detail);
+            $this->log("[{$nome}] [{$rotulo}] Puppeteer falhou (exit {$code}): " . $detail);
 
             return false;
         }
 
-        $this->log("[{$nome}] Arquivo salvo: {$destino}");
+        $this->log("[{$nome}] [{$rotulo}] Arquivo salvo: {$destino}");
 
         return true;
     }
 
-    private function caminhoDestinoPdf(string $nomeAluno, ?string $id = null): string
+    private function caminhoDestinoPdf(string $nomeAluno, string $model = 'questoes', ?string $id = null): string
     {
         $seguro = $this->sanitizarNomeArquivo($nomeAluno);
+        $modelSeguro = preg_replace('/[^a-z0-9\-]/i', '', $model) ?: 'relatorio';
         $data = date('Ymd_Hi');
-        // Formato: relatorio_$data_$aluno_$periodo.pdf
-        $destino = $this->pastaDownload.'/relatorio_'.$data.'_'.$seguro.'_'.$this->periodo.'.pdf';
+        // Formato: relatorio_{model}_{Ymd_Hi}_{aluno}_{periodo}.pdf
+        $destino = $this->pastaDownload.'/relatorio_'.$modelSeguro.'_'.$data.'_'.$seguro.'_'.$this->periodo.'.pdf';
         $n = 1;
         while (file_exists($destino)) {
-            $destino = $this->pastaDownload.'/relatorio_'.$data.'_'.$seguro.'_'.$this->periodo.'_'.$n.'.pdf';
+            $destino = $this->pastaDownload.'/relatorio_'.$modelSeguro.'_'.$data.'_'.$seguro.'_'.$this->periodo.'_'.$n.'.pdf';
             $n++;
         }
 
@@ -679,65 +736,82 @@ class CoachReportDownloader
     }
 
     /**
-     * Extrai o trecho do nome em filenames conhecidos.
+     * Extrai modelo e nome do aluno em filenames conhecidos.
+     *
+     * @return array{model: string, nome: string}|null
      */
-    private function extrairNomeDoArquivoPdf(string $arquivo): ?string
+    private function extrairMetaDoArquivoPdf(string $arquivo): ?array
     {
         $periodo = preg_quote($this->periodo, '/');
 
-        // relatorio_{Ymd}_{Hi}_{Nome}_{periodo}.pdf
+        // relatorio_{model}_{Ymd}_{Hi}_{Nome}_{periodo}.pdf
+        if (preg_match('/^relatorio_([a-z0-9\-]+)_\d{8}_\d{4}_(.+)_'.$periodo.'(?:_\d+)?\.pdf$/ui', $arquivo, $m)) {
+            return ['model' => strtolower($m[1]), 'nome' => $m[2]];
+        }
+        // legado: relatorio_{Ymd}_{Hi}_{Nome}_{periodo}.pdf (questões)
         if (preg_match('/^relatorio_\d{8}_\d{4}_(.+)_'.$periodo.'(?:_\d+)?\.pdf$/ui', $arquivo, $m)) {
-            return $m[1];
+            return ['model' => 'questoes', 'nome' => $m[1]];
         }
         // legado: relatorio-{id}-{Nome}-{ddmmyyyy}.pdf
         if (preg_match('/^relatorio-\d+-(.+)-\d{8}(?:_\d+)?\.pdf$/ui', $arquivo, $m)) {
-            return $m[1];
+            return ['model' => 'questoes', 'nome' => $m[1]];
         }
         // legado: {Nome}_{Ym}.pdf
         if (preg_match('/^(.+)_\d{4}-\d{2}(?:_\d+)?\.pdf$/ui', $arquivo, $m)) {
-            return $m[1];
+            return ['model' => 'questoes', 'nome' => $m[1]];
         }
 
         return null;
     }
 
     /**
-     * Localiza o PDF mais recente do aluno na pasta de download para o período atual.
+     * Localiza os PDFs mais recentes do aluno (um por modelo em RELATORIOS) na pasta de download.
+     *
+     * @return list<string>
      */
-    private function encontrarPdfAluno(string $nomeAluno): ?string
+    private function encontrarPdfsAluno(string $nomeAluno): array
     {
         if (! is_dir($this->pastaDownload)) {
-            return null;
+            return [];
         }
 
         $seguro = $this->sanitizarNomeArquivo($nomeAluno);
-        $candidatos = [];
+        $modelos = array_column($this->relatorios(), 'model');
+        /** @var array<string, list<string>> $porModelo */
+        $porModelo = [];
 
         foreach (scandir($this->pastaDownload) ?: [] as $arquivo) {
             if (! str_ends_with(mb_strtolower($arquivo), '.pdf')) {
                 continue;
             }
-            $nomeArquivo = $this->extrairNomeDoArquivoPdf($arquivo);
-            if ($nomeArquivo === null) {
+            $meta = $this->extrairMetaDoArquivoPdf($arquivo);
+            if ($meta === null) {
                 continue;
             }
-            if (! $this->nomesArquivoSaoCompativeis($seguro, $nomeArquivo)) {
+            if (! $this->nomesArquivoSaoCompativeis($seguro, $meta['nome'])) {
                 continue;
             }
-            $candidatos[] = $this->pastaDownload.'/'.$arquivo;
+            if (! in_array($meta['model'], $modelos, true)) {
+                continue;
+            }
+            $porModelo[$meta['model']][] = $this->pastaDownload.'/'.$arquivo;
         }
 
-        if ($candidatos === []) {
-            return null;
+        $encontrados = [];
+        foreach ($modelos as $model) {
+            $candidatos = $porModelo[$model] ?? [];
+            if ($candidatos === []) {
+                continue;
+            }
+            usort($candidatos, static fn (string $a, string $b): int => filemtime($b) <=> filemtime($a));
+            $encontrados[] = $candidatos[0];
         }
 
-        usort($candidatos, static fn (string $a, string $b): int => filemtime($b) <=> filemtime($a));
-
-        return $candidatos[0];
+        return $encontrados;
     }
 
     /**
-     * Lista alunos do admin e envia o PDF por e-mail quando recebe_email=true.
+     * Lista alunos do admin e envia os PDFs por e-mail (todos os anexos em um único e-mail).
      */
     private function enviarEmailsDosAlunos(): void
     {
@@ -761,6 +835,7 @@ class CoachReportDownloader
 
         [$dtIni, $dtFim] = $this->datasPeriodoBr();
         $periodoLabel = $dtIni.' a '.$dtFim.' (período '.$this->periodo.')';
+        $nomesRelatorios = array_column($this->relatorios(), 'nome');
 
         $enviados = 0;
         $pulados = 0;
@@ -769,20 +844,17 @@ class CoachReportDownloader
         foreach ($alunos as $aluno) {
             $this->log("[{$aluno->nome}] e-mail={$aluno->email} | recebe_email=".($aluno->recebe_email ? 'sim' : 'não'));
 
-            $pdf = $this->encontrarPdfAluno($aluno->nome);
-            if ($pdf === null) {
-                $this->log("[{$aluno->nome}] PDF não encontrado em {$this->pastaDownload}");
+            $pdfs = $this->encontrarPdfsAluno($aluno->nome);
+            if ($pdfs === []) {
+                $this->log("[{$aluno->nome}] Nenhum PDF encontrado em {$this->pastaDownload}");
                 $this->log("[{$aluno->nome}] Dica: o nome no admin deve coincidir com o do Tutory (ex.: Laíra Lacerda).");
                 $falhas++;
 
                 continue;
             }
-            $encontrado = basename($pdf);
-            $seguro = $this->sanitizarNomeArquivo($aluno->nome);
-            if (! str_contains($encontrado, $seguro)) {
-                $this->log("[{$aluno->nome}] PDF aproximado encontrado: {$encontrado}");
-            } else {
-                $this->log("[{$aluno->nome}] PDF: {$encontrado}");
+
+            foreach ($pdfs as $pdf) {
+                $this->log("[{$aluno->nome}] PDF: ".basename($pdf));
             }
 
             if (! $aluno->recebe_email) {
@@ -804,11 +876,12 @@ class CoachReportDownloader
                     [
                         'nome' => $aluno->nome,
                         'periodoLabel' => $periodoLabel,
+                        'relatorios' => $nomesRelatorios,
                     ],
                     $aluno->email,
-                    $pdf
+                    $pdfs
                 );
-                $this->log("[{$aluno->nome}] E-mail enviado para {$aluno->email}");
+                $this->log("[{$aluno->nome}] E-mail enviado para {$aluno->email} com ".count($pdfs).' anexo(s)');
                 $enviados++;
             } catch (Throwable $exc) {
                 $falhas++;
@@ -831,6 +904,7 @@ class CoachReportDownloader
         string $html,
         string $dtIniIso,
         string $dtFimIso,
+        string $model = 'questoes',
     ): ?string {
         $this->log("[{$nome}] Montando PDF (Dompdf: panorama + gráficos + assuntos)...");
 
@@ -955,7 +1029,7 @@ HTML;
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
 
-            return $this->salvarBytesPdf($nome, $dompdf->output() ?? '', $id);
+            return $this->salvarBytesPdf($nome, $dompdf->output() ?? '', $model, $id);
         } catch (Throwable $exc) {
             $this->log("[{$nome}] Erro Dompdf: " . $exc->getMessage());
 
@@ -1439,12 +1513,12 @@ HTML;
         return null;
     }
 
-    private function salvarBytesPdf(string $nomeAluno, string $bytes, ?string $id = null): ?string
+    private function salvarBytesPdf(string $nomeAluno, string $bytes, string $model = 'questoes', ?string $id = null): ?string
     {
         if ($bytes === '') {
             return null;
         }
-        $destino = $this->caminhoDestinoPdf($nomeAluno, $id);
+        $destino = $this->caminhoDestinoPdf($nomeAluno, $model, $id);
         file_put_contents($destino, $bytes);
         $this->log("[{$nomeAluno}] Arquivo salvo: {$destino}");
 
@@ -1486,7 +1560,8 @@ HTML;
             'Início: ' . $inicio->format('d/m/Y H:i:s'),
             'Fim:    ' . $fim->format('d/m/Y H:i:s'),
             'Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()),
-            "Alunos: {$total}",
+            'Alunos: ' . $total,
+            'Modelos: ' . implode(', ', array_column($this->relatorios(), 'model')),
             'PDFs: ' . count($pdfs),
             'Falhas: ' . count($falhas),
             "Pasta: {$this->pastaDownload}",
@@ -1514,8 +1589,13 @@ HTML;
     private function baixarTodos(): void
     {
         $inicio = new \DateTimeImmutable('now');
+        $relatorios = $this->relatorios();
         $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
-        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + Puppeteer/PDFWriter (fallback Dompdf)');
+        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + Puppeteer/PDFWriter (fallback Dompdf em questões)');
+        $this->log('Relatórios: ' . implode(', ', array_map(
+            static fn (array $r): string => $r['nome'] . ' (' . $r['model'] . ')',
+            $relatorios
+        )));
 
         $alunos = $this->coletarAlunosAtivos();
         if ($this->teste) {
@@ -1539,47 +1619,55 @@ HTML;
             return;
         }
 
-        /** @var array<string, array{nome: string, sucesso: bool, arquivo: ?string, tentativas: int, meta: array{nome: string, id: string}}> $resultados */
+        /** @var array<string, array{nome: string, sucesso: bool, arquivo: ?string, tentativas: int, meta: array{nome: string, id: string}, relatorio: array{model: string, nome: string, slug: string}}> $resultados */
         $resultados = [];
         foreach ($alunos as $a) {
-            $resultados[$a['nome']] = [
-                'nome' => $a['nome'],
-                'sucesso' => false,
-                'arquivo' => null,
-                'tentativas' => 0,
-                'meta' => $a,
-            ];
+            foreach ($relatorios as $relatorio) {
+                $chave = $a['nome'] . '|' . $relatorio['model'];
+                $resultados[$chave] = [
+                    'nome' => $a['nome'] . ' / ' . $relatorio['nome'],
+                    'sucesso' => false,
+                    'arquivo' => null,
+                    'tentativas' => 0,
+                    'meta' => $a,
+                    'relatorio' => $relatorio,
+                ];
+            }
         }
-        $nomes = array_keys($resultados);
+        $chaves = array_keys($resultados);
 
         $processarLote = function (array $lista, int $rodada) use (&$resultados): void {
             $total = count($lista);
-            foreach ($lista as $i => $nome) {
-                $resultados[$nome]['tentativas']++;
-                $t = $resultados[$nome]['tentativas'];
+            foreach ($lista as $i => $chave) {
+                $resultados[$chave]['tentativas']++;
+                $t = $resultados[$chave]['tentativas'];
+                $rotulo = $resultados[$chave]['nome'];
                 $this->log(str_repeat('=', 50));
-                $this->log("[rodada {$rodada}] Aluno " . ($i + 1) . "/{$total}: {$nome} (tentativa {$t}/" . self::MAX_TENTATIVAS . ')');
+                $this->log("[rodada {$rodada}] Item " . ($i + 1) . "/{$total}: {$rotulo} (tentativa {$t}/" . self::MAX_TENTATIVAS . ')');
                 try {
-                    $arquivo = $this->processarAluno($resultados[$nome]['meta']);
+                    $arquivo = $this->processarAluno(
+                        $resultados[$chave]['meta'],
+                        $resultados[$chave]['relatorio']
+                    );
                 } catch (Throwable $exc) {
-                    $this->log("[{$nome}] ERRO: " . $exc->getMessage());
+                    $this->log("[{$rotulo}] ERRO: " . $exc->getMessage());
                     $arquivo = null;
                 }
                 if ($arquivo !== null) {
-                    $resultados[$nome]['sucesso'] = true;
-                    $resultados[$nome]['arquivo'] = $arquivo;
-                    $this->log("[{$nome}] SUCESSO");
+                    $resultados[$chave]['sucesso'] = true;
+                    $resultados[$chave]['arquivo'] = $arquivo;
+                    $this->log("[{$rotulo}] SUCESSO");
                 } else {
-                    $resultados[$nome]['sucesso'] = false;
-                    $resultados[$nome]['arquivo'] = null;
-                    $this->log("[{$nome}] FALHA");
+                    $resultados[$chave]['sucesso'] = false;
+                    $resultados[$chave]['arquivo'] = null;
+                    $this->log("[{$rotulo}] FALHA");
                 }
             }
         };
 
-        $processarLote($nomes, 1);
+        $processarLote($chaves, 1);
         for ($rodada = 2; $rodada <= self::MAX_TENTATIVAS; $rodada++) {
-            $pendentes = array_values(array_filter($nomes, static fn($n) => ! $resultados[$n]['sucesso']));
+            $pendentes = array_values(array_filter($chaves, static fn($k) => ! $resultados[$k]['sucesso']));
             if ($pendentes === []) {
                 $this->log(str_repeat('=', 50));
                 $this->log('Nenhuma falha restante.');
@@ -1600,9 +1688,9 @@ HTML;
                 $falhas[] = $r['nome'];
             }
         }
-        $lista = array_map(static fn($n) => $resultados[$n], $nomes);
+        $lista = array_map(static fn($k) => $resultados[$k], $chaves);
         $fim = new \DateTimeImmutable('now');
-        $log = $this->gravarLogResumo($inicio, $fim, count($nomes), $pdfs, $falhas, $lista);
+        $log = $this->gravarLogResumo($inicio, $fim, count($alunos), $pdfs, $falhas, $lista);
 
         $this->log(str_repeat('=', 50));
         $this->log('Início: ' . $inicio->format('d/m/Y H:i:s'));
@@ -1610,8 +1698,11 @@ HTML;
         $this->log('Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()));
         $this->log('PDFs baixados: ' . count($pdfs));
         $this->log('Falhas finais: ' . count($falhas));
-        foreach ($falhas as $f) {
-            $this->log("- {$f} (tentativas: {$resultados[$f]['tentativas']})");
+        foreach ($chaves as $chave) {
+            if ($resultados[$chave]['sucesso']) {
+                continue;
+            }
+            $this->log("- {$resultados[$chave]['nome']} (tentativas: {$resultados[$chave]['tentativas']})");
         }
         $this->log("Arquivos em: {$this->pastaDownload}");
         $this->log("Log salvo em: {$log}");
