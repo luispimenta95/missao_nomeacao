@@ -157,8 +157,8 @@ try {
   await page.waitForSelector('#btn_save', { timeout: 60000 });
 
   if (model === 'progresso') {
-    // Espera DADOS dos gráficos (Chart.js v2).
-    // chart_horas_diarias com 1 label agregado = conteúdo diferente do download manual.
+    // Espera DADOS de TODOS os gráficos usados pelo PDFWriter (págs 1–9).
+    // Sem isso, pág 2 (Panorama), 4 (taxa) e 5 (pizza/evolução) saem vazias ou agregadas.
     await page.waitForFunction(() => {
       if (!window.Chart || !Chart.instances) return false;
 
@@ -171,18 +171,32 @@ try {
         return null;
       }
 
-      const horas = findChartByCanvasId('chart_horas_diarias');
-      const principal = findChartByCanvasId('chart_progresso_principal');
-      const modalidades = findChartByCanvasId('chart_progresso_modalidades');
-      const estudo = findChartByCanvasId('chart_progresso_estudo');
+      function chartReady(id, minLabels) {
+        const ch = findChartByCanvasId(id);
+        if (!ch || !ch.data || !ch.data.labels) return false;
+        const canvas = ch.canvas || (ch.chart && ch.chart.canvas);
+        if (!canvas || (canvas.width || 0) < 10) return false;
+        return ch.data.labels.length >= minLabels;
+      }
 
-      const horasLabels = horas && horas.data && horas.data.labels ? horas.data.labels.length : 0;
-      const principalOk = !!(principal && principal.data && principal.data.datasets && principal.data.datasets[0]);
-      const modalidadesOk = !!(modalidades && modalidades.data && modalidades.data.labels && modalidades.data.labels.length >= 4);
-      const estudoOk = !!(estudo && estudo.data && estudo.data.labels && estudo.data.labels.length >= 1);
       const nums = document.querySelectorAll('.row-numbers h5').length;
+      const questions = document.querySelectorAll('.row-questions .col-6, .row-questions [class*="col-"]').length;
 
-      return horasLabels >= 7 && principalOk && modalidadesOk && estudoOk && nums >= 3;
+      return nums >= 3
+        && questions >= 2
+        && chartReady('chart_progresso_principal', 1)
+        && chartReady('chart_progresso_modalidades', 4)
+        && chartReady('chart_top_disciplinas', 1) // pág 2
+        && chartReady('chart_pizza_modalidades', 1) // pág 2
+        && chartReady('chart_horas_diarias', 7) // pág 3 diário
+        && chartReady('chart_tx_acerto', 2) // pág 4
+        && chartReady('chart_bar_questoes_disciplina', 1) // pág 4
+        && chartReady('chart_pizza_questoes', 1) // pág 5
+        && chartReady('chart_linha_evolucao_questoes', 2) // pág 5
+        && chartReady('chart_progresso_estudo', 1)
+        && chartReady('chart_progresso_resumo', 1)
+        && chartReady('chart_progresso_revisao', 1)
+        && chartReady('chart_progresso_exercicio', 1);
     }, { timeout: 120000 });
   } else {
     await page.waitForSelector('#chart_questoes_dia', { timeout: 60000 });
@@ -252,26 +266,45 @@ try {
       'chart_horas_diarias',
       'chart_progresso_principal',
       'chart_progresso_modalidades',
+      'chart_top_disciplinas',
+      'chart_pizza_modalidades',
+      'chart_tx_acerto',
+      'chart_bar_questoes_disciplina',
+      'chart_pizza_questoes',
+      'chart_linha_evolucao_questoes',
       'chart_progresso_estudo',
       'chart_questoes_dia',
     ]) {
       const ch = findChartByCanvasId(id);
       if (!ch || !ch.data) continue;
+      const canvas = ch.canvas || (ch.chart && ch.chart.canvas);
       snap[id] = {
         labels: (ch.data.labels || []).length,
         firstLabels: (ch.data.labels || []).slice(0, 3),
         ds0: ch.data.datasets && ch.data.datasets[0]
           ? (ch.data.datasets[0].data || []).slice(0, 5)
           : null,
+        width: canvas ? canvas.width : 0,
       };
     }
     return snap;
   });
 
   if (model === 'progresso') {
-    const horasLabels = chartSnapshot.chart_horas_diarias?.labels || 0;
-    if (horasLabels < 7) {
-      throw new Error(`chart_horas_diarias ainda agregado/incompleto (labels=${horasLabels})`);
+    const required = {
+      chart_horas_diarias: 7,
+      chart_top_disciplinas: 1,
+      chart_pizza_modalidades: 1,
+      chart_tx_acerto: 2,
+      chart_pizza_questoes: 1,
+      chart_linha_evolucao_questoes: 2,
+    };
+    for (const [id, min] of Object.entries(required)) {
+      const labels = chartSnapshot[id]?.labels || 0;
+      const width = chartSnapshot[id]?.width || 0;
+      if (labels < min || width < 10) {
+        throw new Error(`${id} incompleto (labels=${labels}, width=${width}, minLabels=${min})`);
+      }
     }
   }
 
@@ -304,6 +337,14 @@ try {
         if (horasLabels < 7) {
           throw new Error(`chart_horas_diarias incompleto (labels=${horasLabels}, esperado >= 7 diários)`);
         }
+        const top = findChartByCanvasId('chart_top_disciplinas');
+        if (!top || !top.data || !top.data.labels || top.data.labels.length < 1) {
+          throw new Error('chart_top_disciplinas ausente (página 2 Panorama)');
+        }
+        const tx = findChartByCanvasId('chart_tx_acerto');
+        if (!tx || !tx.data || !tx.data.labels || tx.data.labels.length < 2) {
+          throw new Error('chart_tx_acerto incompleto (página 4)');
+        }
       } else {
         const panoramaOk = document.querySelectorAll('.main-numbers h3').length >= 3;
         const assuntosOk = document.querySelectorAll('#tabela_questoes tbody tr').length > 0;
@@ -322,6 +363,37 @@ try {
             if (typeof chart.update === 'function') chart.update(0);
           } catch (e) {}
         }
+      }
+
+      // Bug do painel: PDFWriter usa section-4-3 duas vezes na pág 5;
+      // a evolução deve usar section-4-4 ("Por fim, vamos analisar...").
+      if (reportModel === 'progresso' && typeof PDFWriter.start === 'function') {
+        let src = PDFWriter.start.toString();
+        let seen = 0;
+        src = src.replace(/\$\(\s*['"]\.section-4-3['"]\s*\)/g, (m) => {
+          seen += 1;
+          return seen === 2 ? "$('.section-4-4')" : m;
+        });
+        if (seen >= 2) {
+          // eslint-disable-next-line no-eval
+          PDFWriter.start = eval('(' + src + ')');
+        }
+      }
+
+      // addChart seguro: não aborta o PDF inteiro se um canvas ainda estiver 0x0
+      if (typeof PDFWriter.addChart === 'function' && !PDFWriter.__safeAddChart) {
+        const originalAddChart = PDFWriter.addChart.bind(PDFWriter);
+        PDFWriter.addChart = function safeAddChart(chart, y) {
+          if (!chart || !(chart.width > 0) || !(chart.height > 0)) {
+            return 0;
+          }
+          try {
+            return originalAddChart(chart, y);
+          } catch (e) {
+            return 0;
+          }
+        };
+        PDFWriter.__safeAddChart = true;
       }
 
       PDFWriter.start();
