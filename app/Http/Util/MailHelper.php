@@ -52,7 +52,15 @@ class MailHelper
     /**
      * Envia os Relatórios do Coach com PDFs em anexo (um único e-mail).
      *
-     * @param  array{nome: string, periodoLabel?: string, relatorios?: list<string>, nivelDesempenho?: string|null, textoDesempenho?: string|null, metricasDesempenho?: array<string, float|null>}  $dados
+     * @param  array{
+     *   nome: string,
+     *   periodoLabel?: string,
+     *   relatorios?: list<string>,
+     *   nivelDesempenho?: string|null,
+     *   textoDesempenho?: string|null,
+     *   blocosDesempenho?: list<array<string, mixed>>,
+     *   metricasDesempenho?: array<string, mixed>
+     * }  $dados
      * @param  string|list<string>  $pdfPath  Um caminho ou lista de PDFs
      */
     public static function emailRelatorioCoach(array $dados, string $mailTo, string|array $pdfPath): void
@@ -65,6 +73,7 @@ class MailHelper
                 'relatorios' => $dados['relatorios'] ?? null,
                 'nivelDesempenho' => $dados['nivelDesempenho'] ?? null,
                 'textoDesempenho' => $dados['textoDesempenho'] ?? null,
+                'blocosDesempenho' => $dados['blocosDesempenho'] ?? null,
                 'metricasDesempenho' => $dados['metricasDesempenho'] ?? null,
             ],
         ];

@@ -58,7 +58,7 @@
                             <div class="ml-5 w-0 flex-1">
                                 <dl>
                                     <dt class="text-sm font-medium text-gray-400 truncate">Desempenho</dt>
-                                    <dd class="text-lg font-medium text-white">{{ \App\Models\NivelDesempenho::count() }} níveis</dd>
+                                    <dd class="text-lg font-medium text-white">{{ \App\Models\EixoDesempenho::count() }} eixos</dd>
                                 </dl>
                             </div>
                         </div>

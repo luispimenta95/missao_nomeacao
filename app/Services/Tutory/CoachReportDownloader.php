@@ -536,7 +536,7 @@ class CoachReportDownloader
         // Réplica do PDF do painel (mesmo PDFWriter/jsPDF do botão Baixar)
         if ($this->gerarPdfComPuppeteer($nome, $reportUrl, $destino, $model, $rotulo)) {
             if ($this->pdfContemSecoesObrigatorias($destino, $model)) {
-                $this->salvarMetricasProgressoSeAplicavel($destino, $model, $html);
+                $this->salvarMetricasRelatorioSeAplicavel($destino, $model, $html);
 
                 return $destino;
             }
@@ -549,7 +549,7 @@ class CoachReportDownloader
         if ($model === 'progresso') {
             $salvo = $this->gerarPdfProgressoDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso);
             if ($salvo !== null) {
-                $this->salvarMetricasProgressoSeAplicavel($salvo, $model, $html);
+                $this->salvarMetricasRelatorioSeAplicavel($salvo, $model, $html);
             }
 
             return $salvo;
@@ -557,7 +557,7 @@ class CoachReportDownloader
 
         $salvo = $this->gerarPdfDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso, $model);
         if ($salvo !== null) {
-            $this->salvarMetricasProgressoSeAplicavel($salvo, $model, $html);
+            $this->salvarMetricasRelatorioSeAplicavel($salvo, $model, $html);
         }
 
         return $salvo;
@@ -908,13 +908,12 @@ class CoachReportDownloader
             }
 
             try {
-                $avaliacao = $this->avaliarDesempenhoDoProgresso($pdfs);
-                $nivelNome = $avaliacao['nivel']?->nome;
-                $textoDesempenho = $avaliacao['nivel']?->texto_email;
-                if ($nivelNome !== null) {
-                    $this->log("[{$aluno->nome}] Desempenho: {$nivelNome}");
-                } elseif ($avaliacao['motivo'] !== '') {
-                    $this->log("[{$aluno->nome}] Desempenho: {$avaliacao['motivo']}");
+                $avaliacao = $this->avaliarDesempenhoDosPdfs($aluno->nome, $pdfs);
+                $blocos = $avaliacao['blocos'] ?? [];
+                if ($blocos !== []) {
+                    $this->log("[{$aluno->nome}] Desempenho: ".count($blocos).' bloco(s) — '.($avaliacao['resumo'] ?? 'ok'));
+                } else {
+                    $this->log("[{$aluno->nome}] Desempenho: sem blocos (métricas ausentes ou parâmetros não seedados)");
                 }
 
                 MailHelper::emailRelatorioCoach(
@@ -922,9 +921,10 @@ class CoachReportDownloader
                         'nome' => $aluno->nome,
                         'periodoLabel' => $periodoLabel,
                         'relatorios' => $nomesAnexos !== [] ? $nomesAnexos : array_values($nomePorModelo),
-                        'nivelDesempenho' => $nivelNome,
-                        'textoDesempenho' => $textoDesempenho,
-                        'metricasDesempenho' => $avaliacao['metricas'],
+                        'nivelDesempenho' => $avaliacao['resumo'] ?? null,
+                        'textoDesempenho' => null,
+                        'blocosDesempenho' => $blocos,
+                        'metricasDesempenho' => $avaliacao['metricas'] ?? [],
                     ],
                     $aluno->email,
                     $pdfs
@@ -1199,81 +1199,157 @@ HTML;
     }
 
     /**
-     * Extrai métricas do panorama do Progresso do plano (.row-numbers).
+     * Constância a partir do gráfico de horas diárias do Progresso.
      *
-     * @return array<string, float|null>
+     * @return array{dias_analisados: int, dias_estudados: int, dias_falhados: int}
      */
-    public function extrairMetricasProgresso(string $html): array
+    public function extrairMetricasConstancia(string $html): array
     {
-        $xp = $this->loadDom($html);
-        $avaliador = new AvaliadorDesempenho;
-        $brutos = [
-            'horas_brutas' => null,
-            'horas_liquidas' => null,
-            'dias' => null,
-            'semanas' => null,
-            'pct_questoes' => null,
-        ];
+        $diasAnalisados = 0;
+        $diasEstudados = 0;
 
-        $mapaLabels = [
-            'horasbrutas' => 'horas_brutas',
-            'horasliquidas' => 'horas_liquidas',
-            'dias' => 'dias',
-            'semanas' => 'semanas',
-            'questoes' => 'pct_questoes',
-            'pctquestoes' => 'pct_questoes',
-        ];
-
-        $rows = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' row-numbers ')]");
-        if ($rows !== false && $rows->length > 0) {
-            $primeiro = $rows->item(0);
-            if ($primeiro instanceof DOMElement) {
-                foreach ($primeiro->getElementsByTagName('div') as $col) {
-                    if (! $col instanceof DOMElement) {
+        $cfg = $this->extrairChartConfig($html, 'chart_horas_diarias');
+        if (is_array($cfg)) {
+            $labels = $cfg['data']['labels'] ?? [];
+            if (is_array($labels)) {
+                $diasAnalisados = count($labels);
+            }
+            $datasets = $cfg['data']['datasets'] ?? [];
+            if (is_array($datasets)) {
+                foreach ($datasets as $ds) {
+                    if (! is_array($ds)) {
                         continue;
                     }
-                    $class = ' '.$col->getAttribute('class').' ';
-                    if (! str_contains($class, ' col-')) {
+                    $label = mb_strtolower((string) ($ds['label'] ?? ''));
+                    if (! str_contains($label, 'estudad')) {
                         continue;
                     }
-                    $valor = '';
-                    $label = '';
-                    foreach ($col->getElementsByTagName('h5') as $el) {
-                        $valor = trim((string) $el->textContent);
+                    $series = $ds['data'] ?? [];
+                    if (! is_array($series)) {
                         break;
                     }
-                    foreach ($col->getElementsByTagName('span') as $el) {
-                        $label = trim((string) $el->textContent);
-                        break;
+                    foreach ($series as $valor) {
+                        $n = (new AvaliadorDesempenho)->paraNumero($valor);
+                        if ($n !== null && $n > 0) {
+                            $diasEstudados++;
+                        }
                     }
-                    $labelKey = $this->normalizarParaComparacao($label);
-                    $labelKey = str_replace('%', '', $labelKey);
-                    if (isset($mapaLabels[$labelKey])) {
-                        $brutos[$mapaLabels[$labelKey]] = $valor;
-                    }
+                    break;
                 }
             }
         }
 
-        return $avaliador->normalizarMetricas($brutos);
+        // Fallback: tamanho do período do relatório
+        if ($diasAnalisados <= 0) {
+            [$ini, $fim] = $this->datasPeriodoIso();
+            try {
+                $d1 = new \DateTimeImmutable($ini);
+                $d2 = new \DateTimeImmutable($fim);
+                $diasAnalisados = max(1, (int) $d1->diff($d2)->days + 1);
+            } catch (Throwable) {
+                $diasAnalisados = 15;
+            }
+        }
+
+        $diasFalhados = max(0, $diasAnalisados - $diasEstudados);
+
+        return [
+            'dias_analisados' => $diasAnalisados,
+            'dias_estudados' => $diasEstudados,
+            'dias_falhados' => $diasFalhados,
+        ];
     }
 
-    private function salvarMetricasProgressoSeAplicavel(string $pdfPath, string $model, string $html): void
+    /**
+     * Volume, % geral e assuntos a partir do relatório de Questões.
+     *
+     * @return array{total_questoes: float|null, percentual_acertos: float|null, assuntos: list<array{disciplina: string, assunto: string, percentual: float|null}>}
+     */
+    public function extrairMetricasQuestoes(string $html): array
     {
-        if ($model !== 'progresso' || $pdfPath === '' || ! is_file($pdfPath)) {
+        $avaliador = new AvaliadorDesempenho;
+        $xp = $this->loadDom($html);
+        $total = null;
+        $pct = null;
+
+        $nodes = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' main-numbers ')]");
+        if ($nodes !== false) {
+            foreach ($nodes as $node) {
+                if (! $node instanceof DOMElement) {
+                    continue;
+                }
+                $label = '';
+                $valor = '';
+                foreach ($node->getElementsByTagName('p') as $el) {
+                    $label = trim((string) $el->textContent);
+                    break;
+                }
+                foreach ($node->getElementsByTagName('h3') as $el) {
+                    $valor = trim((string) $el->textContent);
+                    break;
+                }
+                $key = $this->normalizarParaComparacao($label);
+                if ($key === 'questoes') {
+                    $total = $avaliador->paraNumero($valor);
+                } elseif (str_contains($key, 'acerto')) {
+                    $pct = $avaliador->paraNumero($valor);
+                }
+            }
+        }
+
+        $assuntos = [];
+        $tabela = $xp->query("//table[@id='tabela_questoes']//tbody/tr");
+        if ($tabela !== false) {
+            foreach ($tabela as $tr) {
+                if (! $tr instanceof DOMElement) {
+                    continue;
+                }
+                $tds = [];
+                foreach ($tr->getElementsByTagName('td') as $td) {
+                    $tds[] = trim(preg_replace('/\s+/', ' ', (string) $td->textContent) ?? '');
+                }
+                if (count($tds) < 3) {
+                    continue;
+                }
+                $assuntos[] = [
+                    'disciplina' => $tds[0],
+                    'assunto' => $tds[1],
+                    'percentual' => $avaliador->paraNumero($tds[2]),
+                ];
+            }
+        }
+
+        return [
+            'total_questoes' => $total,
+            'percentual_acertos' => $pct,
+            'assuntos' => $assuntos,
+        ];
+    }
+
+    private function salvarMetricasRelatorioSeAplicavel(string $pdfPath, string $model, string $html): void
+    {
+        if ($pdfPath === '' || ! is_file($pdfPath)) {
             return;
         }
 
-        $metricas = $this->extrairMetricasProgresso($html);
+        $metricas = match ($model) {
+            'progresso' => $this->extrairMetricasConstancia($html),
+            'questoes' => $this->extrairMetricasQuestoes($html),
+            default => null,
+        };
+        if ($metricas === null) {
+            return;
+        }
+
         $sidecar = $this->caminhoMetricasSidecar($pdfPath);
         $payload = [
             'gerado_em' => date('c'),
             'periodo' => $this->periodo,
+            'model' => $model,
             'metricas' => $metricas,
-            'metricas_raw' => $metricas,
         ];
         file_put_contents($sidecar, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        $this->log('Métricas de desempenho salvas: '.$sidecar);
+        $this->log("Métricas de desempenho ({$model}) salvas: ".$sidecar);
     }
 
     private function caminhoMetricasSidecar(string $pdfPath): string
@@ -1287,16 +1363,16 @@ HTML;
 
     /**
      * @param  list<string>  $pdfs
-     * @return array{nivel: \App\Models\NivelDesempenho|null, metricas: array<string, float|null>, motivo: string}
+     * @return array{blocos: list<array<string, mixed>>, metricas: array<string, mixed>, resumo: string|null}
      */
-    private function avaliarDesempenhoDoProgresso(array $pdfs): array
+    private function avaliarDesempenhoDosPdfs(string $nomeAluno, array $pdfs): array
     {
         $avaliador = new AvaliadorDesempenho;
-        $metricas = null;
+        $dados = ['nome' => $nomeAluno];
 
         foreach ($pdfs as $pdf) {
             $meta = $this->extrairMetaDoArquivoPdf(basename($pdf));
-            if ($meta === null || ($meta['model'] ?? '') !== 'progresso') {
+            if ($meta === null) {
                 continue;
             }
             $sidecar = $this->caminhoMetricasSidecar($pdf);
@@ -1304,22 +1380,23 @@ HTML;
                 continue;
             }
             $json = json_decode((string) file_get_contents($sidecar), true);
-            if (! is_array($json)) {
+            if (! is_array($json) || ! is_array($json['metricas'] ?? null)) {
                 continue;
             }
-            $metricas = is_array($json['metricas'] ?? null) ? $json['metricas'] : null;
-            break;
+            $model = (string) ($meta['model'] ?? $json['model'] ?? '');
+            $m = $json['metricas'];
+            if ($model === 'progresso') {
+                $dados['dias_analisados'] = $m['dias_analisados'] ?? null;
+                $dados['dias_estudados'] = $m['dias_estudados'] ?? null;
+                $dados['dias_falhados'] = $m['dias_falhados'] ?? null;
+            } elseif ($model === 'questoes') {
+                $dados['total_questoes'] = $m['total_questoes'] ?? null;
+                $dados['percentual_acertos'] = $m['percentual_acertos'] ?? null;
+                $dados['assuntos'] = is_array($m['assuntos'] ?? null) ? $m['assuntos'] : [];
+            }
         }
 
-        if ($metricas === null) {
-            return [
-                'nivel' => null,
-                'metricas' => $avaliador->normalizarMetricas([]),
-                'motivo' => 'Sem métricas do Progresso do plano (arquivo .metricas.json ausente).',
-            ];
-        }
-
-        return $avaliador->avaliar($metricas);
+        return $avaliador->avaliarRelatorio($dados);
     }
 
     private function montarHtmlMotivacaoProgresso(DOMXPath $xp): string

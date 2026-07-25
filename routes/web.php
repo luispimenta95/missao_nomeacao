@@ -71,13 +71,10 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::put('/alunos/{aluno}', [AlunoController::class, 'update'])->name('alunos.update');
     Route::delete('/alunos/{aluno}', [AlunoController::class, 'destroy'])->name('alunos.destroy');
 
-    // Gestão de desempenho (níveis + critérios do Progresso do plano)
+    // Gestão de desempenho (eixos e faixas do documento de parâmetros)
     Route::get('/desempenho', [DesempenhoAdminController::class, 'index'])->name('desempenho.index');
-    Route::get('/desempenho/create', [DesempenhoAdminController::class, 'create'])->name('desempenho.create');
-    Route::post('/desempenho', [DesempenhoAdminController::class, 'store'])->name('desempenho.store');
     Route::get('/desempenho/{desempenho}/edit', [DesempenhoAdminController::class, 'edit'])->name('desempenho.edit');
     Route::put('/desempenho/{desempenho}', [DesempenhoAdminController::class, 'update'])->name('desempenho.update');
-    Route::delete('/desempenho/{desempenho}', [DesempenhoAdminController::class, 'destroy'])->name('desempenho.destroy');
 
     // Leads routes
     Route::get('/leads', [LeadAdminController::class, 'index'])->name('leads.index');

@@ -88,26 +88,27 @@ Conferir: `php artisan schedule:list`
 
 ## Gestão de desempenho (admin)
 
-Em `/admin/desempenho` o mentor cadastra **níveis** (Excelente, Bom, etc.) com **1 ou N critérios** baseados no panorama do Progresso do plano:
+Em `/admin/desempenho` o mentor edita as **faixas e textos** dos eixos do documento de parâmetros. O e-mail do aluno recebe um bloco por eixo aplicável.
 
-| Critério | Unidade | Origem no relatório |
-|----------|---------|---------------------|
-| Horas brutas | h | `.row-numbers` |
-| Horas líquidas | h | `.row-numbers` |
-| Dias | d | `.row-numbers` |
-| Semanas | sem | `.row-numbers` |
-| % questões | % | `.row-numbers` |
+| Eixo | Métrica | Origem |
+|------|---------|--------|
+| Constância na quinzena | `dias_falhados = dias_analisados − dias_estudados` | Progresso → `#chart_horas_diarias` |
+| Quantidade total de questões | `total_questoes` | Questões → `.main-numbers` |
+| Percentual geral de acertos | `% acertos` (só se ≥ 100 questões) | Questões → `.main-numbers` |
+| Percentual por assunto | assuntos com % ≤ 75 | Questões → `#tabela_questoes` |
 
-- Dentro de um nível, todos os critérios precisam ser atendidos (E lógico).
-- A **ordem** menor é avaliada primeiro.
-- Ao baixar o Progresso, as métricas são salvas em `*.metricas.json` ao lado do PDF.
-- No e-mail do aluno entram o **nome do nível** e o **texto** cadastrado.
+Faixas padrão (seed):
 
-Seed dos critérios e níveis (Excelente → Requer atenção):
+- **Constância:** 0 excelente · 1–3 bom · 4–10 brigando · ≥11 crítico  
+- **Volume:** 0–49 crítico · 50–99 baixo · 100–500 suficiente · >500 alto  
+- **% geral:** ≤60 crítico · ≤70 alerta · <80 mediano · <90 muito bom · ≤100 excelente  
+- **Assunto:** ≤60 crítico · ≤75 abaixo da média  
+
+Placeholders nos textos: `{NOME}`, `{X}`, `{Y}`, `{Z}`, `{TOTAL_QUESTOES}`, `{PERCENTUAL_ACERTOS}`, `{ASSUNTO}`, `{PERCENTUAL}`.
 
 ```bash
-php artisan db:seed --class=CriteriosDesempenhoSeeder
-php artisan db:seed --class=NiveisDesempenhoSeeder
+php artisan migrate
+php artisan db:seed --class=ParametrosDesempenhoSeeder
 ```
 
 ## Segurança
