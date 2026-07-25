@@ -152,7 +152,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 0,
                         'valor_max' => 60,
                         'ordem' => 1,
-                        'texto_email' => 'No assunto {ASSUNTO}, você alcançou {PERCENTUAL}% de acertos. Esse resultado foi sinalizado como possível gargalo e merece uma análise mais próxima para corrigir a rota.',
+                        'texto_email' => "{LISTA_ASSUNTOS}\n\nEsses resultados foram sinalizados como possíveis gargalos e merecem uma análise mais próxima para definir a correção de rota.",
                     ],
                     [
                         'codigo' => 'abaixo_media',
@@ -160,7 +160,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 60.01,
                         'valor_max' => 75,
                         'ordem' => 2,
-                        'texto_email' => 'No assunto {ASSUNTO}, você alcançou {PERCENTUAL}% de acertos. Esse ponto seguirá em acompanhamento nos próximos relatórios. Priorize reduzir os erros recorrentes e verificar se o percentual evolui; se permanecer nessa faixa ou cair, faremos uma correção de rota mais próxima.',
+                        'texto_email' => "{LISTA_ASSUNTOS}\n\nEsses dados vão ficar em acompanhamento nos próximos relatórios.\nA prioridade agora é reduzir os erros recorrentes e verificar se o percentual evolui nos próximos períodos. Caso o desempenho permaneça nessa faixa ou apresente queda, faremos uma análise mais próxima para definir a correção de rota, ok?",
                     ],
                 ],
             ],

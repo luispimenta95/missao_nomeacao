@@ -73,8 +73,22 @@
                 @if(!empty($bloco['titulo']))
                 <h3>{{ $bloco['titulo'] }}</h3>
                 @endif
-                @if(!empty($bloco['texto']))
-                <p>{{ $bloco['texto'] }}</p>
+                @if(!empty($bloco['itens']) && is_array($bloco['itens']))
+                <ul style="margin:0 0 12px;padding-left:20px;">
+                    @foreach($bloco['itens'] as $item)
+                    <li style="margin:0 0 6px;">{{ $item }}</li>
+                    @endforeach
+                </ul>
+                @php
+                    $textoBloco = (string) ($bloco['texto'] ?? '');
+                    // Remove a lista textual se o e-mail já renderizou bullets em HTML
+                    $textoBloco = trim(preg_replace('/^•.+(?:\n•.+)*\n*/mu', '', $textoBloco) ?? $textoBloco);
+                @endphp
+                @if($textoBloco !== '')
+                <p style="white-space:pre-line;margin:0;">{{ $textoBloco }}</p>
+                @endif
+                @elseif(!empty($bloco['texto']))
+                <p style="white-space:pre-line;margin:0;">{{ $bloco['texto'] }}</p>
                 @endif
             </div>
             @endforeach
