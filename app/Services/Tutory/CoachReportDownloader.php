@@ -552,19 +552,32 @@ class CoachReportDownloader
 
     private function pdfContemSecoesObrigatorias(string $caminho, string $model = 'questoes'): bool
     {
-        if (! is_file($caminho) || filesize($caminho) < 500) {
+        if (! is_file($caminho)) {
             return false;
         }
+
+        // PDF oficial do painel (com gráficos) é grande; page.pdf()/HTML sem charts fica ~100–200KB.
+        $minBytes = $model === 'progresso' ? 800_000 : 400_000;
+        $size = filesize($caminho);
+        if ($size === false || $size < $minBytes) {
+            return false;
+        }
+
         $bytes = file_get_contents($caminho);
         if ($bytes === false) {
             return false;
         }
 
         if ($model === 'progresso') {
-            return str_contains($bytes, 'Progresso')
+            $temTexto = str_contains($bytes, 'Progresso')
                 || str_contains($bytes, 'Panorama')
                 || str_contains($bytes, 'Motivação')
                 || str_contains($bytes, 'Motivacao');
+            // jsPDF embute gráficos como imagens; PDF incompleto quase não tem /Image
+            $temImagens = substr_count($bytes, '/Subtype /Image') >= 5
+                || substr_count($bytes, '/Subtype/Image') >= 5;
+
+            return $temTexto && $temImagens;
         }
 
         // jsPDF grava texto em literais PDF; aceita com ou sem acentos escapados
