@@ -2197,7 +2197,7 @@ HTML;
             return [700, $h, 460, (int) round($h * 0.68)];
         }
         if ($type === 'pie' || $type === 'doughnut') {
-            return [360, 260, 220, 160];
+            return [320, 230, 180, 130];
         }
         if ($type === 'bar') {
             $h = $labelCount <= 4 ? 180 : 230;
