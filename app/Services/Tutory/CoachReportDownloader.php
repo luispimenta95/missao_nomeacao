@@ -1045,7 +1045,9 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 }
 .panorama .label{color:#888; font-size:8pt; margin:0 0 8pt; line-height:1.1;}
 .panorama .value{font-size:11pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
-.chart,.chart-sm{margin:6px auto 10px; display:block;}
+.chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
+.chart-sm{width:100%; max-width:700px; max-height:140px; margin:8px 0 14px;}
+.chart-pie{width:220px; height:160px; margin:8px auto 14px; display:block;}
 .assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
 .assuntos thead td{background:#00aced; color:#fff; font-weight:bold; padding:8px;}
 .assuntos tbody td{border-bottom:1px solid #eee; padding:8px; vertical-align:top;}
@@ -1518,7 +1520,9 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 }
 .panorama .label{color:#cccccc; font-size:9pt; margin:0 0 12pt; line-height:1.1;}
 .panorama .value{font-size:12pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
-.chart,.chart-sm{margin:6px auto 10px; display:block;}
+.chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
+.chart-sm{width:100%; max-width:700px; max-height:140px; margin:8px 0 14px;}
+.chart-pie{width:220px; height:160px; margin:8px auto 14px; display:block;}
 .two-col{width:100%; border-collapse:collapse;}
 .two-col td{width:50%; vertical-align:top; padding:4px;}
 .assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
@@ -1728,7 +1732,7 @@ HTML;
         if ($cfg === null) {
             return '';
         }
-        [$img, $w, $h] = $this->quickChartPngDataUri($cfg, $chartId);
+        $img = $this->quickChartPngDataUri($cfg);
         if ($img === null) {
             return '';
         }
@@ -1737,9 +1741,15 @@ HTML;
             $out .= '<p style="text-align:center;font-weight:bold;margin:8px 0;">'
                 . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</p>';
         }
-        // Dompdf ignora max-height: dimensões explícitas evitam gráficos exagerados
-        $class = in_array($chartId, ['chart_progresso_principal'], true) ? 'chart-sm' : 'chart';
-        $out .= '<img class="' . $class . '" src="' . $img . '" width="' . $w . '" height="' . $h . '" />';
+        $type = (string) ($cfg['type'] ?? '');
+        $isPie = in_array($type, ['pie', 'doughnut'], true);
+        $class = $isPie
+            ? 'chart-pie'
+            : (in_array($chartId, ['chart_progresso_principal'], true) ? 'chart-sm' : 'chart');
+        // Pizza: dimensões explícitas (Dompdf ignora max-height)
+        $out .= $isPie
+            ? '<img class="' . $class . '" src="' . $img . '" width="220" height="160" />'
+            : '<img class="' . $class . '" src="' . $img . '" />';
 
         return $out;
     }
@@ -2112,19 +2122,14 @@ HTML;
 
     /**
      * @param  array<string, mixed>  $chartConfig
-     * @return array{0: ?string, 1: int, 2: int}  [dataUri|null, pdfWidth, pdfHeight]
      */
-    private function quickChartPngDataUri(array $chartConfig, string $chartId = ''): array
+    private function quickChartPngDataUri(array $chartConfig): ?string
     {
-        [$renderW, $renderH, $pdfW, $pdfH] = $this->dimensoesChart($chartConfig, $chartId);
-
         try {
-            $chartConfig = $this->ajustarOpcoesChartCompacto($chartConfig);
-
             // chart como string JS para permitir formatter() (caixinhas pretas "N questões" / "N%")
             $chartJs = json_encode($chartConfig, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             if ($chartJs === false) {
-                return [null, $pdfW, $pdfH];
+                return null;
             }
             $replacements = [
                 '"__DATALABEL_QUESTOES__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
@@ -2136,9 +2141,25 @@ HTML;
             ];
             $chartJs = str_replace(array_keys($replacements), array_values($replacements), $chartJs);
 
+            $type = (string) ($chartConfig['type'] ?? '');
+            $labelCount = is_array($chartConfig['data']['labels'] ?? null)
+                ? count($chartConfig['data']['labels'])
+                : 1;
+            $width = 900;
+            $height = 420;
+            if ($type === 'horizontalBar') {
+                $height = max(110, min(420, 48 + ($labelCount * 38)));
+            } elseif ($type === 'pie' || $type === 'doughnut') {
+                // Pizza menor (único ajuste de tamanho)
+                $width = 360;
+                $height = 260;
+            } elseif ($type === 'bar' && $labelCount <= 4) {
+                $height = 320;
+            }
+
             $payload = [
-                'width' => $renderW,
-                'height' => $renderH,
+                'width' => $width,
+                'height' => $height,
                 'devicePixelRatio' => 2,
                 'format' => 'png',
                 'backgroundColor' => 'white',
@@ -2155,7 +2176,7 @@ HTML;
                 $body = $resp->body();
                 $ctype = (string) ($resp->header('Content-Type') ?? '');
                 if (str_starts_with($body, "\x89PNG") || str_contains($ctype, 'image')) {
-                    return ['data:image/png;base64,' . base64_encode($body), $pdfW, $pdfH];
+                    return 'data:image/png;base64,' . base64_encode($body);
                 }
                 $this->log('QuickChart resposta inesperada: ' . substr($body, 0, 180));
             }
@@ -2163,93 +2184,17 @@ HTML;
             // GET fallback (sem function — só útil se não houver formatter)
             if (! str_contains($chartJs, 'function(value)')) {
                 $url = 'https://quickchart.io/chart?c=' . rawurlencode($chartJs)
-                    . '&w=' . $renderW . '&h=' . $renderH . '&bkg=white&f=png&v=2.9.4';
+                    . '&w=' . $width . '&h=' . $height . '&bkg=white&f=png&v=2.9.4';
                 $get = Http::timeout(45)->get($url);
                 if ($get->successful() && strlen($get->body()) > 100) {
-                    return ['data:image/png;base64,' . base64_encode($get->body()), $pdfW, $pdfH];
+                    return 'data:image/png;base64,' . base64_encode($get->body());
                 }
             }
         } catch (Throwable $exc) {
             $this->log('QuickChart erro: ' . $exc->getMessage());
         }
 
-        return [null, $pdfW, $pdfH];
-    }
-
-    /**
-     * @param  array<string, mixed>  $chartConfig
-     * @return array{0: int, 1: int, 2: int, 3: int}  renderW, renderH, pdfW, pdfH
-     */
-    private function dimensoesChart(array $chartConfig, string $chartId): array
-    {
-        $type = (string) ($chartConfig['type'] ?? '');
-        $labelCount = is_array($chartConfig['data']['labels'] ?? null)
-            ? count($chartConfig['data']['labels'])
-            : 1;
-
-        // Dimensões compactas (próximas do PDFWriter oficial)
-        if ($chartId === 'chart_progresso_principal' || ($type === 'horizontalBar' && $labelCount <= 1)) {
-            return [640, 64, 460, 46];
-        }
-        if ($type === 'horizontalBar') {
-            $h = max(80, min(170, 34 + ($labelCount * 24)));
-
-            return [700, $h, 460, (int) round($h * 0.68)];
-        }
-        if ($type === 'pie' || $type === 'doughnut') {
-            return [320, 230, 180, 130];
-        }
-        if ($type === 'bar') {
-            $h = $labelCount <= 4 ? 180 : 230;
-
-            return [700, $h, 460, (int) round($h * 0.68)];
-        }
-        if ($type === 'line') {
-            return [700, 190, 460, 125];
-        }
-        if ($type === 'bubble') {
-            return [700, 240, 460, 165];
-        }
-
-        return [700, 210, 460, 145];
-    }
-
-    /**
-     * @param  array<string, mixed>  $chartConfig
-     * @return array<string, mixed>
-     */
-    private function ajustarOpcoesChartCompacto(array $chartConfig): array
-    {
-        $type = (string) ($chartConfig['type'] ?? '');
-        $chartConfig['options'] = is_array($chartConfig['options'] ?? null) ? $chartConfig['options'] : [];
-        $chartConfig['options']['maintainAspectRatio'] = false;
-        $chartConfig['options']['layout'] = is_array($chartConfig['options']['layout'] ?? null)
-            ? $chartConfig['options']['layout']
-            : [];
-        $padding = is_array($chartConfig['options']['layout']['padding'] ?? null)
-            ? $chartConfig['options']['layout']['padding']
-            : [];
-        $chartConfig['options']['layout']['padding'] = array_merge([
-            'top' => 8,
-            'right' => 12,
-            'bottom' => 4,
-            'left' => 4,
-        ], $padding);
-
-        if ($type === 'horizontalBar' || $type === 'bar') {
-            $axis = $type === 'horizontalBar' ? 'yAxes' : 'xAxes';
-            $axes = $chartConfig['options']['scales'][$axis] ?? [[]];
-            if (! is_array($axes) || $axes === []) {
-                $axes = [[]];
-            }
-            $first = is_array($axes[0] ?? null) ? $axes[0] : [];
-            $first['categoryPercentage'] = 0.65;
-            $first['barPercentage'] = 0.75;
-            $axes[0] = $first;
-            $chartConfig['options']['scales'][$axis] = $axes;
-        }
-
-        return $chartConfig;
+        return null;
     }
 
     private function salvarBytesPdf(string $nomeAluno, string $bytes, string $model = 'questoes', ?string $id = null): ?string
