@@ -20,7 +20,7 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
             TurmaSeeder::class,
             CriteriosDesempenhoSeeder::class,
-            NiveisDesempenhoSeeder::class,
+            ParametrosDesempenhoSeeder::class,
         ]);
     }
 }

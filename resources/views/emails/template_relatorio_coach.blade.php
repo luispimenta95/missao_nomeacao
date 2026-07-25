@@ -29,6 +29,25 @@
             margin-bottom: 20px;
         }
 
+        .bloco {
+            margin: 16px 0;
+            padding: 14px 16px;
+            background: #f8f4e8;
+            border-left: 4px solid #BF8F00;
+            border-radius: 4px;
+        }
+
+        .bloco h3 {
+            margin: 0 0 8px;
+            font-size: 15px;
+            color: #222;
+        }
+
+        .bloco p {
+            margin: 0;
+            color: #444;
+        }
+
         .footer {
             font-size: 14px;
             color: #888;
@@ -46,16 +65,28 @@
             @if(!empty($dados['periodoLabel']))
             <p>Período: <strong>{{ $dados['periodoLabel'] }}</strong>.</p>
             @endif
-            @if(!empty($dados['nivelDesempenho']) || !empty($dados['textoDesempenho']))
-            <div style="margin:16px 0;padding:14px 16px;background:#f8f4e8;border-left:4px solid #BF8F00;border-radius:4px;">
-                @if(!empty($dados['nivelDesempenho']))
-                <p style="margin:0 0 8px;"><strong>Nível de desempenho:</strong> {{ $dados['nivelDesempenho'] }}</p>
+
+            @if(!empty($dados['blocosDesempenho']) && is_array($dados['blocosDesempenho']))
+            <p><strong>Análise de desempenho do período</strong></p>
+            @foreach($dados['blocosDesempenho'] as $bloco)
+            <div class="bloco">
+                @if(!empty($bloco['titulo']))
+                <h3>{{ $bloco['titulo'] }}</h3>
                 @endif
-                @if(!empty($dados['textoDesempenho']))
-                <p style="margin:0;">{{ $dados['textoDesempenho'] }}</p>
+                @if(!empty($bloco['texto']))
+                <p>{{ $bloco['texto'] }}</p>
                 @endif
             </div>
+            @endforeach
+            @elseif(!empty($dados['textoDesempenho']))
+            <div class="bloco">
+                @if(!empty($dados['nivelDesempenho']))
+                <h3>Nível de desempenho: {{ $dados['nivelDesempenho'] }}</h3>
+                @endif
+                <p>{{ $dados['textoDesempenho'] }}</p>
+            </div>
             @endif
+
             @if(!empty($dados['relatorios']) && is_array($dados['relatorios']))
             <p>Anexos:</p>
             <ul>
