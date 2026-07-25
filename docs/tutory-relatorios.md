@@ -103,7 +103,12 @@ Em `/admin/desempenho` o mentor cadastra **níveis** (Excelente, Bom, etc.) com 
 - Ao baixar o Progresso, as métricas são salvas em `*.metricas.json` ao lado do PDF.
 - No e-mail do aluno entram o **nome do nível** e o **texto** cadastrado.
 
-Seed dos critérios: `php artisan db:seed --class=CriteriosDesempenhoSeeder`
+Seed dos critérios e níveis (Excelente → Requer atenção):
+
+```bash
+php artisan db:seed --class=CriteriosDesempenhoSeeder
+php artisan db:seed --class=NiveisDesempenhoSeeder
+```
 
 ## Segurança
 
