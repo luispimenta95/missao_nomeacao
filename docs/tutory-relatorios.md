@@ -1,24 +1,36 @@
 # Relatórios do Coach (Tutory)
 
-CLI PHP **HTTP + Puppeteer** que baixa o Relatório do Coach dos alunos **ativos** no Tutory e envia o PDF por e-mail aos alunos cadastrados no admin (`recebe_email=true`).
+CLI PHP **HTTP + Puppeteer** que baixa os relatórios do Coach dos alunos **ativos** no Tutory e envia os PDFs por e-mail aos alunos cadastrados no admin (`recebe_email=true`).
 
 ## Fluxo
 
 1. `POST /intent/login` → sessão + Bearer (`adminUser.token`)
 2. `GET /alunos/consulta?status=ativos` → `data-id` de cada aluno
-3. `POST /intent/cadastrar-relatorio-coach` (`alunos[]`, `dt_ini`, `dt_fim`, `agrupamento=dia`)
-4. `GET /documentos/relatorios/questoes?key=...`
-5. PDF oficial via **Puppeteer** (`scripts/tutory-render-pdf.mjs` → `PDFWriter.output()`)
-6. Fallback: Dompdf + QuickChart (se Node/Chromium indisponível)
-7. Reprocessa falhas (até 3 tentativas)
-8. Lista alunos do **admin** (`alunos`) → localiza PDF em `public/pdfs` pelo nome → envia e-mail se `recebe_email=true` (PDF em anexo)
+3. Para **cada modelo** no array `RELATORIOS` (mesmo fluxo):
+   1. `POST /intent/cadastrar-relatorio-coach` (`alunos[]`, `dt_ini`, `dt_fim`, `agrupamento=dia`)
+   2. `GET /documentos/relatorios/{model}?key=...`
+   3. PDF oficial via **Puppeteer** (`scripts/tutory-render-pdf.mjs` → `PDFWriter.output()`)
+   4. Fallback Dompdf + QuickChart **apenas** para o modelo `questoes`
+4. Reprocessa falhas por aluno+modelo (até 3 tentativas)
+5. Lista alunos do **admin** (`alunos`) → localiza PDFs em `public/pdfs` pelo nome → envia **um único e-mail** com todos os PDFs em anexo se `recebe_email=true`
+
+## Modelos (`RELATORIOS`)
+
+Definidos em `CoachReportDownloader::RELATORIOS`:
+
+| model (URL) | Nome |
+|-------------|------|
+| `questoes` | Desempenho em Questões |
+| `progresso` | Progresso do plano |
+
+Para incluir outro relatório do painel, adicione um índice ao array com o `model` usado em `/documentos/relatorios/{model}`.
 
 ## Requisitos
 
 - PHP 8.2+
 - Node.js 18+ com `puppeteer` (`npm install`) — Chromium baixado pelo Puppeteer
 - Rede para `admin.tutory.com.br`
-- (Fallback Dompdf) extensão **gd** + acesso a `quickchart.io`
+- (Fallback Dompdf, só questões) extensão **gd** + acesso a `quickchart.io`
 - SMTP configurado (`MAIL_*`) para envio dos relatórios
 - Alunos cadastrados em `/admin/alunos` com o **mesmo nome** usado no Tutory (para casar o PDF)
 
@@ -34,7 +46,6 @@ TIMEOUT=120
 APP_TIMEZONE=America/Sao_Paulo
 # NODE_BINARY=node
 # TUTORY_REPORT_GENERATE_URL=/intent/cadastrar-relatorio-coach
-# TUTORY_REPORT_MODEL=questoes
 # TUTORY_REPORT_AGRUPAMENTO=dia
 ```
 
@@ -51,10 +62,12 @@ php artisan tutory:baixar-relatorios --periodo=1
 php artisan tutory:baixar-relatorios --periodo=2 --teste
 ```
 
-Arquivo gerado: `relatorio_{Ymd_Hi}_{aluno}_{periodo}.pdf`  
-Exemplo: `relatorio_20260721_1830_Laíra_Lacerda_1.pdf`
+Arquivo gerado: `relatorio_{model}_{Ymd_Hi}_{aluno}_{periodo}.pdf`  
+Exemplos:
+- `relatorio_questoes_20260721_1830_Laíra_Lacerda_1.pdf`
+- `relatorio_progresso_20260721_1830_Laíra_Lacerda_1.pdf`
 
-O envio de e-mail usa o PDF mais recente do aluno na pasta para o `--periodo` informado (aceita pequenas diferenças de digitação no nome).
+O envio de e-mail anexa o PDF mais recente de **cada modelo** do aluno para o `--periodo` informado (aceita pequenas diferenças de digitação no nome).
 
 ## Agendamento (Laravel Scheduler)
 

@@ -4,18 +4,31 @@ namespace App\Mail;
 
 class EmailRelatorioCoach extends BaseEmail
 {
-    public $subject = 'Seu Relatório do Coach - Missão Nomeação';
+    public $subject = 'Seus Relatórios do Coach - Missão Nomeação';
 
-    private ?string $anexoPath;
+    /** @var list<string> */
+    private array $anexoPaths;
 
-    public function __construct(array $dados, ?string $anexoPath = null)
+    /**
+     * @param  string|list<string>|null  $anexoPath
+     */
+    public function __construct(array $dados, string|array|null $anexoPath = null)
     {
         parent::__construct($dados);
-        $this->anexoPath = $anexoPath;
+        if (is_string($anexoPath) && $anexoPath !== '') {
+            $this->anexoPaths = [$anexoPath];
+        } elseif (is_array($anexoPath)) {
+            $this->anexoPaths = array_values(array_filter(
+                $anexoPath,
+                static fn ($p): bool => is_string($p) && $p !== ''
+            ));
+        } else {
+            $this->anexoPaths = [];
+        }
 
         $periodoLabel = $dados['body']['periodoLabel'] ?? null;
         if (is_string($periodoLabel) && $periodoLabel !== '') {
-            $this->subject = 'Relatório do Coach ('.$periodoLabel.') - Missão Nomeação';
+            $this->subject = 'Relatórios do Coach ('.$periodoLabel.') - Missão Nomeação';
         }
     }
 
@@ -23,11 +36,13 @@ class EmailRelatorioCoach extends BaseEmail
     {
         $mail = parent::build();
 
-        if ($this->anexoPath !== null && is_file($this->anexoPath)) {
-            $mail->attach($this->anexoPath, [
-                'as' => basename($this->anexoPath),
-                'mime' => 'application/pdf',
-            ]);
+        foreach ($this->anexoPaths as $path) {
+            if (is_file($path)) {
+                $mail->attach($path, [
+                    'as' => basename($path),
+                    'mime' => 'application/pdf',
+                ]);
+            }
         }
 
         return $mail;

@@ -6,6 +6,7 @@
  *   node scripts/tutory-render-pdf.mjs \
  *     --url "https://admin.tutory.com.br/documentos/relatorios/questoes?key=..." \
  *     --out "/path/relatorio.pdf" \
+ *     [--model questoes|progresso] \
  *     [--cookie "PHPSESSID=..."] \
  *     [--token "BearerToken"]
  */
@@ -22,11 +23,12 @@ function arg(name, fallback = null) {
 
 const url = arg('url');
 const out = arg('out');
+const model = (arg('model', 'questoes') || 'questoes').toLowerCase();
 const cookieHeader = arg('cookie', '');
 const token = arg('token', '');
 
 if (!url || !out) {
-  console.error('Uso: node scripts/tutory-render-pdf.mjs --url URL --out FILE [--cookie PHPSESSID=..] [--token TOKEN]');
+  console.error('Uso: node scripts/tutory-render-pdf.mjs --url URL --out FILE [--model questoes|progresso] [--cookie PHPSESSID=..] [--token TOKEN]');
   process.exit(1);
 }
 
@@ -65,17 +67,26 @@ try {
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
 
   await page.waitForSelector('#btn_save', { timeout: 60000 });
-  await page.waitForSelector('#chart_questoes_dia', { timeout: 60000 });
-  await page.waitForSelector('.main-numbers h3', { timeout: 60000 });
-  await page.waitForSelector('#tabela_questoes tbody tr', { timeout: 60000 });
 
-  // Espera Chart.js pintar e congela animações (igual ao script Selenium)
-  await page.waitForFunction(() => {
-    const c = document.getElementById('chart_questoes_dia');
-    const rows = document.querySelectorAll('#tabela_questoes tbody tr');
-    const nums = document.querySelectorAll('.main-numbers h3');
-    return c && c.width > 10 && c.height > 10 && rows.length > 0 && nums.length >= 3;
-  }, { timeout: 60000 });
+  if (model === 'progresso') {
+    await page.waitForSelector('#chart_progresso_principal', { timeout: 60000 });
+    await page.waitForFunction(() => {
+      const c = document.getElementById('chart_progresso_principal');
+      return c && c.width > 10 && c.height > 0;
+    }, { timeout: 60000 });
+  } else {
+    await page.waitForSelector('#chart_questoes_dia', { timeout: 60000 });
+    await page.waitForSelector('.main-numbers h3', { timeout: 60000 });
+    await page.waitForSelector('#tabela_questoes tbody tr', { timeout: 60000 });
+
+    // Espera Chart.js pintar e congela animações (igual ao script Selenium)
+    await page.waitForFunction(() => {
+      const c = document.getElementById('chart_questoes_dia');
+      const rows = document.querySelectorAll('#tabela_questoes tbody tr');
+      const nums = document.querySelectorAll('.main-numbers h3');
+      return c && c.width > 10 && c.height > 10 && rows.length > 0 && nums.length >= 3;
+    }, { timeout: 60000 });
+  }
 
   await new Promise((r) => setTimeout(r, 2500));
 
@@ -95,15 +106,22 @@ try {
   });
 
   // Intercepta jsPDF.save e dispara o mesmo fluxo do botão Baixar
-  const pdfBase64 = await page.evaluate(async () => {
+  const pdfBase64 = await page.evaluate(async (reportModel) => {
     if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
       throw new Error('PDFWriter não encontrado na página');
     }
 
-    const panoramaOk = document.querySelectorAll('.main-numbers h3').length >= 3;
-    const assuntosOk = document.querySelectorAll('#tabela_questoes tbody tr').length > 0;
-    if (!panoramaOk || !assuntosOk) {
-      throw new Error(`Seções incompletas no DOM (panorama=${panoramaOk}, assuntos=${assuntosOk})`);
+    if (reportModel === 'progresso') {
+      const progressoOk = !!document.getElementById('chart_progresso_principal');
+      if (!progressoOk) {
+        throw new Error('Seções incompletas no DOM (progresso)');
+      }
+    } else {
+      const panoramaOk = document.querySelectorAll('.main-numbers h3').length >= 3;
+      const assuntosOk = document.querySelectorAll('#tabela_questoes tbody tr').length > 0;
+      if (!panoramaOk || !assuntosOk) {
+        throw new Error(`Seções incompletas no DOM (panorama=${panoramaOk}, assuntos=${assuntosOk})`);
+      }
     }
 
     return await new Promise((resolve, reject) => {
@@ -135,7 +153,7 @@ try {
         reject(err);
       }
     });
-  });
+  }, model);
 
   const buf = Buffer.from(pdfBase64.base64, 'base64');
   fs.writeFileSync(out, buf);
@@ -144,9 +162,10 @@ try {
     out,
     bytes: buf.length,
     filename: pdfBase64.filename,
+    model,
   }));
 } catch (err) {
-  console.error(JSON.stringify({ ok: false, error: String(err && err.message ? err.message : err) }));
+  console.error(JSON.stringify({ ok: false, error: String(err && err.message ? err.message : err), model }));
   process.exit(1);
 } finally {
   await browser.close();

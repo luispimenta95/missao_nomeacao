@@ -42,11 +42,19 @@
     <div class="container">
         <div class="content">
             <p>Olá, {{ $dados['nome'] }}!</p>
-            <p>Seu <strong>Relatório do Coach</strong> está pronto.</p>
+            <p>Seus <strong>Relatórios do Coach</strong> estão prontos.</p>
             @if(!empty($dados['periodoLabel']))
             <p>Período: <strong>{{ $dados['periodoLabel'] }}</strong>.</p>
             @endif
-            <p>O PDF segue em anexo neste e-mail.</p>
+            @if(!empty($dados['relatorios']) && is_array($dados['relatorios']))
+            <p>Anexos:</p>
+            <ul>
+                @foreach($dados['relatorios'] as $relatorio)
+                <li>{{ $relatorio }}</li>
+                @endforeach
+            </ul>
+            @endif
+            <p>Os PDFs seguem em anexo neste e-mail.</p>
             <p>Qualquer dúvida, estamos à disposição.</p>
         </div>
         <div class="footer">
