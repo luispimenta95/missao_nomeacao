@@ -1020,7 +1020,8 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 }
 .panorama .label{color:#888; font-size:8pt; margin:0 0 8pt; line-height:1.1;}
 .panorama .value{font-size:11pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
-.chart{width:100%; max-width:700px; margin:8px 0 16px;}
+.chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
+.chart-sm{width:100%; max-width:700px; max-height:140px; margin:8px 0 14px;}
 .assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
 .assuntos thead td{background:#00aced; color:#fff; font-weight:bold; padding:8px;}
 .assuntos tbody td{border-bottom:1px solid #eee; padding:8px; vertical-align:top;}
@@ -1292,7 +1293,8 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 }
 .panorama .label{color:#cccccc; font-size:9pt; margin:0 0 12pt; line-height:1.1;}
 .panorama .value{font-size:12pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
-.chart{width:100%; max-width:700px; margin:8px 0 16px;}
+.chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
+.chart-sm{width:100%; max-width:700px; max-height:140px; margin:8px 0 14px;}
 .two-col{width:100%; border-collapse:collapse;}
 .two-col td{width:50%; vertical-align:top; padding:4px;}
 .assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
@@ -1509,7 +1511,9 @@ HTML;
             $out .= '<p style="text-align:center;font-weight:bold;margin:8px 0;">'
                 . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</p>';
         }
-        $out .= '<img class="chart" src="' . $img . '" />';
+        $out .= '<img class="' . (
+            in_array($chartId, ['chart_progresso_principal'], true) ? 'chart-sm' : 'chart'
+        ) . '" src="' . $img . '" />';
 
         return $out;
     }
@@ -1574,6 +1578,9 @@ HTML;
         }
 
         $colors = $this->extrairChartColors($html);
+        if ($colors === []) {
+            $colors = ['#00ACED', '#FF595E', '#FFCA3A', '#8AC926', '#6A4C93'];
+        }
 
         // JS object → JSON aproximado
         $json = $jsonish;
@@ -1590,10 +1597,41 @@ HTML;
             $json
         ) ?? $json;
 
+        // Remove functions antes de expandir chartColors (evita lixo tipo chartColors[context.dataIndex])
+        $json = preg_replace('/formatter\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
+        $json = preg_replace('/label\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
+        $json = preg_replace('/backgroundColor\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
+        $json = preg_replace('/[A-Za-z_][A-Za-z0-9_]*\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
+        $json = preg_replace('/function\s*\(.*?\)\s*\{.*?\},?/s', 'null,', $json) ?? $json;
+
+        // Expandir chartColors[n] / chartColors[expr] restantes para cor fixa
+        $json = preg_replace_callback(
+            '/chartColors\s*\[\s*([^\]]+)\s*\]/',
+            static function (array $m) use (&$colorIdx, $colors): string {
+                $inner = trim($m[1]);
+                if (ctype_digit($inner)) {
+                    $c = $colors[((int) $inner) % count($colors)];
+                } else {
+                    $c = $colors[$colorIdx % count($colors)];
+                    $colorIdx++;
+                }
+
+                return "'" . $c . "'";
+            },
+            $json
+        ) ?? $json;
+
+        // Expandir chartColors sem índice (ex.: backgroundColor: chartColors)
+        $coresJson = json_encode(array_values($colors), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if ($coresJson === false) {
+            $coresJson = '["#00ACED","#FF595E","#FFCA3A","#8AC926","#6A4C93"]';
+        }
+        $json = preg_replace('/\bchartColors\b/', $coresJson, $json) ?? $json;
+
         $json = preg_replace('/([{\[,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/', '$1"$2":', $json) ?? $json;
         $json = str_replace("'", '"', $json);
         $json = preg_replace('/,\s*([}\]])/', '$1', $json) ?? $json;
-        // remove functions (datalabels formatter etc.)
+        // remove functions residuais (já com aspas após quoting)
         $json = preg_replace('/"formatter"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
         $json = preg_replace('/"label"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
         $json = preg_replace('/"function"\s*:\s*function\s*\(.*?\)\s*\{.*?\},?/s', '', $json) ?? $json;
@@ -1602,10 +1640,41 @@ HTML;
 
         $data = json_decode($json, true);
         if (! is_array($data)) {
+            $this->log("Chart {$canvasId}: JSON inválido após normalização (".json_last_error_msg().')');
+
             return null;
         }
 
+        $data = $this->normalizarCoresDataset($data);
+
         return $this->aplicarDatalabelsOficiais($data, $canvasId);
+    }
+
+    /**
+     * Limita backgroundColor ao nº de pontos (evita barra única com array enorme de cores).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function normalizarCoresDataset(array $data): array
+    {
+        $datasets = $data['data']['datasets'] ?? null;
+        if (! is_array($datasets)) {
+            return $data;
+        }
+
+        foreach ($datasets as $i => $ds) {
+            if (! is_array($ds)) {
+                continue;
+            }
+            $points = is_array($ds['data'] ?? null) ? count($ds['data']) : 0;
+            $bg = $ds['backgroundColor'] ?? null;
+            if ($points > 0 && is_array($bg) && count($bg) > $points) {
+                $data['data']['datasets'][$i]['backgroundColor'] = array_values(array_slice($bg, 0, max($points, 1)));
+            }
+        }
+
+        return $data;
     }
 
     /**
@@ -1656,29 +1725,65 @@ HTML;
             ];
         }
 
+        // Labels aninhados do Chart.js v2 → texto único (QuickChart renderiza melhor)
+        if (isset($data['data']['labels']) && is_array($data['data']['labels'])) {
+            $data['data']['labels'] = array_map(static function ($label) {
+                if (is_array($label)) {
+                    return trim(implode(' ', array_map(static fn ($p) => (string) $p, $label)));
+                }
+
+                return $label;
+            }, $data['data']['labels']);
+        }
+
         // Barras: nomes das disciplinas no eixo X
-        if ($type === 'bar') {
-            $data['options']['scales']['xAxes'] = [[
-                'ticks' => [
-                    'fontSize' => 8,
-                    'autoSkip' => false,
-                    'maxRotation' => 45,
-                    'minRotation' => 45,
-                ],
-            ]];
-            if (! isset($data['options']['scales']['yAxes'])) {
-                $data['options']['scales']['yAxes'] = [[
-                    'ticks' => ['beginAtZero' => true, 'max' => 120],
+        if ($type === 'bar' || $type === 'horizontalBar') {
+            if ($type === 'bar') {
+                $data['options']['scales']['xAxes'] = [[
+                    'ticks' => [
+                        'fontSize' => 8,
+                        'autoSkip' => false,
+                        'maxRotation' => 45,
+                        'minRotation' => 45,
+                    ],
                 ]];
+                if (! isset($data['options']['scales']['yAxes'])) {
+                    $data['options']['scales']['yAxes'] = [[
+                        'ticks' => ['beginAtZero' => true, 'max' => 120],
+                    ]];
+                }
             }
+            // horizontalBar: preserva scales do HTML (já vêm prontas do Tutory)
             $data['options']['legend']['display'] = false;
+            $suffix = match ($canvasId) {
+                'chart_top_disciplinas' => '__DATALABEL_HOURS__',
+                'chart_pizza_modalidades' => '__DATALABEL_HOURS__',
+                default => '__DATALABEL_PERCENT__',
+            };
             $data['options']['plugins']['datalabels'] = [
                 'color' => '#333',
                 'anchor' => 'end',
                 'align' => 'end',
                 'offset' => 6,
                 'font' => ['size' => 10],
-                'formatter' => '__DATALABEL_PERCENT__',
+                'formatter' => $suffix,
+            ];
+
+            return $data;
+        }
+
+        if ($type === 'pie' || $type === 'doughnut') {
+            $data['options']['legend']['display'] = true;
+            $data['options']['plugins']['datalabels'] = [
+                'color' => '#fff',
+                'backgroundColor' => '#000',
+                'anchor' => 'end',
+                'align' => 'end',
+                'offset' => -16,
+                'font' => ['size' => 10],
+                'formatter' => in_array($canvasId, ['chart_pizza_modalidades'], true)
+                    ? '__DATALABEL_HOURS__'
+                    : '__DATALABEL_QUESTOES__',
             ];
 
             return $data;
@@ -1793,15 +1898,31 @@ HTML;
             $replacements = [
                 '"__DATALABEL_QUESTOES__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
                 '"__DATALABEL_PERCENT__"' => 'function(value){return Number(value).toFixed(0)+"%";}',
+                '"__DATALABEL_HOURS__"' => 'function(value){return Number(value).toFixed(0)+"h";}',
                 '"__DATALABEL_BUBBLE_PERCENT__"' => 'function(value){return value&&value.r!=null?Number(value.r*10).toFixed(0)+"%":"";}',
                 // legado
                 '"__DATALABEL_FORMATTER__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
             ];
             $chartJs = str_replace(array_keys($replacements), array_values($replacements), $chartJs);
 
+            $type = (string) ($chartConfig['type'] ?? '');
+            $labelCount = is_array($chartConfig['data']['labels'] ?? null)
+                ? count($chartConfig['data']['labels'])
+                : 1;
+            $width = 900;
+            $height = 420;
+            if ($type === 'horizontalBar') {
+                $height = max(110, min(420, 48 + ($labelCount * 38)));
+            } elseif ($type === 'pie' || $type === 'doughnut') {
+                $width = 560;
+                $height = 400;
+            } elseif ($type === 'bar' && $labelCount <= 4) {
+                $height = 320;
+            }
+
             $payload = [
-                'width' => 900,
-                'height' => 420,
+                'width' => $width,
+                'height' => $height,
                 'devicePixelRatio' => 2,
                 'format' => 'png',
                 'backgroundColor' => 'white',
