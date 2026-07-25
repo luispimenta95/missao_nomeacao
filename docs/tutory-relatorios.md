@@ -86,6 +86,25 @@ No servidor (cron):
 
 Conferir: `php artisan schedule:list`
 
+## Gestão de desempenho (admin)
+
+Em `/admin/desempenho` o mentor cadastra **níveis** (Excelente, Bom, etc.) com **1 ou N critérios** baseados no panorama do Progresso do plano:
+
+| Critério | Unidade | Origem no relatório |
+|----------|---------|---------------------|
+| Horas brutas | h | `.row-numbers` |
+| Horas líquidas | h | `.row-numbers` |
+| Dias | d | `.row-numbers` |
+| Semanas | sem | `.row-numbers` |
+| % questões | % | `.row-numbers` |
+
+- Dentro de um nível, todos os critérios precisam ser atendidos (E lógico).
+- A **ordem** menor é avaliada primeiro.
+- Ao baixar o Progresso, as métricas são salvas em `*.metricas.json` ao lado do PDF.
+- No e-mail do aluno entram o **nome do nível** e o **texto** cadastrado.
+
+Seed dos critérios: `php artisan db:seed --class=CriteriosDesempenhoSeeder`
+
 ## Segurança
 
 - **Não** salve dumps de HTML do admin em `public/` (o `adminUser.token` vaza).

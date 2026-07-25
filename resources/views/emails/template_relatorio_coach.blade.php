@@ -46,6 +46,16 @@
             @if(!empty($dados['periodoLabel']))
             <p>Período: <strong>{{ $dados['periodoLabel'] }}</strong>.</p>
             @endif
+            @if(!empty($dados['nivelDesempenho']) || !empty($dados['textoDesempenho']))
+            <div style="margin:16px 0;padding:14px 16px;background:#f8f4e8;border-left:4px solid #BF8F00;border-radius:4px;">
+                @if(!empty($dados['nivelDesempenho']))
+                <p style="margin:0 0 8px;"><strong>Nível de desempenho:</strong> {{ $dados['nivelDesempenho'] }}</p>
+                @endif
+                @if(!empty($dados['textoDesempenho']))
+                <p style="margin:0;">{{ $dados['textoDesempenho'] }}</p>
+                @endif
+            </div>
+            @endif
             @if(!empty($dados['relatorios']) && is_array($dados['relatorios']))
             <p>Anexos:</p>
             <ul>
