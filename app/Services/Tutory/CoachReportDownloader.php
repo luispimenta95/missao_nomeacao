@@ -552,14 +552,7 @@ class CoachReportDownloader
 
     private function pdfContemSecoesObrigatorias(string $caminho, string $model = 'questoes'): bool
     {
-        if (! is_file($caminho)) {
-            return false;
-        }
-
-        // PDF oficial do painel (com gráficos) é grande; page.pdf()/HTML sem charts fica ~100–200KB.
-        $minBytes = $model === 'progresso' ? 800_000 : 400_000;
-        $size = filesize($caminho);
-        if ($size === false || $size < $minBytes) {
+        if (! is_file($caminho) || filesize($caminho) < 500) {
             return false;
         }
 
@@ -568,16 +561,18 @@ class CoachReportDownloader
             return false;
         }
 
+        // Conteúdo oficial do painel vem do PDFWriter/jsPDF.
+        // page.pdf() do Chromium altera gráficos (ex.: horas diárias agregadas) e não tem jsPDF.
+        $temJsPdf = str_contains($bytes, 'jsPDF');
+        $imagens = substr_count($bytes, '/Subtype /Image') + substr_count($bytes, '/Subtype/Image');
+
         if ($model === 'progresso') {
             $temTexto = str_contains($bytes, 'Progresso')
                 || str_contains($bytes, 'Panorama')
                 || str_contains($bytes, 'Motivação')
                 || str_contains($bytes, 'Motivacao');
-            // jsPDF embute gráficos como imagens; PDF incompleto quase não tem /Image
-            $temImagens = substr_count($bytes, '/Subtype /Image') >= 5
-                || substr_count($bytes, '/Subtype/Image') >= 5;
 
-            return $temTexto && $temImagens;
+            return $temJsPdf && $temTexto && $imagens >= 5;
         }
 
         // jsPDF grava texto em literais PDF; aceita com ou sem acentos escapados
@@ -587,7 +582,7 @@ class CoachReportDownloader
             || str_contains($bytes, 'tabela_questoes')
             || str_contains($bytes, 'Taxa de');
 
-        return $temPanorama && $temAssuntos;
+        return $temJsPdf && $temPanorama && $temAssuntos;
     }
 
     private function cookieHeader(): string
@@ -946,14 +941,54 @@ class CoachReportDownloader
 
         $panoramaHtml = $this->montarHtmlPanoramaProgresso($xp);
         $motivacaoHtml = $this->montarHtmlMotivacaoProgresso($xp);
+        $perguntasHtml = $this->montarHtmlPerguntasProgresso($xp);
         $assuntosHtml = $this->montarHtmlAssuntos($xp);
 
+        // Mesmos gráficos do PDFWriter.start() do painel (ordem das páginas oficiais)
         $chartPrincipal = $this->chartImgHtml($html, 'chart_progresso_principal', null);
-        $chartModalidades = $this->chartImgHtml($html, 'chart_progresso_modalidades', 'Progresso por Modalidade');
+        $chartModalidades = $this->chartImgHtml($html, 'chart_progresso_modalidades', null);
         $chartTop = $this->chartImgHtml($html, 'chart_top_disciplinas', null);
-        $chartTx = $this->chartImgHtml($html, 'chart_tx_acerto', 'Taxa de Acerto');
+        $chartPizzaMod = $this->chartImgHtml($html, 'chart_pizza_modalidades', null);
+        $chartHoras = $this->chartImgHtml($html, 'chart_horas_diarias', null);
+        $chartTx = $this->chartImgHtml($html, 'chart_tx_acerto', null);
         $chartBar = $this->chartImgHtml($html, 'chart_bar_questoes_disciplina', null);
-        $chartLinha = $this->chartImgHtml($html, 'chart_linha_evolucao_questoes', 'Evolução de Questões');
+        $chartPizzaQ = $this->chartImgHtml($html, 'chart_pizza_questoes', null);
+        $chartLinha = $this->chartImgHtml($html, 'chart_linha_evolucao_questoes', null);
+        $chartEstudo = $this->chartImgHtml($html, 'chart_progresso_estudo', null);
+        $chartResumo = $this->chartImgHtml($html, 'chart_progresso_resumo', null);
+        $chartRevisao = $this->chartImgHtml($html, 'chart_progresso_revisao', null);
+        $chartExercicio = $this->chartImgHtml($html, 'chart_progresso_exercicio', null);
+
+        $desc1 = htmlspecialchars($this->xpathText($xp, "//h2[contains(@class,'section-1')]/following-sibling::p[1]")
+            ?: 'Confira o seu progresso geral no plano de estudos', ENT_QUOTES, 'UTF-8');
+        $desc1b = htmlspecialchars($this->xpathText($xp, "//*[contains(@class,'section-1-1')]")
+            ?: 'Confira a seguir, o progresso por modalidade de estudo:', ENT_QUOTES, 'UTF-8');
+        $desc2 = htmlspecialchars($this->xpathText($xp, "//h2[contains(@class,'section-2')]/following-sibling::p[1]")
+            ?: 'Confira as disciplinas com que você mais teve contato no período', ENT_QUOTES, 'UTF-8');
+        $desc2b = htmlspecialchars($this->xpathText($xp, "//*[contains(@class,'section-2-1')]")
+            ?: 'Esse é o panorama das modalidades de estudo praticadas', ENT_QUOTES, 'UTF-8');
+        $desc3 = htmlspecialchars($this->xpathText($xp, "//*[contains(@class,'section-3-1')]")
+            ?: 'Agora, vamos comparar as horas por dia com o seu horário atual', ENT_QUOTES, 'UTF-8');
+        $desc4 = htmlspecialchars($this->xpathText($xp, "//h2[contains(@class,'section-4')]/following-sibling::p[1]")
+            ?: 'Confira o histórico da sua taxa de acerto de questões', ENT_QUOTES, 'UTF-8');
+        $desc4b = htmlspecialchars($this->xpathText($xp, "//*[contains(@class,'section-4-1')]")
+            ?: 'Aqui estão as matérias em que você vai bem ou precisa melhorar', ENT_QUOTES, 'UTF-8');
+        $desc4c = htmlspecialchars($this->xpathText($xp, "//*[contains(@class,'section-4-2')]")
+            ?: 'Esse aqui é o panorama de todas as disciplinas que você praticou', ENT_QUOTES, 'UTF-8');
+        $desc4d = htmlspecialchars($this->xpathText($xp, "//*[contains(@class,'section-4-3')]")
+            ?: 'Agora, vamos conferir quais disciplinas estão sendo mais praticadas', ENT_QUOTES, 'UTF-8');
+        $desc4e = htmlspecialchars($this->xpathText($xp, "//*[contains(@class,'section-4-4')]")
+            ?: 'Por fim, vamos analisar a evolução do seu desempenho por disciplina', ENT_QUOTES, 'UTF-8');
+        $desc5 = htmlspecialchars($this->xpathText($xp, "//h2[contains(@class,'section-5')]/following-sibling::p[1]")
+            ?: 'Confira o seu progresso por modalidade de estudo', ENT_QUOTES, 'UTF-8');
+        $desc6 = htmlspecialchars($this->xpathText($xp, "//h2[contains(@class,'section-6')]/following-sibling::p[1]")
+            ?: 'Confira o seu progresso por modalidade de resumo', ENT_QUOTES, 'UTF-8');
+        $desc7 = htmlspecialchars($this->xpathText($xp, "//h2[contains(@class,'section-7')]/following-sibling::p[1]")
+            ?: 'Confira o seu progresso por modalidade de revisão', ENT_QUOTES, 'UTF-8');
+        $desc8 = htmlspecialchars($this->xpathText($xp, "//h2[contains(@class,'section-8')]/following-sibling::p[1]")
+            ?: 'Confira o seu progresso por modalidade de exercício', ENT_QUOTES, 'UTF-8');
+        $desc9 = htmlspecialchars($this->xpathText($xp, "//h2[contains(@class,'section-9')]/following-sibling::p[1]")
+            ?: 'Para finalizar, segue o seu histórico de metas cumpridas neste período:', ENT_QUOTES, 'UTF-8');
 
         $seguroNome = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
         $seguroCurso = htmlspecialchars($curso, ENT_QUOTES, 'UTF-8');
@@ -991,10 +1026,12 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .assuntos tbody td{border-bottom:1px solid #eee; padding:8px; vertical-align:top;}
 .assuntos .taxa{text-align:right; font-weight:bold;}
 .motivacao p{margin:0 0 8px; line-height:1.4;}
+.questions{width:100%; border-collapse:collapse; margin:8px 0 16px;}
+.questions td{width:50%; text-align:center; vertical-align:top; padding:8px;}
 .rule{border:0;border-top:1px solid #eaeaea; margin:12px 0;}
 </style></head><body>
 {$logoHtml}
-<h1>Progresso do plano</h1>
+<h1>Progresso no Plano</h1>
 <div class="periodo">{$seguroPeriodo}</div>
 <hr class="rule" />
 <div class="aluno">
@@ -1003,25 +1040,63 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 </div>
 
 <h2 class="section">Progresso no Plano</h2>
+<p class="section-desc">{$desc1}</p>
 {$chartPrincipal}
 {$panoramaHtml}
-
-<h2 class="section">Panorama</h2>
+<p class="section-desc">{$desc1b}</p>
 {$chartModalidades}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Panorama</h2>
+<p class="section-desc">{$desc2}</p>
 {$chartTop}
+<p class="section-desc">{$desc2b}</p>
+{$chartPizzaMod}
 
 <div style="page-break-before: always;"></div>
 <h2 class="section">Motivação</h2>
+<p class="section-desc">{$desc3}</p>
+{$chartHoras}
 <div class="motivacao">{$motivacaoHtml}</div>
 
+<div style="page-break-before: always;"></div>
 <h2 class="section">Desempenho de Questões</h2>
+<p class="section-desc">{$desc4}</p>
 {$chartTx}
+<p class="section-desc">{$desc4b}</p>
+{$perguntasHtml}
+<p class="section-desc">{$desc4c}</p>
 {$chartBar}
+
+<div style="page-break-before: always;"></div>
+<p class="section-desc">{$desc4d}</p>
+{$chartPizzaQ}
+<p class="section-desc">{$desc4e}</p>
 {$chartLinha}
 
 <div style="page-break-before: always;"></div>
-<h2 class="section">Performance por assunto</h2>
-<p class="section-desc">Confira o desempenho de questões por assunto no período do relatório:</p>
+<h2 class="section">Progresso por Modalidade</h2>
+<p class="section-desc">{$desc5}</p>
+{$chartEstudo}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Progresso por Modalidade</h2>
+<p class="section-desc">{$desc6}</p>
+{$chartResumo}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Progresso por Modalidade</h2>
+<p class="section-desc">{$desc7}</p>
+{$chartRevisao}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Progresso por Modalidade</h2>
+<p class="section-desc">{$desc8}</p>
+{$chartExercicio}
+
+<div style="page-break-before: always;"></div>
+<h2 class="section">Desempenho de Questões</h2>
+<p class="section-desc">{$desc9}</p>
 {$assuntosHtml}
 </body></html>
 HTML;
@@ -1108,7 +1183,10 @@ HTML;
             return '<p style="color:#888;">(Seção Motivação indisponível na página)</p>';
         }
 
-        $out = '';
+        $titulo = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' insights-panel ')]//h6");
+        $out = $titulo !== ''
+            ? '<p><b>'.htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</b></p>'
+            : '<p><b>Painel de Insights</b></p>';
         foreach ($nodes as $node) {
             $txt = trim(preg_replace('/\s+/', ' ', (string) $node->textContent) ?? '');
             if ($txt === '') {
@@ -1118,6 +1196,31 @@ HTML;
         }
 
         return $out !== '' ? $out : '<p style="color:#888;">(Seção Motivação vazia)</p>';
+    }
+
+    /**
+     * Melhor/pior disciplina (bloco row-questions do relatório de progresso).
+     */
+    private function montarHtmlPerguntasProgresso(DOMXPath $xp): string
+    {
+        $cols = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' row-questions ')]//*[contains(@class,'col-')]");
+        if ($cols === false || $cols->length === 0) {
+            return '';
+        }
+
+        $cells = '';
+        foreach ($cols as $col) {
+            if (! $col instanceof DOMElement) {
+                continue;
+            }
+            $txt = trim(preg_replace('/\s+/', ' ', (string) $col->textContent) ?? '');
+            if ($txt === '') {
+                continue;
+            }
+            $cells .= '<td>'.nl2br(htmlspecialchars($txt, ENT_QUOTES, 'UTF-8')).'</td>';
+        }
+
+        return $cells !== '' ? '<table class="questions"><tr>'.$cells.'</tr></table>' : '';
     }
 
     private function gerarPdfDoHtml(
