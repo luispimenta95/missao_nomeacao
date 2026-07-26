@@ -1026,10 +1026,10 @@ class CoachReportDownloader
 <html><head><meta charset="utf-8"><style>
 {$logoFontFace}
 body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-.logo{text-align:center; margin:0 0 12px; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+.logo{text-align:center; margin:0 0 10px; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
 .logo .l1{font-size:26pt; letter-spacing:0.2pt;}
 .logo .l2{font-size:22pt; letter-spacing:0.2pt;}
-.logo .icon{width:22pt; height:22pt; vertical-align:middle; margin-left:2pt; margin-top:-4pt;}
+.logo .logo-img{display:inline-block;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .periodo{color:#555; margin-bottom:14px; text-align:center;}
 .aluno{margin:10px 0 18px;}
@@ -1045,8 +1045,7 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 }
 .panorama .label{color:#888; font-size:8pt; margin:0 0 8pt; line-height:1.1;}
 .panorama .value{font-size:11pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
-.chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
-.chart-sm{width:100%; max-width:700px; max-height:140px; margin:8px 0 14px;}
+.chart,.chart-sm{margin:6px auto 10px; display:block;}
 .assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
 .assuntos thead td{background:#00aced; color:#fff; font-weight:bold; padding:8px;}
 .assuntos tbody td{border-bottom:1px solid #eee; padding:8px; vertical-align:top;}
@@ -1498,10 +1497,10 @@ HTML;
 <html><head><meta charset="utf-8"><style>
 {$logoFontFace}
 body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-.logo{text-align:center; margin:0 0 12px; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+.logo{text-align:center; margin:0 0 10px; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
 .logo .l1{font-size:26pt; letter-spacing:0.2pt;}
 .logo .l2{font-size:22pt; letter-spacing:0.2pt;}
-.logo .icon{width:22pt; height:22pt; vertical-align:middle; margin-left:2pt; margin-top:-4pt;}
+.logo .logo-img{display:inline-block;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .periodo{color:#555; margin-bottom:14px; text-align:center;}
 .aluno{margin:10px 0 18px;}
@@ -1519,8 +1518,7 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 }
 .panorama .label{color:#cccccc; font-size:9pt; margin:0 0 12pt; line-height:1.1;}
 .panorama .value{font-size:12pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
-.chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
-.chart-sm{width:100%; max-width:700px; max-height:140px; margin:8px 0 14px;}
+.chart,.chart-sm{margin:6px auto 10px; display:block;}
 .two-col{width:100%; border-collapse:collapse;}
 .two-col td{width:50%; vertical-align:top; padding:4px;}
 .assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
@@ -1591,23 +1589,25 @@ HTML;
     }
 
     /**
-     * Logo vetorial no topo do PDF (texto + ícone), nítida em qualquer zoom.
+     * Logo da marca no topo do PDF (PNG oficial, fundo transparente).
      */
     private function montarHtmlLogoPdf(): string
     {
-        $iconSrc = $this->logoIconDataUri();
-        $iconHtml = $iconSrc !== ''
-            ? '<img class="icon" src="' . $iconSrc . '" alt="" />'
-            : '';
+        $src = $this->logoBrandDataUri();
+        if ($src === '') {
+            // Fallback tipográfico se o PNG não existir
+            return '<div class="logo"><div class="l1">Missão</div><div class="l2">nomeação</div></div>';
+        }
 
+        // Proporção do PNG oficial (~910x417)
         return '<div class="logo">'
-            . '<div class="l1">Missão' . $iconHtml . '</div>'
-            . '<div class="l2">nomeação</div>'
+            . '<img class="logo-img" src="' . $src . '" width="210" height="96" alt="Missão Nomeação" />'
             . '</div>';
     }
 
     private function montarCssFonteLogoPdf(): string
     {
+        // Mantido para o fallback tipográfico (quando o PNG não estiver disponível).
         $path = storage_path('fonts/Fredoka-Bold.ttf');
         if (! is_file($path)) {
             return '';
@@ -1623,9 +1623,9 @@ HTML;
         return "@font-face{font-family:'FredokaBrand';font-style:normal;font-weight:bold;src:url('{$src}') format('truetype');}";
     }
 
-    private function logoIconDataUri(): string
+    private function logoBrandDataUri(): string
     {
-        $path = public_path('img/logo-missao-icon.png');
+        $path = public_path('img/logo-missao-nomeacao.png');
         if (! is_file($path)) {
             return '';
         }
@@ -1728,7 +1728,7 @@ HTML;
         if ($cfg === null) {
             return '';
         }
-        $img = $this->quickChartPngDataUri($cfg);
+        [$img, $w, $h] = $this->quickChartPngDataUri($cfg, $chartId);
         if ($img === null) {
             return '';
         }
@@ -1737,9 +1737,9 @@ HTML;
             $out .= '<p style="text-align:center;font-weight:bold;margin:8px 0;">'
                 . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</p>';
         }
-        $out .= '<img class="' . (
-            in_array($chartId, ['chart_progresso_principal'], true) ? 'chart-sm' : 'chart'
-        ) . '" src="' . $img . '" />';
+        // Dompdf ignora max-height: dimensões explícitas evitam gráficos exagerados
+        $class = in_array($chartId, ['chart_progresso_principal'], true) ? 'chart-sm' : 'chart';
+        $out .= '<img class="' . $class . '" src="' . $img . '" width="' . $w . '" height="' . $h . '" />';
 
         return $out;
     }
@@ -2112,14 +2112,19 @@ HTML;
 
     /**
      * @param  array<string, mixed>  $chartConfig
+     * @return array{0: ?string, 1: int, 2: int}  [dataUri|null, pdfWidth, pdfHeight]
      */
-    private function quickChartPngDataUri(array $chartConfig): ?string
+    private function quickChartPngDataUri(array $chartConfig, string $chartId = ''): array
     {
+        [$renderW, $renderH, $pdfW, $pdfH] = $this->dimensoesChart($chartConfig, $chartId);
+
         try {
+            $chartConfig = $this->ajustarOpcoesChartCompacto($chartConfig);
+
             // chart como string JS para permitir formatter() (caixinhas pretas "N questões" / "N%")
             $chartJs = json_encode($chartConfig, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             if ($chartJs === false) {
-                return null;
+                return [null, $pdfW, $pdfH];
             }
             $replacements = [
                 '"__DATALABEL_QUESTOES__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
@@ -2131,24 +2136,9 @@ HTML;
             ];
             $chartJs = str_replace(array_keys($replacements), array_values($replacements), $chartJs);
 
-            $type = (string) ($chartConfig['type'] ?? '');
-            $labelCount = is_array($chartConfig['data']['labels'] ?? null)
-                ? count($chartConfig['data']['labels'])
-                : 1;
-            $width = 900;
-            $height = 420;
-            if ($type === 'horizontalBar') {
-                $height = max(110, min(420, 48 + ($labelCount * 38)));
-            } elseif ($type === 'pie' || $type === 'doughnut') {
-                $width = 560;
-                $height = 400;
-            } elseif ($type === 'bar' && $labelCount <= 4) {
-                $height = 320;
-            }
-
             $payload = [
-                'width' => $width,
-                'height' => $height,
+                'width' => $renderW,
+                'height' => $renderH,
                 'devicePixelRatio' => 2,
                 'format' => 'png',
                 'backgroundColor' => 'white',
@@ -2165,24 +2155,101 @@ HTML;
                 $body = $resp->body();
                 $ctype = (string) ($resp->header('Content-Type') ?? '');
                 if (str_starts_with($body, "\x89PNG") || str_contains($ctype, 'image')) {
-                    return 'data:image/png;base64,' . base64_encode($body);
+                    return ['data:image/png;base64,' . base64_encode($body), $pdfW, $pdfH];
                 }
                 $this->log('QuickChart resposta inesperada: ' . substr($body, 0, 180));
             }
 
             // GET fallback (sem function — só útil se não houver formatter)
             if (! str_contains($chartJs, 'function(value)')) {
-                $url = 'https://quickchart.io/chart?c=' . rawurlencode($chartJs) . '&w=900&h=420&bkg=white&f=png&v=2.9.4';
+                $url = 'https://quickchart.io/chart?c=' . rawurlencode($chartJs)
+                    . '&w=' . $renderW . '&h=' . $renderH . '&bkg=white&f=png&v=2.9.4';
                 $get = Http::timeout(45)->get($url);
                 if ($get->successful() && strlen($get->body()) > 100) {
-                    return 'data:image/png;base64,' . base64_encode($get->body());
+                    return ['data:image/png;base64,' . base64_encode($get->body()), $pdfW, $pdfH];
                 }
             }
         } catch (Throwable $exc) {
             $this->log('QuickChart erro: ' . $exc->getMessage());
         }
 
-        return null;
+        return [null, $pdfW, $pdfH];
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartConfig
+     * @return array{0: int, 1: int, 2: int, 3: int}  renderW, renderH, pdfW, pdfH
+     */
+    private function dimensoesChart(array $chartConfig, string $chartId): array
+    {
+        $type = (string) ($chartConfig['type'] ?? '');
+        $labelCount = is_array($chartConfig['data']['labels'] ?? null)
+            ? count($chartConfig['data']['labels'])
+            : 1;
+
+        // Dimensões compactas (próximas do PDFWriter oficial)
+        if ($chartId === 'chart_progresso_principal' || ($type === 'horizontalBar' && $labelCount <= 1)) {
+            return [640, 64, 460, 46];
+        }
+        if ($type === 'horizontalBar') {
+            $h = max(80, min(170, 34 + ($labelCount * 24)));
+
+            return [700, $h, 460, (int) round($h * 0.68)];
+        }
+        if ($type === 'pie' || $type === 'doughnut') {
+            return [320, 230, 180, 130];
+        }
+        if ($type === 'bar') {
+            $h = $labelCount <= 4 ? 180 : 230;
+
+            return [700, $h, 460, (int) round($h * 0.68)];
+        }
+        if ($type === 'line') {
+            return [700, 190, 460, 125];
+        }
+        if ($type === 'bubble') {
+            return [700, 240, 460, 165];
+        }
+
+        return [700, 210, 460, 145];
+    }
+
+    /**
+     * @param  array<string, mixed>  $chartConfig
+     * @return array<string, mixed>
+     */
+    private function ajustarOpcoesChartCompacto(array $chartConfig): array
+    {
+        $type = (string) ($chartConfig['type'] ?? '');
+        $chartConfig['options'] = is_array($chartConfig['options'] ?? null) ? $chartConfig['options'] : [];
+        $chartConfig['options']['maintainAspectRatio'] = false;
+        $chartConfig['options']['layout'] = is_array($chartConfig['options']['layout'] ?? null)
+            ? $chartConfig['options']['layout']
+            : [];
+        $padding = is_array($chartConfig['options']['layout']['padding'] ?? null)
+            ? $chartConfig['options']['layout']['padding']
+            : [];
+        $chartConfig['options']['layout']['padding'] = array_merge([
+            'top' => 8,
+            'right' => 12,
+            'bottom' => 4,
+            'left' => 4,
+        ], $padding);
+
+        if ($type === 'horizontalBar' || $type === 'bar') {
+            $axis = $type === 'horizontalBar' ? 'yAxes' : 'xAxes';
+            $axes = $chartConfig['options']['scales'][$axis] ?? [[]];
+            if (! is_array($axes) || $axes === []) {
+                $axes = [[]];
+            }
+            $first = is_array($axes[0] ?? null) ? $axes[0] : [];
+            $first['categoryPercentage'] = 0.65;
+            $first['barPercentage'] = 0.75;
+            $axes[0] = $first;
+            $chartConfig['options']['scales'][$axis] = $axes;
+        }
+
+        return $chartConfig;
     }
 
     private function salvarBytesPdf(string $nomeAluno, string $bytes, string $model = 'questoes', ?string $id = null): ?string
