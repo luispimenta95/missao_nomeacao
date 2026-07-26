@@ -1020,17 +1020,20 @@ class CoachReportDownloader
         $seguroPeriodo = htmlspecialchars($periodo, ENT_QUOTES, 'UTF-8');
         $logoHtml = $this->montarHtmlLogoPdf();
         $logoFontFace = $this->montarCssFonteLogoPdf();
+        $page = $this->htmlQuebraPaginaComLogo($logoHtml);
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 {$logoFontFace}
-@page{margin:88px 24px 24px 24px;}
-body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:0;}
-.logo{position:fixed; top:-72px; left:0; right:0; height:64px; text-align:center; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
-.logo .l1{font-size:22pt; letter-spacing:0.2pt;}
-.logo .l2{font-size:18pt; letter-spacing:0.2pt;}
+body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
+.logo{text-align:center; margin:0 0 16px; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+.logo .l1{font-size:26pt; letter-spacing:0.2pt;}
+.logo .l2{font-size:22pt; letter-spacing:0.2pt;}
 .logo .logo-img{display:inline-block;}
+.logo-table{margin:0 auto; border-collapse:collapse;}
+.logo-table td{vertical-align:middle; padding:0;}
+.logo-table .logo-icon{padding-left:10px;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .periodo{color:#555; margin-bottom:14px; text-align:center;}
 .aluno{margin:10px 0 18px;}
@@ -1074,20 +1077,20 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 <p class="section-desc">{$desc1b}</p>
 {$chartModalidades}
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Panorama</h2>
 <p class="section-desc">{$desc2}</p>
 {$chartTop}
 <p class="section-desc">{$desc2b}</p>
 {$chartPizzaMod}
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Motivação</h2>
 <p class="section-desc">{$desc3}</p>
 {$chartHoras}
 <div class="motivacao">{$motivacaoHtml}</div>
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Desempenho de Questões</h2>
 <p class="section-desc">{$desc4}</p>
 {$chartTx}
@@ -1096,33 +1099,33 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 <p class="section-desc">{$desc4c}</p>
 {$chartBar}
 
-<div style="page-break-before: always;"></div>
+{$page}
 <p class="section-desc">{$desc4d}</p>
 {$chartPizzaQ}
 <p class="section-desc">{$desc4e}</p>
 {$chartLinha}
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Progresso por Modalidade</h2>
 <p class="section-desc">{$desc5}</p>
 {$chartEstudo}
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Progresso por Modalidade</h2>
 <p class="section-desc">{$desc6}</p>
 {$chartResumo}
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Progresso por Modalidade</h2>
 <p class="section-desc">{$desc7}</p>
 {$chartRevisao}
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Progresso por Modalidade</h2>
 <p class="section-desc">{$desc8}</p>
 {$chartExercicio}
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Desempenho de Questões</h2>
 <p class="section-desc">{$desc9}</p>
 {$assuntosHtml}
@@ -1494,17 +1497,20 @@ HTML;
         $logoHtml = $this->montarHtmlLogoPdf();
 
         $logoFontFace = $this->montarCssFonteLogoPdf();
+        $page = $this->htmlQuebraPaginaComLogo($logoHtml);
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 {$logoFontFace}
-@page{margin:88px 24px 24px 24px;}
-body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:0;}
-.logo{position:fixed; top:-72px; left:0; right:0; height:64px; text-align:center; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
-.logo .l1{font-size:22pt; letter-spacing:0.2pt;}
-.logo .l2{font-size:18pt; letter-spacing:0.2pt;}
+body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
+.logo{text-align:center; margin:0 0 16px; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+.logo .l1{font-size:26pt; letter-spacing:0.2pt;}
+.logo .l2{font-size:22pt; letter-spacing:0.2pt;}
 .logo .logo-img{display:inline-block;}
+.logo-table{margin:0 auto; border-collapse:collapse;}
+.logo-table td{vertical-align:middle; padding:0;}
+.logo-table .logo-icon{padding-left:10px;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .periodo{color:#555; margin-bottom:14px; text-align:center;}
 .aluno{margin:10px 0 18px;}
@@ -1547,7 +1553,7 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 {$panoramaHtml}
 {$chartDia}
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Desempenho por Disciplina</h2>
 <p class="section-desc">{$seguroSec2}</p>
 {$chartBolha}
@@ -1556,12 +1562,12 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
   <td><p><b>{$seguroPiores}</b></p>{$chartPiores}</td>
 </tr></table>
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Evolução do Desempenho por Disciplina</h2>
 <p class="section-desc">{$seguroSec3}</p>
 {$chartEvolucao}
 
-<div style="page-break-before: always;"></div>
+{$page}
 <h2 class="section">Performance por assunto</h2>
 <p class="section-desc">Confira o desempenho de questões por assunto no período do relatório:</p>
 {$assuntosHtml}
@@ -1595,25 +1601,35 @@ HTML;
     }
 
     /**
-     * Logo oficial da marca no topo de todas as páginas do PDF (PNG, fundo transparente).
+     * Quebra de página com a logo no topo (fluxo normal — evita overlap do position:fixed no Dompdf).
+     */
+    private function htmlQuebraPaginaComLogo(string $logoHtml): string
+    {
+        return '<div style="page-break-before: always;"></div>' . $logoHtml;
+    }
+
+    /**
+     * Logo da marca: tipografia Fredoka + ícone oficial (nítido no Dompdf).
      */
     private function montarHtmlLogoPdf(): string
     {
-        $src = $this->logoBrandDataUri();
-        if ($src === '') {
-            // Fallback tipográfico se o PNG não existir
-            return '<div class="logo"><div class="l1">Missão</div><div class="l2">nomeação</div></div>';
+        $icon = $this->logoIconDataUri();
+        $texto = '<div class="l1">Missão</div><div class="l2">nomeação</div>';
+
+        if ($icon === '') {
+            return '<div class="logo">' . $texto . '</div>';
         }
 
-        // Proporção da logo original (~885x318 após upscale)
         return '<div class="logo">'
-            . '<img class="logo-img" src="' . $src . '" width="240" height="86" alt="Missão Nomeação" />'
+            . '<table class="logo-table"><tr>'
+            . '<td style="text-align:left;">' . $texto . '</td>'
+            . '<td class="logo-icon"><img src="' . $icon . '" width="48" height="49" alt="" /></td>'
+            . '</tr></table>'
             . '</div>';
     }
 
     private function montarCssFonteLogoPdf(): string
     {
-        // Mantido para o fallback tipográfico (quando o PNG não estiver disponível).
         $path = storage_path('fonts/Fredoka-Bold.ttf');
         if (! is_file($path)) {
             return '';
@@ -1627,6 +1643,21 @@ HTML;
         $src = 'data:font/truetype;base64,' . base64_encode($bytes);
 
         return "@font-face{font-family:'FredokaBrand';font-style:normal;font-weight:bold;src:url('{$src}') format('truetype');}";
+    }
+
+    private function logoIconDataUri(): string
+    {
+        $path = public_path('img/logo-missao-icon.png');
+        if (! is_file($path)) {
+            return '';
+        }
+
+        $bytes = @file_get_contents($path);
+        if ($bytes === false || $bytes === '') {
+            return '';
+        }
+
+        return 'data:image/png;base64,' . base64_encode($bytes);
     }
 
     private function logoBrandDataUri(): string
