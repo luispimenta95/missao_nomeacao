@@ -1025,10 +1025,11 @@ class CoachReportDownloader
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 {$logoFontFace}
-body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-.logo{text-align:center; margin:0 0 10px; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
-.logo .l1{font-size:26pt; letter-spacing:0.2pt;}
-.logo .l2{font-size:22pt; letter-spacing:0.2pt;}
+@page{margin:88px 24px 24px 24px;}
+body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:0;}
+.logo{position:fixed; top:-72px; left:0; right:0; height:64px; text-align:center; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+.logo .l1{font-size:22pt; letter-spacing:0.2pt;}
+.logo .l2{font-size:18pt; letter-spacing:0.2pt;}
 .logo .logo-img{display:inline-block;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .periodo{color:#555; margin-bottom:14px; text-align:center;}
@@ -1498,10 +1499,11 @@ HTML;
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 {$logoFontFace}
-body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-.logo{text-align:center; margin:0 0 10px; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
-.logo .l1{font-size:26pt; letter-spacing:0.2pt;}
-.logo .l2{font-size:22pt; letter-spacing:0.2pt;}
+@page{margin:88px 24px 24px 24px;}
+body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:0;}
+.logo{position:fixed; top:-72px; left:0; right:0; height:64px; text-align:center; color:#F8C000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+.logo .l1{font-size:22pt; letter-spacing:0.2pt;}
+.logo .l2{font-size:18pt; letter-spacing:0.2pt;}
 .logo .logo-img{display:inline-block;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .periodo{color:#555; margin-bottom:14px; text-align:center;}
@@ -1593,7 +1595,7 @@ HTML;
     }
 
     /**
-     * Logo da marca no topo do PDF (PNG oficial, fundo transparente).
+     * Logo oficial da marca no topo de todas as páginas do PDF (PNG, fundo transparente).
      */
     private function montarHtmlLogoPdf(): string
     {
@@ -1603,9 +1605,9 @@ HTML;
             return '<div class="logo"><div class="l1">Missão</div><div class="l2">nomeação</div></div>';
         }
 
-        // Proporção do PNG oficial (~910x417)
+        // Proporção da logo original (~885x318 após upscale)
         return '<div class="logo">'
-            . '<img class="logo-img" src="' . $src . '" width="210" height="96" alt="Missão Nomeação" />'
+            . '<img class="logo-img" src="' . $src . '" width="240" height="86" alt="Missão Nomeação" />'
             . '</div>';
     }
 
