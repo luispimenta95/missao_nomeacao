@@ -12,7 +12,7 @@ CLI PHP **HTTP + Puppeteer** que baixa os relatórios do Coach dos alunos **ativ
    3. PDF oficial via **Puppeteer** (`scripts/tutory-render-pdf.mjs` → `PDFWriter.output()` com download nativo CDP, igual ao botão Baixar)
    4. Fallback **Dompdf** + QuickChart se Node/Puppeteer falhar (`questoes` e `progresso`). No progresso, configs Chart.js com `backgroundColor: chartColors` são expandidas para cores fixas antes do QuickChart (Panorama, pizza e barras das páginas 2/4/5).
 4. Reprocessa falhas por aluno+modelo (até 3 tentativas)
-5. Lista alunos do **admin** (`alunos`) → localiza PDFs em `public/pdfs` pelo nome → envia **um único e-mail** com todos os PDFs em anexo se `recebe_email=true`
+5. Lista alunos do **admin** (`alunos`) → localiza PDFs em `public/pdfs` pelo nome → avalia o desempenho e grava `last_performance` (nível em português do último relatório) → envia **um único e-mail** com todos os PDFs em anexo se `recebe_email=true`
 
 ## Modelos (`RELATORIOS`)
 

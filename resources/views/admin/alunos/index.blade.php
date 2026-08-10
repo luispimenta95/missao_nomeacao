@@ -20,6 +20,7 @@
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ID</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Nome</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">E-mail</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Último desempenho</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Recebe e-mail</th>
                         <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Ações</th>
                     </tr>
@@ -30,6 +31,13 @@
                             <td class="px-4 py-3 text-sm text-gray-700">{{ $aluno->id }}</td>
                             <td class="px-4 py-3 text-sm font-medium text-gray-800">{{ $aluno->nome }}</td>
                             <td class="px-4 py-3 text-sm text-gray-600">{{ $aluno->email }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-700">
+                                @if($aluno->last_performance)
+                                    <span class="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">{{ $aluno->last_performance }}</span>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-sm">
                                 @if($aluno->recebe_email)
                                     <span class="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">Sim</span>
@@ -43,7 +51,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-gray-600">Nenhum aluno cadastrado.</td>
+                            <td colspan="6" class="px-4 py-8 text-center text-gray-600">Nenhum aluno cadastrado.</td>
                         </tr>
                     @endforelse
                 </tbody>

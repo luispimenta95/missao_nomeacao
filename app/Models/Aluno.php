@@ -15,6 +15,7 @@ class Aluno extends Model
         'nome',
         'email',
         'recebe_email',
+        'last_performance',
     ];
 
     protected $casts = [
