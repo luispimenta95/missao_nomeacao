@@ -40,6 +40,14 @@
                 </label>
             </div>
 
+            <div class="mb-6">
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Último desempenho</span>
+                    <input type="text" readonly class="mt-2 w-full rounded border border-gray-200 bg-gray-50 p-3 text-gray-700" value="{{ $aluno->last_performance ?: 'Ainda não disponível' }}">
+                    <p class="text-xs text-gray-500 mt-1">Atualizado automaticamente com o nível de desempenho do último relatório gerado.</p>
+                </label>
+            </div>
+
             <div class="mb-8">
                 <label class="inline-flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" name="recebe_email" value="1" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {{ old('recebe_email', $aluno->recebe_email) ? 'checked' : '' }}>

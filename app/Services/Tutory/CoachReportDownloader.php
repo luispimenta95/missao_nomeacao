@@ -893,6 +893,21 @@ class CoachReportDownloader
                 $this->log("[{$aluno->nome}] AVISO: faltam PDFs dos modelos: ".implode(', ', $faltando));
             }
 
+            $avaliacao = $this->avaliarDesempenhoDosPdfs($aluno->nome, $pdfs);
+            $blocos = $avaliacao['blocos'] ?? [];
+            $resumo = $avaliacao['resumo'] ?? null;
+            if ($blocos !== []) {
+                $this->log("[{$aluno->nome}] Desempenho: ".count($blocos).' bloco(s) — '.($resumo ?? 'ok'));
+            } else {
+                $this->log("[{$aluno->nome}] Desempenho: sem blocos (métricas ausentes ou parâmetros não seedados)");
+            }
+
+            if (is_string($resumo) && trim($resumo) !== '') {
+                $aluno->last_performance = $resumo;
+                $aluno->save();
+                $this->log("[{$aluno->nome}] last_performance atualizado: {$resumo}");
+            }
+
             if (! $aluno->recebe_email) {
                 $this->log("[{$aluno->nome}] E-mail não enviado (recebe_email=false)");
                 $pulados++;
@@ -908,20 +923,12 @@ class CoachReportDownloader
             }
 
             try {
-                $avaliacao = $this->avaliarDesempenhoDosPdfs($aluno->nome, $pdfs);
-                $blocos = $avaliacao['blocos'] ?? [];
-                if ($blocos !== []) {
-                    $this->log("[{$aluno->nome}] Desempenho: ".count($blocos).' bloco(s) — '.($avaliacao['resumo'] ?? 'ok'));
-                } else {
-                    $this->log("[{$aluno->nome}] Desempenho: sem blocos (métricas ausentes ou parâmetros não seedados)");
-                }
-
                 MailHelper::emailRelatorioCoach(
                     [
                         'nome' => $aluno->nome,
                         'periodoLabel' => $periodoLabel,
                         'relatorios' => $nomesAnexos !== [] ? $nomesAnexos : array_values($nomePorModelo),
-                        'nivelDesempenho' => $avaliacao['resumo'] ?? null,
+                        'nivelDesempenho' => $resumo,
                         'textoDesempenho' => null,
                         'blocosDesempenho' => $blocos,
                         'metricasDesempenho' => $avaliacao['metricas'] ?? [],
