@@ -11,6 +11,7 @@ use App\Http\Controllers\LeadAdminController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\MailTestController;
 use App\Http\Controllers\MaterialController;
+use App\Http\Controllers\RelatorioPdfAdminController;
 use App\Http\Controllers\TurmaController;
 use App\Models\Material;
 use App\Models\Turma;
@@ -75,6 +76,11 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::get('/desempenho', [DesempenhoAdminController::class, 'index'])->name('desempenho.index');
     Route::get('/desempenho/{desempenho}/edit', [DesempenhoAdminController::class, 'edit'])->name('desempenho.edit');
     Route::put('/desempenho/{desempenho}', [DesempenhoAdminController::class, 'update'])->name('desempenho.update');
+
+    // Fonte e preview do PDF dos relatórios
+    Route::get('/relatorios-pdf', [RelatorioPdfAdminController::class, 'index'])->name('relatorios-pdf.index');
+    Route::put('/relatorios-pdf', [RelatorioPdfAdminController::class, 'update'])->name('relatorios-pdf.update');
+    Route::get('/relatorios-pdf/preview', [RelatorioPdfAdminController::class, 'preview'])->name('relatorios-pdf.preview');
 
     // Leads routes
     Route::get('/leads', [LeadAdminController::class, 'index'])->name('leads.index');

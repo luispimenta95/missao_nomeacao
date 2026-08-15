@@ -52,23 +52,6 @@ class CoachReportDownloader
     private const PIE_RENDER_HEIGHT = 406;
 
     /**
-     * Fontes padrão do PDF (só famílias do Dompdf).
-     * DejaVu Sans é o padrão: vem com o Dompdf, é embutida no arquivo e cobre
-     * português (ã, ç, á). Helvetica/Times/Courier são as Base-14 do PDF
-     * (sempre disponíveis, mas sem esses glifos).
-     *
-     * @var array<string, string>
-     */
-    private const PDF_FONTES = [
-        'dejavu' => 'DejaVu Sans',
-        'helvetica' => 'Helvetica',
-        'times' => 'Times-Roman',
-        'courier' => 'Courier',
-    ];
-
-    private const PDF_FONTE_PADRAO = 'dejavu';
-
-    /**
      * Modelos de relatório a baixar (mesmo fluxo para cada índice).
      * model = segmento em /documentos/relatorios/{model}
      *
@@ -1620,46 +1603,14 @@ HTML;
         return '<div class="logo"><div class="l1">MISSÃO</div><div class="l2">NOMEAÇÃO</div></div>';
     }
 
-    /**
-     * Família padrão escolhida (env TUTORY_PDF_FONT: dejavu|helvetica|times|courier).
-     */
-    private function fontePdf(): string
-    {
-        $chave = strtolower(trim((string) env('TUTORY_PDF_FONT', self::PDF_FONTE_PADRAO)));
-        if ($chave === '') {
-            $chave = self::PDF_FONTE_PADRAO;
-        }
-
-        return self::PDF_FONTES[$chave] ?? self::PDF_FONTES[self::PDF_FONTE_PADRAO];
-    }
-
     private function cssFamiliaFontePdf(): string
     {
-        $fonte = $this->fontePdf();
-
-        return match ($fonte) {
-            'Helvetica' => 'Helvetica, Arial, sans-serif',
-            'Times-Roman' => "Times, 'Times New Roman', serif",
-            'Courier' => 'Courier, monospace',
-            default => "'" . $fonte . "', Helvetica, sans-serif",
-        };
+        return PdfFontes::css();
     }
 
     private function opcoesDompdf(): Options
     {
-        $options = new Options;
-        $options->set('isRemoteEnabled', true);
-        $options->set('isFontSubsettingEnabled', true);
-        $options->set('defaultFont', $this->fontePdf());
-        $chroot = array_values(array_filter([
-            base_path(),
-            public_path(),
-        ], 'is_dir'));
-        if ($chroot !== []) {
-            $options->setChroot($chroot);
-        }
-
-        return $options;
+        return PdfFontes::opcoesDompdf();
     }
 
     private function montarHtmlPanorama(DOMXPath $xp): string
