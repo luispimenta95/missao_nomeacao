@@ -12,7 +12,7 @@ CLI PHP **HTTP + Puppeteer** que baixa os relatórios do Coach dos alunos **ativ
    3. PDF oficial via **Puppeteer** (`scripts/tutory-render-pdf.mjs` → `PDFWriter.output()` com download nativo CDP, igual ao botão Baixar)
    4. Fallback **Dompdf** + QuickChart se Node/Puppeteer falhar (`questoes` e `progresso`). No progresso, configs Chart.js com `backgroundColor: chartColors` são expandidas para cores fixas antes do QuickChart (Panorama, pizza e barras das páginas 2/4/5).
 4. Reprocessa falhas por aluno+modelo (até 3 tentativas)
-5. Lista alunos do **admin** (`alunos`) → localiza PDFs em `public/pdfs` pelo nome → avalia o desempenho e grava `last_performance` (nível em português do último relatório) → envia **um único e-mail** com todos os PDFs em anexo se `recebe_email=true`
+5. Lista alunos do **admin** (`alunos`) → localiza PDFs em `public/pdfs` pelo nome → avalia o desempenho e grava `last_performance` (nível em português do último relatório) → envia **um único e-mail** com todos os PDFs em anexo se `recebe_email=true` → **apaga todos os PDFs** da pasta de download (e os `.metricas.json` ao lado). Logs `log_download_*.txt` permanecem.
 
 ## Modelos (`RELATORIOS`)
 
@@ -71,7 +71,7 @@ Exemplos:
 - `relatorio_questoes_20260721_1830_Giovanna_1.pdf`
 - `relatorio_progresso_20260721_1830_Giovanna_1.pdf`
 
-O envio de e-mail anexa o PDF mais recente de **cada modelo** do aluno para o `--periodo` informado (aceita pequenas diferenças de digitação no nome).
+O envio de e-mail anexa o PDF mais recente de **cada modelo** do aluno para o `--periodo` informado (aceita pequenas diferenças de digitação no nome). Depois do envio, **todos os PDFs da pasta são apagados**.
 
 ## Agendamento (Laravel Scheduler)
 
@@ -121,3 +121,4 @@ php artisan db:seed --class=ParametrosDesempenhoSeeder
 - **Não** salve dumps de HTML do admin em `public/` (o `adminUser.token` vaza).
 - Prefira `LOGIN_USER` / `LOGIN_PASSWORD` no `.env` (hardcode só para teste).
 - Se um `debug_*.html` já ficou público, revogue a sessão no Tutory e apague o arquivo.
+- Os PDFs gerados são apagados da pasta de download **depois do envio** dos e-mails.
