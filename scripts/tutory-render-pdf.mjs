@@ -122,6 +122,55 @@ const browserChartUtils = () => {
   return { findChartByCanvasId, freezeAllCharts, labelCount };
 };
 
+/** Remove rótulos de % em gráficos de horas estudadas (Chart.js v2). */
+function stripPercentFromHoursCharts() {
+  const hoursIds = new Set([
+    'chart_horas_diarias',
+    'chart_top_disciplinas',
+    'chart_pizza_modalidades',
+  ]);
+  if (!window.Chart || !Chart.instances) return 0;
+  let n = 0;
+  for (const k of Object.keys(Chart.instances)) {
+    const inst = Chart.instances[k];
+    const chart = inst.chart || inst;
+    const canvas = inst.canvas || (chart && chart.canvas) || (inst.ctx && inst.ctx.canvas);
+    const id = canvas && canvas.id ? canvas.id : '';
+    if (!hoursIds.has(id) || !chart || !chart.options) continue;
+
+    chart.options.plugins = chart.options.plugins || {};
+    chart.options.plugins.datalabels = Object.assign({}, chart.options.plugins.datalabels || {}, {
+      display: false,
+      formatter: function () {
+        return '';
+      },
+    });
+    // Plugin datalabels no Chart.js v2 também lê options.datalabels
+    chart.options.datalabels = Object.assign({}, chart.options.datalabels || {}, {
+      display: false,
+      formatter: function () {
+        return '';
+      },
+    });
+
+    const scales = chart.options.scales || {};
+    for (const key of ['xAxes', 'yAxes']) {
+      const axes = scales[key];
+      if (!Array.isArray(axes)) continue;
+      for (const axis of axes) {
+        if (!axis || !axis.ticks) continue;
+        if (typeof axis.ticks.callback === 'function') {
+          axis.ticks.callback = function (value) {
+            return value;
+          };
+        }
+      }
+    }
+    n += 1;
+  }
+  return n;
+}
+
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900, deviceScaleFactor: 1 });
@@ -220,6 +269,9 @@ try {
     }, { timeout: 60000 });
   }
 
+  // Remove % de gráficos de horas antes de congelar o canvas
+  await page.evaluate(stripPercentFromHoursCharts);
+
   // Congela Chart.js v2 e redesenha frames finais (getChart não existe no v2 do painel)
   const frozen = await page.evaluate(() => {
     if (!window.Chart || !Chart.instances) return 0;
@@ -316,6 +368,7 @@ try {
   let filename = path.basename(outAbs);
 
   try {
+    await page.evaluate(stripPercentFromHoursCharts);
     await page.evaluate((reportModel) => {
       if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
         throw new Error('PDFWriter não encontrado na página');
@@ -413,6 +466,7 @@ try {
   } catch (downloadErr) {
     // Fallback base64 do mesmo PDFWriter (NÃO usar page.pdf — gráficos saem errados)
     try {
+      await page.evaluate(stripPercentFromHoursCharts);
       const pdfBase64 = await page.evaluate(async () => {
         if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
           throw new Error('PDFWriter não encontrado na página');
