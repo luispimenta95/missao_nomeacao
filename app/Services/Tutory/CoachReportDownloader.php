@@ -34,7 +34,7 @@ class CoachReportDownloader
 {
     private const BASE = 'https://admin.tutory.com.br';
 
-    private const ALUNA_TESTE = 'Laíra Lacerda';
+    private const ALUNA_TESTE = 'Giovanna';
 
     private const MAX_TENTATIVAS = 3;
 
@@ -727,7 +727,7 @@ class CoachReportDownloader
 
     private function sanitizarNomeArquivo(string $nomeAluno): string
     {
-        // Mantém acentos (Laíra, José, etc.); remove só caracteres inválidos para arquivo
+        // Mantém acentos (Giovanna, José, etc.); remove só caracteres inválidos para arquivo
         $seguro = preg_replace('/[^\p{L}\p{N} ._\\-]/u', '', $nomeAluno) ?? 'aluno';
         $seguro = preg_replace('/\s+/u', '_', trim($seguro)) ?? 'aluno';
         $seguro = preg_replace('/_+/u', '_', $seguro) ?? 'aluno';
@@ -896,7 +896,7 @@ class CoachReportDownloader
             $pdfs = $this->encontrarPdfsAluno($aluno->nome);
             if ($pdfs === []) {
                 $this->log("[{$aluno->nome}] Nenhum PDF encontrado em {$this->pastaDownload}");
-                $this->log("[{$aluno->nome}] Dica: o nome no admin deve coincidir com o do Tutory (ex.: Laíra Lacerda).");
+                $this->log("[{$aluno->nome}] Dica: o nome no admin deve coincidir com o do Tutory (ex.: Giovanna).");
                 $falhas++;
 
                 continue;
@@ -999,6 +999,7 @@ class CoachReportDownloader
         $xp = $this->loadDom($html);
         $periodo = $this->xpathText($xp, "//*[contains(@class,'report-header')]//p")
             ?: "Período do relatório: de {$dtIniIso} a {$dtFimIso}";
+        $periodo = PdfDatas::textoParaBr($periodo);
         $curso = $this->xpathText($xp, "//*[contains(@class,'report-aluno-desc')]//p")
             ?: '';
 
@@ -1482,6 +1483,7 @@ HTML;
         $xp = $this->loadDom($html);
         $periodo = $this->xpathText($xp, "//*[contains(@class,'report-header')]//p")
             ?: "Período do relatório: de {$dtIniIso} a {$dtFimIso}";
+        $periodo = PdfDatas::textoParaBr($periodo);
         $curso = $this->xpathText($xp, "//*[contains(@class,'report-aluno-desc')]//p")
             ?: '';
 
@@ -1996,6 +1998,7 @@ HTML;
 
                 return $label;
             }, $data['data']['labels']);
+            $data['data']['labels'] = PdfDatas::listaParaBr($data['data']['labels']);
         }
 
         // Barras: nomes das disciplinas no eixo X

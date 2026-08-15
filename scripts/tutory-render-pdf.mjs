@@ -47,7 +47,12 @@ const downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tutory-pdf-'));
 
 const browser = await puppeteer.launch({
   headless: true,
-  args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--lang=pt-BR',
+  ],
 });
 
 function cleanupDownloadDir() {
@@ -171,9 +176,184 @@ function stripPercentFromHoursCharts() {
   return n;
 }
 
+/**
+ * Converte datas MM/DD (EUA) para DD/MM (BR) no DOM, eixos dos gráficos e texto do jsPDF.
+ * Função auto-contida para page.evaluate().
+ */
+function aplicarDatasBrasileiras() {
+  function pareceAmericano(texto) {
+    const re = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+    let m;
+    const primeiros = [];
+    const segundos = [];
+    let americanos = 0;
+    let brasileiros = 0;
+    while ((m = re.exec(texto))) {
+      const n1 = parseInt(m[1], 10);
+      const n2 = parseInt(m[2], 10);
+      primeiros.push(n1);
+      segundos.push(n2);
+      if (n1 <= 12 && n2 > 12) americanos += 1;
+      if (n1 > 12 && n2 <= 12) brasileiros += 1;
+    }
+    if (primeiros.length === 0) return false;
+    if (americanos > brasileiros) return true;
+    if (brasileiros > americanos) return false;
+    const varPrimeiro = new Set(primeiros).size > 1;
+    const varSegundo = new Set(segundos).size > 1;
+    if (!varPrimeiro && varSegundo && Math.max(...primeiros) <= 12) return true;
+    if (varPrimeiro && !varSegundo && Math.max(...segundos) <= 12) return false;
+    if (primeiros.length === 1) return false;
+    return true;
+  }
+
+  function converterBarras(texto, forcar) {
+    return texto.replace(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g, (full, a, b, y) => {
+      const n1 = parseInt(a, 10);
+      const n2 = parseInt(b, 10);
+      if (n1 < 1 || n1 > 31 || n2 < 1 || n2 > 31) return full;
+      if (n1 > 12 && n2 <= 12) return full;
+      const eAmericano = (n1 <= 12 && n2 > 12) || (forcar && n1 <= 12);
+      if (!eAmericano) return full;
+      const dd = String(n2).padStart(2, '0');
+      const mm = String(n1).padStart(2, '0');
+      return y ? `${dd}/${mm}/${y}` : `${dd}/${mm}`;
+    });
+  }
+
+  const mesesEn = {
+    january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3,
+    april: 4, apr: 4, may: 5, june: 6, jun: 6, july: 7, jul: 7,
+    august: 8, aug: 8, september: 9, sept: 9, sep: 9,
+    october: 10, oct: 10, november: 11, nov: 11, december: 12, dec: 12,
+  };
+
+  function converterMesesIngles(texto) {
+    return texto.replace(
+      /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\.?\s+(\d{1,2})(?:,?\s+(\d{2,4}))?\b/gi,
+      (full, mon, day, year) => {
+        const mes = mesesEn[String(mon).toLowerCase().replace('.', '')];
+        if (!mes) return full;
+        const dd = String(parseInt(day, 10)).padStart(2, '0');
+        const mm = String(mes).padStart(2, '0');
+        return year ? `${dd}/${mm}/${year}` : `${dd}/${mm}`;
+      },
+    );
+  }
+
+  function converterIso(texto) {
+    return texto.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y, m, d) => `${d}/${m}/${y}`);
+  }
+
+  function textoParaBr(texto, forcar) {
+    if (typeof texto !== 'string' || texto === '') return texto;
+    return converterIso(converterMesesIngles(converterBarras(texto, forcar)));
+  }
+
+  function converterValor(valor, forcar) {
+    if (typeof valor === 'string') return textoParaBr(valor, forcar);
+    if (Array.isArray(valor)) return valor.map((v) => converterValor(v, forcar));
+    return valor;
+  }
+
+  function aceitarTexto(node) {
+    const p = node.parentElement;
+    if (!p) return NodeFilter.FILTER_REJECT;
+    const tag = p.tagName;
+    if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') {
+      return NodeFilter.FILTER_REJECT;
+    }
+    return NodeFilter.FILTER_ACCEPT;
+  }
+
+  function coletarTextos() {
+    const partes = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: aceitarTexto });
+    while (walker.nextNode()) partes.push(walker.currentNode.nodeValue || '');
+    if (window.Chart && Chart.instances) {
+      for (const k of Object.keys(Chart.instances)) {
+        const inst = Chart.instances[k];
+        const chart = inst.chart || inst;
+        const labels = chart && chart.data && chart.data.labels ? chart.data.labels : [];
+        for (const label of labels) {
+          if (Array.isArray(label)) partes.push(label.join(' '));
+          else if (label != null) partes.push(String(label));
+        }
+      }
+    }
+    return partes.join(' | ');
+  }
+
+  const forcar = pareceAmericano(coletarTextos());
+
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: aceitarTexto });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    const next = textoParaBr(n.nodeValue || '', forcar);
+    if (next !== n.nodeValue) n.nodeValue = next;
+  }
+
+  let charts = 0;
+  if (window.Chart && Chart.instances) {
+    for (const k of Object.keys(Chart.instances)) {
+      const inst = Chart.instances[k];
+      const chart = inst.chart || inst;
+      if (!chart || !chart.data || !chart.data.labels) continue;
+      chart.data.labels = converterValor(chart.data.labels, forcar);
+      const scales = chart.options && chart.options.scales ? chart.options.scales : {};
+      for (const key of ['xAxes', 'yAxes']) {
+        const axes = scales[key];
+        if (!Array.isArray(axes)) continue;
+        for (const axis of axes) {
+          if (!axis.ticks) axis.ticks = {};
+          const orig = axis.ticks.callback;
+          axis.ticks.callback = function patchedTick(value, index, values) {
+            const raw = orig ? orig.call(this, value, index, values) : value;
+            return textoParaBr(String(raw), forcar);
+          };
+        }
+      }
+      try {
+        if (typeof chart.update === 'function') chart.update(0);
+      } catch (e) {}
+      charts += 1;
+    }
+  }
+
+  function patchText(proto) {
+    if (!proto || typeof proto.text !== 'function' || proto.__brDates) return;
+    const orig = proto.text;
+    proto.text = function patchedText(text, ...args) {
+      return orig.call(this, converterValor(text, forcar), ...args);
+    };
+    proto.__brDates = true;
+  }
+  const ctor = typeof jsPDF === 'function' ? jsPDF : window.jsPDF;
+  if (typeof ctor === 'function') {
+    patchText(ctor.API);
+    patchText(ctor.prototype);
+  }
+
+  return { forcar, charts };
+}
+
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900, deviceScaleFactor: 1 });
+  await page.emulateTimezone('America/Sao_Paulo');
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'language', { get: () => 'pt-BR' });
+    Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt'] });
+    const origDate = Date.prototype.toLocaleDateString;
+    Date.prototype.toLocaleDateString = function toLocaleDateStringBr(locales, options) {
+      return origDate.call(this, locales || 'pt-BR', options);
+    };
+    const origStr = Date.prototype.toLocaleString;
+    Date.prototype.toLocaleString = function toLocaleStringBr(locales, options) {
+      return origStr.call(this, locales || 'pt-BR', options);
+    };
+  });
 
   if (cookieHeader) {
     const cookies = cookieHeader.split(';').map((part) => {
@@ -190,11 +370,13 @@ try {
     }
   }
 
+  const extraHeaders = {
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+  };
   if (token) {
-    await page.setExtraHTTPHeaders({
-      Authorization: `Bearer ${token}`,
-    });
+    extraHeaders.Authorization = `Bearer ${token}`;
   }
+  await page.setExtraHTTPHeaders(extraHeaders);
 
   const client = await page.createCDPSession();
   await client.send('Page.setDownloadBehavior', {
@@ -268,6 +450,9 @@ try {
       return labels >= 1 && rows.length > 0 && nums.length >= 3;
     }, { timeout: 60000 });
   }
+
+  // Datas no padrão brasileiro (DD/MM) antes de congelar os gráficos
+  await page.evaluate(aplicarDatasBrasileiras);
 
   // Remove % de gráficos de horas antes de congelar o canvas
   await page.evaluate(stripPercentFromHoursCharts);
@@ -369,6 +554,7 @@ try {
 
   try {
     await page.evaluate(stripPercentFromHoursCharts);
+    await page.evaluate(aplicarDatasBrasileiras);
     await page.evaluate((reportModel) => {
       if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
         throw new Error('PDFWriter não encontrado na página');
@@ -467,6 +653,7 @@ try {
     // Fallback base64 do mesmo PDFWriter (NÃO usar page.pdf — gráficos saem errados)
     try {
       await page.evaluate(stripPercentFromHoursCharts);
+      await page.evaluate(aplicarDatasBrasileiras);
       const pdfBase64 = await page.evaluate(async () => {
         if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
           throw new Error('PDFWriter não encontrado na página');
