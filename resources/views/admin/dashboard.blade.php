@@ -46,6 +46,25 @@
                     </div>
                 </a>
 
+                <!-- PDF do relatório -->
+                <a href="{{ route('relatorios-pdf.index') }}" class="block bg-gray-900 overflow-hidden shadow-sm sm:rounded-lg hover:shadow-lg transition border border-yellow-600">
+                    <div class="p-6">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 bg-yellow-600 rounded-md p-3">
+                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-400 truncate">PDF do relatório</dt>
+                                    <dd class="text-lg font-medium text-white">Fonte e preview</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
                 <!-- Desempenho Card -->
                 <a href="{{ route('desempenho.index') }}" class="block bg-gray-900 overflow-hidden shadow-sm sm:rounded-lg hover:shadow-lg transition border border-yellow-600">
                     <div class="p-6">
