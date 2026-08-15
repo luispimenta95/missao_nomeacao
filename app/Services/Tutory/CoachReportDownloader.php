@@ -857,9 +857,21 @@ class CoachReportDownloader
     }
 
     /**
-     * Lista alunos do admin e envia os PDFs por e-mail (todos os anexos em um único e-mail).
+     * Lista alunos do admin, envia os PDFs por e-mail e apaga os arquivos da pasta.
      */
     private function enviarEmailsDosAlunos(): void
+    {
+        try {
+            $this->enviarEmailsDosAlunosSemLimpar();
+        } finally {
+            $this->removerPdfsBaixados();
+        }
+    }
+
+    /**
+     * Lista alunos do admin e envia os PDFs por e-mail (todos os anexos em um único e-mail).
+     */
+    private function enviarEmailsDosAlunosSemLimpar(): void
     {
         $this->log(str_repeat('=', 50));
         $this->log('Enviando relatórios por e-mail (alunos cadastrados no admin)...');
@@ -982,6 +994,47 @@ class CoachReportDownloader
 
         $this->log(str_repeat('=', 50));
         $this->log("E-mails enviados: {$enviados} | pulados: {$pulados} | falhas: {$falhas}");
+    }
+
+    /**
+     * Remove todos os PDFs da pasta de download (e os .metricas.json ao lado).
+     * Os anexos já foram lidos pelo Mailer no envio.
+     */
+    private function removerPdfsBaixados(): void
+    {
+        if (! is_dir($this->pastaDownload)) {
+            return;
+        }
+
+        $removidos = 0;
+        foreach (scandir($this->pastaDownload) ?: [] as $arquivo) {
+            if ($arquivo === '.' || $arquivo === '..') {
+                continue;
+            }
+            if (! str_ends_with(mb_strtolower($arquivo), '.pdf')) {
+                continue;
+            }
+            $caminho = $this->pastaDownload.'/'.$arquivo;
+            if (! is_file($caminho)) {
+                continue;
+            }
+            $sidecar = $this->caminhoMetricasSidecar($caminho);
+            if (@unlink($caminho)) {
+                $removidos++;
+                $this->log('PDF removido: '.$arquivo);
+            } else {
+                $this->log('Não foi possível remover: '.$arquivo);
+
+                continue;
+            }
+            if (is_file($sidecar) && @unlink($sidecar)) {
+                $this->log('Métricas removidas: '.basename($sidecar));
+            }
+        }
+
+        $this->log($removidos === 0
+            ? 'Nenhum PDF restante para remover em '.$this->pastaDownload
+            : "PDFs removidos após o envio: {$removidos}");
     }
 
     /**
