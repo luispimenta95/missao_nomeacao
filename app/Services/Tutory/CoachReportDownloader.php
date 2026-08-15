@@ -1048,10 +1048,9 @@ class CoachReportDownloader
 <html><head><meta charset="utf-8"><style>
 {$logoFontFace}
 body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-.logo{text-align:center; margin:0 0 14px; color:#000; font-family: DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+.logo{text-align:center; margin:0 0 14px; color:#000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
 .logo .l1{font-size:18pt; letter-spacing:2pt;}
 .logo .l2{font-size:16pt; letter-spacing:1pt;}
-.logo .logo-img{display:inline-block;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .periodo{color:#555; margin-bottom:14px; text-align:center;}
 .aluno{margin:10px 0 18px;}
@@ -1523,10 +1522,9 @@ HTML;
 <html><head><meta charset="utf-8"><style>
 {$logoFontFace}
 body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-.logo{text-align:center; margin:0 0 14px; color:#000; font-family: DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+.logo{text-align:center; margin:0 0 14px; color:#000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
 .logo .l1{font-size:18pt; letter-spacing:2pt;}
 .logo .l2{font-size:16pt; letter-spacing:1pt;}
-.logo .logo-img{display:inline-block;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .periodo{color:#555; margin-bottom:14px; text-align:center;}
 .aluno{margin:10px 0 18px;}
@@ -1625,19 +1623,11 @@ HTML;
     }
 
     /**
-     * Logo oficial da marca (PNG preto transparente) no topo de cada página.
+     * Marca em texto no topo de cada página (sem imagem).
      */
     private function montarHtmlLogoPdf(): string
     {
-        $src = $this->logoBrandDataUri();
-        if ($src === '') {
-            return '<div class="logo"><div class="l1">MISSÃO</div><div class="l2">NOMEAÇÃO</div></div>';
-        }
-
-        // Proporção ~900x534
-        return '<div class="logo">'
-            . '<img class="logo-img" src="' . $src . '" width="200" height="119" alt="Missão Nomeação" />'
-            . '</div>';
+        return '<div class="logo"><div class="l1">MISSÃO</div><div class="l2">NOMEAÇÃO</div></div>';
     }
 
     private function montarCssFonteLogoPdf(): string
@@ -1655,21 +1645,6 @@ HTML;
         $src = 'data:font/truetype;base64,' . base64_encode($bytes);
 
         return "@font-face{font-family:'FredokaBrand';font-style:normal;font-weight:bold;src:url('{$src}') format('truetype');}";
-    }
-
-    private function logoBrandDataUri(): string
-    {
-        $path = public_path('img/logo-missao-nomeacao.png');
-        if (! is_file($path)) {
-            return '';
-        }
-
-        $bytes = @file_get_contents($path);
-        if ($bytes === false || $bytes === '') {
-            return '';
-        }
-
-        return 'data:image/png;base64,' . base64_encode($bytes);
     }
 
     private function montarHtmlPanorama(DOMXPath $xp): string
