@@ -55,6 +55,45 @@ const browser = await puppeteer.launch({
   ],
 });
 
+function swapAmericanDatesInPdf(buf) {
+  const s0 = buf.toString('latin1');
+  const re = /\((\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\)/g;
+  const matches = [...s0.matchAll(re)];
+  if (matches.length === 0) return buf;
+
+  let americanos = 0;
+  let brasileiros = 0;
+  const primeiros = [];
+  const segundos = [];
+  for (const m of matches) {
+    const n1 = parseInt(m[1], 10);
+    const n2 = parseInt(m[2], 10);
+    primeiros.push(n1);
+    segundos.push(n2);
+    if (n1 <= 12 && n2 > 12) americanos += 1;
+    if (n1 > 12 && n2 <= 12) brasileiros += 1;
+  }
+  const varPrimeiro = new Set(primeiros).size > 1;
+  const varSegundo = new Set(segundos).size > 1;
+  const forcar = americanos > brasileiros
+    || (americanos === brasileiros && !varPrimeiro && varSegundo && Math.max(...primeiros) <= 12);
+  if (!forcar && brasileiros > americanos) return buf;
+
+  const s1 = s0.replace(/\((\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\)/g, (full, a, b, y) => {
+    const n1 = parseInt(a, 10);
+    const n2 = parseInt(b, 10);
+    if (n1 < 1 || n1 > 31 || n2 < 1 || n2 > 31) return full;
+    if (n1 > 12 && n2 <= 12) return full;
+    const eAmericano = (n1 <= 12 && n2 > 12) || (forcar && n1 <= 12);
+    if (!eAmericano) return full;
+    const dd = String(n2).padStart(2, '0');
+    const mm = String(n1).padStart(2, '0');
+    return y ? `(${dd}/${mm}/${y})` : `(${dd}/${mm})`;
+  });
+  if (s1 === s0) return buf;
+  return Buffer.from(s1, 'latin1');
+}
+
 function cleanupDownloadDir() {
   try {
     for (const f of fs.readdirSync(downloadDir)) {
@@ -250,7 +289,16 @@ function aplicarDatasBrasileiras() {
     return converterIso(converterMesesIngles(converterBarras(texto, forcar)));
   }
 
+  function dataParaBr(d) {
+    if (!(d instanceof Date) || Number.isNaN(d.getTime())) return null;
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  }
+
   function converterValor(valor, forcar) {
+    const deData = dataParaBr(valor);
+    if (deData) return deData;
     if (typeof valor === 'string') return textoParaBr(valor, forcar);
     if (Array.isArray(valor)) return valor.map((v) => converterValor(v, forcar));
     return valor;
@@ -306,11 +354,20 @@ function aplicarDatasBrasileiras() {
         const axes = scales[key];
         if (!Array.isArray(axes)) continue;
         for (const axis of axes) {
+          if (axis.time && axis.time.displayFormats) {
+            for (const k of Object.keys(axis.time.displayFormats)) {
+              const v = String(axis.time.displayFormats[k]);
+              axis.time.displayFormats[k] = v.replace(/MM\/DD/g, 'DD/MM').replace(/M\/D/g, 'D/M');
+            }
+          }
           if (!axis.ticks) axis.ticks = {};
           const orig = axis.ticks.callback;
           axis.ticks.callback = function patchedTick(value, index, values) {
+            const asDate = dataParaBr(value instanceof Date ? value : null);
+            if (asDate) return asDate.slice(0, 5);
             const raw = orig ? orig.call(this, value, index, values) : value;
-            return textoParaBr(String(raw), forcar);
+            const txt = String(raw);
+            return textoParaBr(txt, pareceAmericano(txt) || forcar);
           };
         }
       }
@@ -325,14 +382,47 @@ function aplicarDatasBrasileiras() {
     if (!proto || typeof proto.text !== 'function' || proto.__brDates) return;
     const orig = proto.text;
     proto.text = function patchedText(text, ...args) {
-      return orig.call(this, converterValor(text, forcar), ...args);
+      const joined = typeof text === 'string'
+        ? text
+        : (Array.isArray(text) ? text.map((t) => (t == null ? '' : String(t))).join(' | ') : '');
+      const usar = forcar || pareceAmericano(joined);
+      return orig.call(this, converterValor(text, usar), ...args);
     };
     proto.__brDates = true;
   }
-  const ctor = typeof jsPDF === 'function' ? jsPDF : window.jsPDF;
-  if (typeof ctor === 'function') {
+  const ctors = [];
+  if (typeof jsPDF === 'function') ctors.push(jsPDF);
+  if (typeof window.jsPDF === 'function') ctors.push(window.jsPDF);
+  if (window.jspdf && typeof window.jspdf.jsPDF === 'function') ctors.push(window.jspdf.jsPDF);
+  for (const ctor of ctors) {
     patchText(ctor.API);
     patchText(ctor.prototype);
+  }
+  if (window.moment && typeof window.moment.locale === 'function') {
+    window.moment.locale('pt-br');
+  }
+
+  if (typeof PDFWriter !== 'undefined') {
+    const alvos = [];
+    if (typeof PDFWriter.start === 'function') alvos.push(['start', PDFWriter.start]);
+    for (const nome of Object.keys(PDFWriter)) {
+      if (typeof PDFWriter[nome] === 'function' && nome !== 'start') {
+        alvos.push([nome, PDFWriter[nome]]);
+      }
+    }
+    for (const [nome, fn] of alvos) {
+      let src = '';
+      try { src = fn.toString(); } catch (e) { continue; }
+      const next = src
+        .replace(/['"]MM\/DD\/YYYY['"]/g, "'DD/MM/YYYY'")
+        .replace(/['"]MM\/DD\/YY['"]/g, "'DD/MM/YY'")
+        .replace(/['"]MM\/DD['"]/g, "'DD/MM'")
+        .replace(/['"]M\/D\/YYYY['"]/g, "'D/M/YYYY'")
+        .replace(/['"]en-US['"]/g, "'pt-BR'");
+      if (next !== src) {
+        try { PDFWriter[nome] = eval('(' + next + ')'); } catch (e) {}
+      }
+    }
   }
 
   return { forcar, charts };
@@ -345,14 +435,23 @@ try {
   await page.evaluateOnNewDocument(() => {
     Object.defineProperty(navigator, 'language', { get: () => 'pt-BR' });
     Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt'] });
+    // O PDFWriter formata Date com locale da página; forçar pt-BR mesmo se passar en-US.
     const origDate = Date.prototype.toLocaleDateString;
-    Date.prototype.toLocaleDateString = function toLocaleDateStringBr(locales, options) {
-      return origDate.call(this, locales || 'pt-BR', options);
+    Date.prototype.toLocaleDateString = function toLocaleDateStringBr(_locales, options) {
+      return origDate.call(this, 'pt-BR', options);
     };
     const origStr = Date.prototype.toLocaleString;
-    Date.prototype.toLocaleString = function toLocaleStringBr(locales, options) {
-      return origStr.call(this, locales || 'pt-BR', options);
+    Date.prototype.toLocaleString = function toLocaleStringBr(_locales, options) {
+      return origStr.call(this, 'pt-BR', options);
     };
+    const OrigDTF = Intl.DateTimeFormat;
+    Intl.DateTimeFormat = function DateTimeFormatBr(locales, options) {
+      return new OrigDTF('pt-BR', options);
+    };
+    Intl.DateTimeFormat.prototype = OrigDTF.prototype;
+    if (typeof OrigDTF.supportedLocalesOf === 'function') {
+      Intl.DateTimeFormat.supportedLocalesOf = OrigDTF.supportedLocalesOf.bind(OrigDTF);
+    }
   });
 
   if (cookieHeader) {
@@ -711,9 +810,13 @@ try {
     }
   }
 
-  const finalBuf = fs.readFileSync(outAbs);
-  if (finalBuf.length < 500) {
-    throw new Error(`PDF final vazio (${finalBuf.length} bytes)`);
+  const finalBuf0 = fs.readFileSync(outAbs);
+  if (finalBuf0.length < 500) {
+    throw new Error(`PDF final vazio (${finalBuf0.length} bytes)`);
+  }
+  const finalBuf = swapAmericanDatesInPdf(finalBuf0);
+  if (finalBuf !== finalBuf0) {
+    fs.writeFileSync(outAbs, finalBuf);
   }
 
   // Conteúdo oficial do painel vem do jsPDF. page.pdf do Chromium não tem jsPDF e altera gráficos.
