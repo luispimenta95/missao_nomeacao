@@ -1925,6 +1925,15 @@ HTML;
         return $colors !== [] ? $colors : $defaults;
     }
 
+    private function isHoursChart(string $canvasId): bool
+    {
+        return in_array($canvasId, [
+            'chart_horas_diarias',
+            'chart_top_disciplinas',
+            'chart_pizza_modalidades',
+        ], true);
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -1932,6 +1941,7 @@ HTML;
     private function aplicarDatalabelsOficiais(array $data, string $canvasId): array
     {
         $type = (string) ($data['type'] ?? '');
+        $isHours = $this->isHoursChart($canvasId);
 
         // Garante legenda com nomes das disciplinas (bolha / evolução)
         if (in_array($canvasId, ['chart_bolha_questoes', 'chart_evolucao_materia'], true)) {
@@ -1964,26 +1974,26 @@ HTML;
                         'minRotation' => 45,
                     ],
                 ]];
-                if (! isset($data['options']['scales']['yAxes'])) {
+                // Eixo 0–120 é de percentual — não aplicar em gráficos de horas
+                if (! $isHours && ! isset($data['options']['scales']['yAxes'])) {
                     $data['options']['scales']['yAxes'] = [[
                         'ticks' => ['beginAtZero' => true, 'max' => 120],
                     ]];
                 }
             }
+            if ($isHours) {
+                // Horas estudadas: sem caixinhas de % (legenda permanece para séries)
+                return $this->ocultarDatalabels($data);
+            }
             // horizontalBar: preserva scales do HTML (já vêm prontas do Tutory)
             $data['options']['legend']['display'] = false;
-            $suffix = match ($canvasId) {
-                'chart_top_disciplinas' => '__DATALABEL_HOURS__',
-                'chart_pizza_modalidades' => '__DATALABEL_HOURS__',
-                default => '__DATALABEL_PERCENT__',
-            };
             $data['options']['plugins']['datalabels'] = [
                 'color' => '#333',
                 'anchor' => 'end',
                 'align' => 'end',
                 'offset' => 6,
                 'font' => ['size' => 10],
-                'formatter' => $suffix,
+                'formatter' => '__DATALABEL_PERCENT__',
             ];
 
             return $data;
@@ -1991,6 +2001,10 @@ HTML;
 
         if ($type === 'pie' || $type === 'doughnut') {
             $data['options']['legend']['display'] = true;
+            if ($isHours) {
+                // Pizza de horas: sem rótulo de % sobre as fatias
+                return $this->ocultarDatalabels($data);
+            }
             $data['options']['plugins']['datalabels'] = [
                 'color' => '#fff',
                 'backgroundColor' => '#000',
@@ -1998,9 +2012,7 @@ HTML;
                 'align' => 'end',
                 'offset' => -16,
                 'font' => ['size' => 10],
-                'formatter' => in_array($canvasId, ['chart_pizza_modalidades'], true)
-                    ? '__DATALABEL_HOURS__'
-                    : '__DATALABEL_QUESTOES__',
+                'formatter' => '__DATALABEL_QUESTOES__',
             ];
 
             return $data;
@@ -2030,6 +2042,9 @@ HTML;
         }
 
         if ($type === 'line') {
+            if ($isHours) {
+                return $this->ocultarDatalabels($data);
+            }
             $isQuestoesDia = $canvasId === 'chart_questoes_dia';
             $data['options']['plugins']['datalabels'] = [
                 'anchor' => 'end',
@@ -2057,6 +2072,21 @@ HTML;
         }
 
         unset($data['options']['plugins']['datalabels']);
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function ocultarDatalabels(array $data): array
+    {
+        $data['options'] = is_array($data['options'] ?? null) ? $data['options'] : [];
+        $data['options']['plugins'] = is_array($data['options']['plugins'] ?? null)
+            ? $data['options']['plugins']
+            : [];
+        $data['options']['plugins']['datalabels'] = ['display' => false];
 
         return $data;
     }
