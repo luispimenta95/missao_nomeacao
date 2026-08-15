@@ -27,11 +27,23 @@ class PdfDatasTest extends TestCase
         );
     }
 
-    public function test_converte_iso_para_brasileiro(): void
+    public function test_converte_yyyy_mm_dd_com_barra_para_brasileiro(): void
     {
         $this->assertSame(
-            'de 01/08/2026 a 15/08/2026',
-            PdfDatas::textoParaBr('de 2026-08-01 a 2026-08-15')
+            'Período do relatório: de 01/08/2026 a 15/08/2026',
+            PdfDatas::textoParaBr('Período do relatório: de 2026/08/01 a 2026/08/15')
+        );
+        $this->assertSame('01/08/2026', PdfDatas::textoParaBr('2026/8/1'));
+        $this->assertSame(
+            ['01/08/2026', '15/08/2026'],
+            PdfDatas::listaParaBr(['2026/08/01', '2026/08/15'])
+        );
+        // Dia <= 12 não pode ser invertido de novo (nem com forçar MM/DD).
+        $this->assertSame('05/08/2026', PdfDatas::textoParaBr('2026/08/05'));
+        $this->assertSame('05/08/2026', PdfDatas::textoParaBr('2026/08/05', true));
+        $this->assertSame(
+            ['01/08', '02/08', '01/08/2026'],
+            PdfDatas::listaParaBr(['08/01', '08/02', '2026/08/01'])
         );
     }
 
@@ -65,8 +77,20 @@ class PdfDatasTest extends TestCase
         $this->assertSame('15/08', PdfDatas::textoParaBr('Aug 15'));
     }
 
+    public function test_converte_iso_com_hifen_para_brasileiro(): void
+    {
+        $this->assertSame(
+            'de 01/08/2026 a 15/08/2026',
+            PdfDatas::textoParaBr('de 2026-08-01 a 2026-08-15')
+        );
+    }
+
     public function test_nao_inverte_data_ambigua_sozinha(): void
     {
         $this->assertSame('01/08/2026', PdfDatas::textoParaBr('01/08/2026'));
+        $this->assertSame(
+            '01/08/2026 a 15/08/2026',
+            PdfDatas::textoParaBr('01/08/2026 a 15/08/2026', true)
+        );
     }
 }

@@ -3,7 +3,7 @@
 namespace App\Services\Tutory;
 
 /**
- * Converte datas do padrão americano (MM/DD) para o brasileiro (DD/MM) nos PDFs.
+ * Converte datas MM/DD, YYYY/MM/DD e YYYY-MM-DD para o padrão brasileiro (DD/MM/YYYY) nos PDFs.
  */
 final class PdfDatas
 {
@@ -39,12 +39,15 @@ final class PdfDatas
 
     public static function textoParaBr(string $texto, ?bool $forcarAmericano = null): string
     {
-        $forcar = $forcarAmericano ?? self::pareceAmericano($texto);
-        $texto = self::converterBarras($texto, $forcar);
+        $bloqueados = [];
+        $texto = self::converterIso($texto, $bloqueados);
+        $local = self::pareceAmericano($texto);
+        // forcar vale para MM/DD curto (eixo). Data com ano só inverte se ESTE trecho for americano.
+        $forcarCurto = $forcarAmericano ?? $local;
+        $texto = self::converterBarras($texto, $forcarCurto, $local);
         $texto = self::converterMesesIngles($texto);
-        $texto = self::converterIso($texto);
 
-        return $texto;
+        return self::restaurarBloqueios($texto, $bloqueados);
     }
 
     /**
@@ -76,7 +79,7 @@ final class PdfDatas
 
     public static function pareceAmericano(string $texto): bool
     {
-        if (! preg_match_all('/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/', $texto, $matches, PREG_SET_ORDER)) {
+        if (! preg_match_all('/(?<!\d[\/\-.])\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/', $texto, $matches, PREG_SET_ORDER)) {
             return false;
         }
 
@@ -126,11 +129,11 @@ final class PdfDatas
         return true;
     }
 
-    private static function converterBarras(string $texto, bool $forcarAmericano): string
+    private static function converterBarras(string $texto, bool $forcarCurto, bool $forcarCompleto): string
     {
         $convertido = preg_replace_callback(
-            '/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/',
-            static function (array $m) use ($forcarAmericano): string {
+            '/(?<!\d[\/\-.])\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/',
+            static function (array $m) use ($forcarCurto, $forcarCompleto): string {
                 $n1 = (int) $m[1];
                 $n2 = (int) $m[2];
                 $ano = $m[3] ?? null;
@@ -144,7 +147,9 @@ final class PdfDatas
                     return $m[0];
                 }
 
-                $eAmericano = ($n1 <= 12 && $n2 > 12) || ($forcarAmericano && $n1 <= 12);
+                $anoCompleto = is_string($ano) && strlen($ano) >= 4;
+                $forcar = $anoCompleto ? $forcarCompleto : $forcarCurto;
+                $eAmericano = ($n1 <= 12 && $n2 > 12) || ($forcar && $n1 <= 12);
                 if (! $eAmericano) {
                     return $m[0];
                 }
@@ -160,17 +165,53 @@ final class PdfDatas
         return is_string($convertido) ? $convertido : $texto;
     }
 
-    private static function converterIso(string $texto): string
+    /**
+     * YYYY/MM/DD, YYYY-MM-DD e YYYY.MM.DD → DD/MM/YYYY.
+     * Trava o resultado para o conversor MM/DD não inverter de novo (01/08/2026 → 08/01/2026).
+     *
+     * @param  list<string>  $bloqueados
+     */
+    private static function converterIso(string $texto, array &$bloqueados): string
     {
         $convertido = preg_replace_callback(
-            '/\b(\d{4})-(\d{2})-(\d{2})\b/',
-            static function (array $m): string {
-                return $m[3].'/'.$m[2].'/'.$m[1];
+            '/\b(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/',
+            static function (array $m) use (&$bloqueados): string {
+                $ano = (int) $m[1];
+                $mes = (int) $m[2];
+                $dia = (int) $m[3];
+                if ($ano < 1900 || $ano > 2100 || $mes < 1 || $mes > 12 || $dia < 1 || $dia > 31) {
+                    return $m[0];
+                }
+
+                $br = str_pad((string) $dia, 2, '0', STR_PAD_LEFT)
+                    .'/'.str_pad((string) $mes, 2, '0', STR_PAD_LEFT)
+                    .'/'.$m[1];
+                $token = self::tokenIso(count($bloqueados));
+                $bloqueados[] = $br;
+
+                return $token;
             },
             $texto
         );
 
         return is_string($convertido) ? $convertido : $texto;
+    }
+
+    /**
+     * @param  list<string>  $bloqueados
+     */
+    private static function restaurarBloqueios(string $texto, array $bloqueados): string
+    {
+        for ($i = count($bloqueados) - 1; $i >= 0; $i--) {
+            $texto = str_replace(self::tokenIso($i), $bloqueados[$i], $texto);
+        }
+
+        return $texto;
+    }
+
+    private static function tokenIso(int $indice): string
+    {
+        return "\u{E000}ISO{$indice}\u{E001}";
     }
 
     private static function converterMesesIngles(string $texto): string
