@@ -64,8 +64,8 @@ php artisan tutory:baixar-relatorios --periodo=2 --teste
 
 Arquivo gerado: `relatorio_{model}_{Ymd_Hi}_{aluno}_{periodo}.pdf`  
 Exemplos:
-- `relatorio_questoes_20260721_1830_Laíra_Lacerda_1.pdf`
-- `relatorio_progresso_20260721_1830_Laíra_Lacerda_1.pdf`
+- `relatorio_questoes_20260721_1830_Giovanna_1.pdf`
+- `relatorio_progresso_20260721_1830_Giovanna_1.pdf`
 
 O envio de e-mail anexa o PDF mais recente de **cada modelo** do aluno para o `--periodo` informado (aceita pequenas diferenças de digitação no nome).
 

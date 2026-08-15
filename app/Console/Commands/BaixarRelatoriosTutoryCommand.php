@@ -10,7 +10,7 @@ class BaixarRelatoriosTutoryCommand extends Command
 {
     protected $signature = 'tutory:baixar-relatorios
                             {--periodo= : 1 = dias 01–15; 2 = dia 16 até o último dia do mês}
-                            {--teste : Baixa só o relatório da aluna Laíra Lacerda}';
+                            {--teste : Baixa só o relatório da aluna Giovanna}';
 
     protected $description = 'Baixa os relatórios do Coach (questões + progresso do plano) e envia por e-mail com todos os PDFs em anexo';
 
@@ -27,7 +27,7 @@ class BaixarRelatoriosTutoryCommand extends Command
 
         $teste = (bool) $this->option('teste');
         if ($teste) {
-            $this->warn('Modo --teste ativo: processa apenas Laíra Lacerda.');
+            $this->warn('Modo --teste ativo: processa apenas Giovanna.');
         }
 
         try {

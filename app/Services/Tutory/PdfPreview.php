@@ -50,7 +50,7 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 <div class="periodo">Período do relatório: de 01/08/2026 a 15/08/2026</div>
 <hr class="rule" />
 <div class="aluno">
-  <h2>Laíra Lacerda</h2>
+  <h2>Giovanna</h2>
   <div class="periodo" style="text-align:left;margin:0;">Pré-edital · Delegado de Polícia — São Paulo</div>
 </div>
 
