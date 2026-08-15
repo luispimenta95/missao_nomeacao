@@ -61,7 +61,10 @@
     <div class="container">
         <div class="content">
             <p>Olá, {{ $dados['nome'] }}!</p>
-            <p>Seus <strong>Relatórios do Coach</strong> estão prontos.</p>
+            <strong>
+                <p>Seus relatórios da mentoria
+             estão prontos.</p>
+            </strong>
             @if(!empty($dados['periodoLabel']))
             <p>Período: <strong>{{ $dados['periodoLabel'] }}</strong>.</p>
             @endif
@@ -80,9 +83,9 @@
                     @endforeach
                 </ul>
                 @php
-                    $textoBloco = (string) ($bloco['texto'] ?? '');
-                    // Remove a lista textual se o e-mail já renderizou bullets em HTML
-                    $textoBloco = trim(preg_replace('/^•.+(?:\n•.+)*\n*/mu', '', $textoBloco) ?? $textoBloco);
+                $textoBloco = (string) ($bloco['texto'] ?? '');
+                // Remove a lista textual se o e-mail já renderizou bullets em HTML
+                $textoBloco = trim(preg_replace('/^•.+(?:\n•.+)*\n*/mu', '', $textoBloco) ?? $textoBloco);
                 @endphp
                 @if($textoBloco !== '')
                 <p style="white-space:pre-line;margin:0;">{{ $textoBloco }}</p>
