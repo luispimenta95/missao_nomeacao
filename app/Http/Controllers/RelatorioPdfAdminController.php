@@ -33,7 +33,10 @@ class RelatorioPdfAdminController extends Controller
 
     public function preview(Request $request, PdfPreview $preview)
     {
-        $fonte = PdfFontes::normalizar($request->query('fonte'));
+        $query = $request->query('fonte');
+        $fonte = is_string($query) && $query !== ''
+            ? PdfFontes::normalizar($query)
+            : PdfFontes::chaveAtual();
         $bytes = $preview->gerar($fonte);
 
         return response($bytes, 200, [
