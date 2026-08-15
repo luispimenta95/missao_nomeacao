@@ -4,7 +4,7 @@ namespace App\Mail;
 
 class EmailRelatorioCoach extends BaseEmail
 {
-    public $subject = 'Seus Relatórios do Coach - Missão Nomeação';
+    public $subject = 'Seus Relatórios da Mentoria - Missão Nomeação';
 
     /** @var list<string> */
     private array $anexoPaths;
@@ -20,16 +20,13 @@ class EmailRelatorioCoach extends BaseEmail
         } elseif (is_array($anexoPath)) {
             $this->anexoPaths = array_values(array_filter(
                 $anexoPath,
-                static fn ($p): bool => is_string($p) && $p !== ''
+                static fn($p): bool => is_string($p) && $p !== ''
             ));
         } else {
             $this->anexoPaths = [];
         }
 
-        $periodoLabel = $dados['body']['periodoLabel'] ?? null;
-        if (is_string($periodoLabel) && $periodoLabel !== '') {
-            $this->subject = 'Relatórios do Coach ('.$periodoLabel.') - Missão Nomeação';
-        }
+        $this->subject = 'Relatórios da Mentoria - Missão Nomeação';
     }
 
     public function build()
