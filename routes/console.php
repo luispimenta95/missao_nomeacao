@@ -20,10 +20,10 @@ Artisan::command('inspire', function () {
 |
 */
 
-Schedule::command('tutory:baixar-relatorios --periodo=1')
-    ->monthlyOn(16, '00:00')
-    ->name('tutory-relatorios-periodo-1');
-
 Schedule::command('tutory:baixar-relatorios --periodo=2')
-    ->lastDayOfMonth('00:00')
+    ->monthlyOn(01, '10:30')
     ->name('tutory-relatorios-periodo-2');
+
+Schedule::command('tutory:baixar-relatorios --periodo=1')
+    ->monthlyOn(16, '10:30')
+    ->name('tutory-relatorios-periodo-1');
