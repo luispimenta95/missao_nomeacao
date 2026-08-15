@@ -58,9 +58,13 @@ Se `PASTA_DOWNLOAD` estiver vazio, usa `public/pdfs`.
 ```bash
 npm install   # puppeteer + Chromium
 
-php artisan tutory:baixar-relatorios --periodo=1
+# Regenerar só a Giovanna (quinzena atual):
+# período 1 = dias 01–15; período 2 = dia 16 até o último dia do mês
+php artisan tutory:baixar-relatorios --periodo=1 --teste
 php artisan tutory:baixar-relatorios --periodo=2 --teste
 ```
+
+Os PDFs já gerados **não são reescritos**: rode de novo o comando acima para sair com datas em `dd/mm/aaaa`.
 
 Arquivo gerado: `relatorio_{model}_{Ymd_Hi}_{aluno}_{periodo}.pdf`  
 Exemplos:
