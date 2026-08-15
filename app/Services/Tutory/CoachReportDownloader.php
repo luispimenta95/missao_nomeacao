@@ -39,6 +39,19 @@ class CoachReportDownloader
     private const MAX_TENTATIVAS = 3;
 
     /**
+     * Pizza no PDF Dompdf — meio-termo entre o original (~700×327, grande demais)
+     * e o recorte 220×160 (pequeno demais). Mesma proporção ~1,38 do recorte,
+     * com altura próxima dos demais gráficos (.chart max-height 280px).
+     */
+    private const PIE_PDF_WIDTH = 400;
+
+    private const PIE_PDF_HEIGHT = 290;
+
+    private const PIE_RENDER_WIDTH = 560;
+
+    private const PIE_RENDER_HEIGHT = 406;
+
+    /**
      * Modelos de relatório a baixar (mesmo fluxo para cada índice).
      * model = segmento em /documentos/relatorios/{model}
      *
@@ -1028,6 +1041,7 @@ class CoachReportDownloader
         $logoHtml = $this->montarHtmlLogoPdf();
         $logoFontFace = $this->montarCssFonteLogoPdf();
         $page = $this->htmlQuebraPaginaComLogo($logoHtml);
+        $pieCss = $this->cssChartPie();
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
@@ -1055,7 +1069,7 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .panorama .value{font-size:11pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
 .chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
 .chart-sm{width:100%; max-width:700px; max-height:140px; margin:8px 0 14px;}
-.chart-pie{width:220px; height:160px; margin:8px auto 14px; display:block;}
+{$pieCss}
 .assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
 .assuntos thead td{background:#00aced; color:#fff; font-weight:bold; padding:8px;}
 .assuntos tbody td{border-bottom:1px solid #eee; padding:8px; vertical-align:top;}
@@ -1502,6 +1516,7 @@ HTML;
 
         $logoFontFace = $this->montarCssFonteLogoPdf();
         $page = $this->htmlQuebraPaginaComLogo($logoHtml);
+        $pieCss = $this->cssChartPie();
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
@@ -1531,7 +1546,7 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .panorama .value{font-size:12pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
 .chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
 .chart-sm{width:100%; max-width:700px; max-height:140px; margin:8px 0 14px;}
-.chart-pie{width:220px; height:160px; margin:8px auto 14px; display:block;}
+{$pieCss}
 .two-col{width:100%; border-collapse:collapse;}
 .two-col td{width:50%; vertical-align:top; padding:4px;}
 .assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
@@ -1736,6 +1751,15 @@ HTML;
             . '</tr></thead><tbody>' . $body . '</tbody></table>';
     }
 
+    private function cssChartPie(): string
+    {
+        return sprintf(
+            '.chart-pie{width:%dpx; height:%dpx; margin:8px auto 14px; display:block;}',
+            self::PIE_PDF_WIDTH,
+            self::PIE_PDF_HEIGHT
+        );
+    }
+
     private function chartImgHtml(string $html, string $chartId, ?string $titulo): string
     {
         if (! extension_loaded('gd')) {
@@ -1763,7 +1787,8 @@ HTML;
             : (in_array($chartId, ['chart_progresso_principal'], true) ? 'chart-sm' : 'chart');
         // Pizza: dimensões explícitas (Dompdf ignora max-height)
         $out .= $isPie
-            ? '<img class="' . $class . '" src="' . $img . '" width="220" height="160" />'
+            ? '<img class="' . $class . '" src="' . $img . '" width="' . self::PIE_PDF_WIDTH
+                . '" height="' . self::PIE_PDF_HEIGHT . '" />'
             : '<img class="' . $class . '" src="' . $img . '" />';
 
         return $out;
@@ -2165,9 +2190,9 @@ HTML;
             if ($type === 'horizontalBar') {
                 $height = max(110, min(420, 48 + ($labelCount * 38)));
             } elseif ($type === 'pie' || $type === 'doughnut') {
-                // Pizza menor (único ajuste de tamanho)
-                $width = 360;
-                $height = 260;
+                // Pizza: render nítido na proporção do PDF (único ajuste de tamanho)
+                $width = self::PIE_RENDER_WIDTH;
+                $height = self::PIE_RENDER_HEIGHT;
             } elseif ($type === 'bar' && $labelCount <= 4) {
                 $height = 320;
             }
