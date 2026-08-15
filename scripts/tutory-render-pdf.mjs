@@ -56,10 +56,33 @@ const browser = await puppeteer.launch({
 });
 
 function swapAmericanDatesInPdf(buf) {
-  const s0 = buf.toString('latin1');
-  const re = /\((\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\)/g;
-  const matches = [...s0.matchAll(re)];
-  if (matches.length === 0) return buf;
+  const original = buf.toString('latin1');
+  const pdfLiteral = () => /\((?:\\.|[^\\)])*\)/g;
+  const mmdd = () => /(?<!\d[/\-.])\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+  const locked = [];
+  let s = original.replace(pdfLiteral(), (lit) => {
+    const inner = lit.slice(1, -1).replace(/\b(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})\b/g, (full, y, m, d) => {
+      const ano = parseInt(y, 10);
+      const mes = parseInt(m, 10);
+      const dia = parseInt(d, 10);
+      if (ano < 1900 || ano > 2100 || mes < 1 || mes > 12 || dia < 1 || dia > 31) return full;
+      const token = `\x02ISO${locked.length}\x03`;
+      locked.push(`${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${y}`);
+      return token;
+    });
+    return `(${inner})`;
+  });
+
+  const matches = [];
+  s.replace(pdfLiteral(), (lit) => {
+    const inner = lit.slice(1, -1);
+    const re = mmdd();
+    let m;
+    while ((m = re.exec(inner))) matches.push(m);
+    return lit;
+  });
+
+  if (matches.length === 0 && locked.length === 0) return buf;
 
   let americanos = 0;
   let brasileiros = 0;
@@ -75,23 +98,34 @@ function swapAmericanDatesInPdf(buf) {
   }
   const varPrimeiro = new Set(primeiros).size > 1;
   const varSegundo = new Set(segundos).size > 1;
-  const forcar = americanos > brasileiros
-    || (americanos === brasileiros && !varPrimeiro && varSegundo && Math.max(...primeiros) <= 12);
-  if (!forcar && brasileiros > americanos) return buf;
+  const forcar = primeiros.length > 0 && (
+    americanos > brasileiros
+    || (americanos === brasileiros && !varPrimeiro && varSegundo && Math.max(...primeiros) <= 12)
+    || (americanos === brasileiros && varPrimeiro && varSegundo && primeiros.length > 1)
+  );
 
-  const s1 = s0.replace(/\((\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\)/g, (full, a, b, y) => {
-    const n1 = parseInt(a, 10);
-    const n2 = parseInt(b, 10);
-    if (n1 < 1 || n1 > 31 || n2 < 1 || n2 > 31) return full;
-    if (n1 > 12 && n2 <= 12) return full;
-    const eAmericano = (n1 <= 12 && n2 > 12) || (forcar && n1 <= 12);
-    if (!eAmericano) return full;
-    const dd = String(n2).padStart(2, '0');
-    const mm = String(n1).padStart(2, '0');
-    return y ? `(${dd}/${mm}/${y})` : `(${dd}/${mm})`;
-  });
-  if (s1 === s0) return buf;
-  return Buffer.from(s1, 'latin1');
+  if (forcar) {
+    s = s.replace(pdfLiteral(), (lit) => {
+      const inner = lit.slice(1, -1).replace(mmdd(), (full, a, b, y) => {
+        const n1 = parseInt(a, 10);
+        const n2 = parseInt(b, 10);
+        if (n1 < 1 || n1 > 31 || n2 < 1 || n2 > 31) return full;
+        if (n1 > 12 && n2 <= 12) return full;
+        const eAmericano = (n1 <= 12 && n2 > 12) || n1 <= 12;
+        if (!eAmericano) return full;
+        const dd = String(n2).padStart(2, '0');
+        const mm = String(n1).padStart(2, '0');
+        return y ? `${dd}/${mm}/${y}` : `${dd}/${mm}`;
+      });
+      return `(${inner})`;
+    });
+  }
+
+  for (let i = locked.length - 1; i >= 0; i -= 1) {
+    s = s.split(`\x02ISO${i}\x03`).join(locked[i]);
+  }
+  if (s === original) return buf;
+  return Buffer.from(s, 'latin1');
 }
 
 function cleanupDownloadDir() {
@@ -221,7 +255,7 @@ function stripPercentFromHoursCharts() {
  */
 function aplicarDatasBrasileiras() {
   function pareceAmericano(texto) {
-    const re = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+    const re = /(?<!\d[/\-.])\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
     let m;
     const primeiros = [];
     const segundos = [];
@@ -246,12 +280,14 @@ function aplicarDatasBrasileiras() {
     return true;
   }
 
-  function converterBarras(texto, forcar) {
-    return texto.replace(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g, (full, a, b, y) => {
+  function converterBarras(texto, forcarCurto, forcarCompleto) {
+    return texto.replace(/(?<!\d[/\-.])\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g, (full, a, b, y) => {
       const n1 = parseInt(a, 10);
       const n2 = parseInt(b, 10);
       if (n1 < 1 || n1 > 31 || n2 < 1 || n2 > 31) return full;
       if (n1 > 12 && n2 <= 12) return full;
+      const anoCompleto = typeof y === 'string' && y.length >= 4;
+      const forcar = anoCompleto ? forcarCompleto : forcarCurto;
       const eAmericano = (n1 <= 12 && n2 > 12) || (forcar && n1 <= 12);
       if (!eAmericano) return full;
       const dd = String(n2).padStart(2, '0');
@@ -280,13 +316,31 @@ function aplicarDatasBrasileiras() {
     );
   }
 
-  function converterIso(texto) {
-    return texto.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y, m, d) => `${d}/${m}/${y}`);
+  function converterIso(texto, locked) {
+    return texto.replace(/\b(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})\b/g, (full, y, m, d) => {
+      const ano = parseInt(y, 10);
+      const mes = parseInt(m, 10);
+      const dia = parseInt(d, 10);
+      if (ano < 1900 || ano > 2100 || mes < 1 || mes > 12 || dia < 1 || dia > 31) return full;
+      const br = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${y}`;
+      if (!locked) return br;
+      const token = `\uE000ISO${locked.length}\uE001`;
+      locked.push(br);
+      return token;
+    });
   }
 
   function textoParaBr(texto, forcar) {
     if (typeof texto !== 'string' || texto === '') return texto;
-    return converterIso(converterMesesIngles(converterBarras(texto, forcar)));
+    const locked = [];
+    const iso = converterIso(texto, locked);
+    const local = pareceAmericano(iso);
+    const forcarCurto = forcar ?? local;
+    let out = converterMesesIngles(converterBarras(iso, forcarCurto, local));
+    for (let i = locked.length - 1; i >= 0; i -= 1) {
+      out = out.split(`\uE000ISO${i}\uE001`).join(locked[i]);
+    }
+    return out;
   }
 
   function dataParaBr(d) {
@@ -332,14 +386,19 @@ function aplicarDatasBrasileiras() {
     return partes.join(' | ');
   }
 
+  const jaAplicado = document.documentElement.getAttribute('data-br-dates') === '1';
+  document.documentElement.setAttribute('data-br-dates', '1');
+
   const forcar = pareceAmericano(coletarTextos());
 
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: aceitarTexto });
-  const nodes = [];
-  while (walker.nextNode()) nodes.push(walker.currentNode);
-  for (const n of nodes) {
-    const next = textoParaBr(n.nodeValue || '', forcar);
-    if (next !== n.nodeValue) n.nodeValue = next;
+  if (!jaAplicado) {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: aceitarTexto });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const n of nodes) {
+      const next = textoParaBr(n.nodeValue || '', forcar);
+      if (next !== n.nodeValue) n.nodeValue = next;
+    }
   }
 
   let charts = 0;
@@ -357,7 +416,12 @@ function aplicarDatasBrasileiras() {
           if (axis.time && axis.time.displayFormats) {
             for (const k of Object.keys(axis.time.displayFormats)) {
               const v = String(axis.time.displayFormats[k]);
-              axis.time.displayFormats[k] = v.replace(/MM\/DD/g, 'DD/MM').replace(/M\/D/g, 'D/M');
+              axis.time.displayFormats[k] = v
+                .replace(/YYYY\/MM\/DD/g, 'DD/MM/YYYY')
+                .replace(/YYYY-MM-DD/g, 'DD/MM/YYYY')
+                .replace(/yyyy\/mm\/dd/g, 'DD/MM/YYYY')
+                .replace(/MM\/DD/g, 'DD/MM')
+                .replace(/M\/D/g, 'D/M');
             }
           }
           if (!axis.ticks) axis.ticks = {};
@@ -401,6 +465,32 @@ function aplicarDatasBrasileiras() {
   if (window.moment && typeof window.moment.locale === 'function') {
     window.moment.locale('pt-br');
   }
+  function patchFormatFn(obj) {
+    if (!obj || typeof obj.format !== 'function' || obj.__brDates) return;
+    const orig = obj.format;
+    obj.format = function patchedFormat(fmt, ...rest) {
+      if (typeof fmt === 'string') {
+        fmt = fmt
+          .replace(/YYYY\/MM\/DD/g, 'DD/MM/YYYY')
+          .replace(/YYYY-MM-DD/g, 'DD/MM/YYYY')
+          .replace(/yyyy\/mm\/dd/g, 'DD/MM/YYYY')
+          .replace(/yyyy-mm-dd/g, 'DD/MM/YYYY')
+          .replace(/YYYY\/M\/D/g, 'D/M/YYYY')
+          .replace(/YYYY\/MM/g, 'MM/YYYY')
+          .replace(/MM\/DD\/YYYY/g, 'DD/MM/YYYY')
+          .replace(/MM\/DD/g, 'DD/MM');
+      }
+      return orig.call(this, fmt, ...rest);
+    };
+    obj.__brDates = true;
+  }
+  if (window.moment) {
+    patchFormatFn(window.moment.fn);
+    patchFormatFn(window.moment.prototype);
+  }
+  if (window.dayjs && window.dayjs.prototype) {
+    patchFormatFn(window.dayjs.prototype);
+  }
 
   if (typeof PDFWriter !== 'undefined') {
     const alvos = [];
@@ -414,6 +504,13 @@ function aplicarDatasBrasileiras() {
       let src = '';
       try { src = fn.toString(); } catch (e) { continue; }
       const next = src
+        .replace(/['"]YYYY\/M\/D['"]/g, "'D/M/YYYY'")
+        .replace(/['"]yyyy\/M\/d['"]/g, "'d/M/yyyy'")
+        .replace(/['"]YYYY\/MM\/DD['"]/g, "'DD/MM/YYYY'")
+        .replace(/['"]YYYY-MM-DD['"]/g, "'DD/MM/YYYY'")
+        .replace(/['"]yyyy\/mm\/dd['"]/g, "'dd/mm/yyyy'")
+        .replace(/['"]yyyy-mm-dd['"]/g, "'dd/mm/yyyy'")
+        .replace(/['"]YYYY\/MM['"]/g, "'MM/YYYY'")
         .replace(/['"]MM\/DD\/YYYY['"]/g, "'DD/MM/YYYY'")
         .replace(/['"]MM\/DD\/YY['"]/g, "'DD/MM/YY'")
         .replace(/['"]MM\/DD['"]/g, "'DD/MM'")
