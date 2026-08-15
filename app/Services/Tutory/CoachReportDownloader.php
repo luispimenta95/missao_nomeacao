@@ -52,6 +52,24 @@ class CoachReportDownloader
     private const PIE_RENDER_HEIGHT = 406;
 
     /**
+     * Gráficos de Progresso por Modalidade: cabem na mesma página do título.
+     * Dompdf ignora max-height e, com PNG em 2x, joga a imagem para a página seguinte.
+     */
+    private const MODALIDADE_PDF_WIDTH = 640;
+
+    private const MODALIDADE_PDF_HEIGHT = 280;
+
+    /**
+     * @var list<string>
+     */
+    private const CHARTS_MODALIDADE = [
+        'chart_progresso_estudo',
+        'chart_progresso_resumo',
+        'chart_progresso_revisao',
+        'chart_progresso_exercicio',
+    ];
+
+    /**
      * Modelos de relatório a baixar (mesmo fluxo para cada índice).
      * model = segmento em /documentos/relatorios/{model}
      *
@@ -1042,6 +1060,10 @@ class CoachReportDownloader
         $page = $this->htmlQuebraPaginaComLogo($logoHtml);
         $pieCss = $this->cssChartPie();
         $fontCss = $this->cssFamiliaFontePdf();
+        $blocoEstudo = $this->htmlPaginaModalidade($page, $desc5, $chartEstudo);
+        $blocoResumo = $this->htmlPaginaModalidade($page, $desc6, $chartResumo);
+        $blocoRevisao = $this->htmlPaginaModalidade($page, $desc7, $chartRevisao);
+        $blocoExercicio = $this->htmlPaginaModalidade($page, $desc8, $chartExercicio);
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
@@ -1067,6 +1089,9 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 .panorama .value{font-size:11pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
 .chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
 .chart-sm{width:100%; max-width:700px; max-height:140px; margin:8px 0 14px;}
+.chart-mod{width:640px; height:280px; margin:8px 0 12px; display:block; page-break-inside:avoid;}
+.keep{page-break-inside:avoid;}
+.keep .section{margin-top:8px;}
 {$pieCss}
 .assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
 .assuntos thead td{background:#00aced; color:#fff; font-weight:bold; padding:8px;}
@@ -1121,25 +1146,10 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 <p class="section-desc">{$desc4e}</p>
 {$chartLinha}
 
-{$page}
-<h2 class="section">Progresso por Modalidade</h2>
-<p class="section-desc">{$desc5}</p>
-{$chartEstudo}
-
-{$page}
-<h2 class="section">Progresso por Modalidade</h2>
-<p class="section-desc">{$desc6}</p>
-{$chartResumo}
-
-{$page}
-<h2 class="section">Progresso por Modalidade</h2>
-<p class="section-desc">{$desc7}</p>
-{$chartRevisao}
-
-{$page}
-<h2 class="section">Progresso por Modalidade</h2>
-<p class="section-desc">{$desc8}</p>
-{$chartExercicio}
+{$blocoEstudo}
+{$blocoResumo}
+{$blocoRevisao}
+{$blocoExercicio}
 
 {$page}
 <h2 class="section">Desempenho de Questões</h2>
@@ -1588,6 +1598,23 @@ HTML;
     }
 
     /**
+     * Uma página de Progresso por Modalidade: título + gráfico juntos (sem página vazia).
+     */
+    private function htmlPaginaModalidade(string $page, string $desc, string $chart): string
+    {
+        if (trim($chart) === '') {
+            return '';
+        }
+
+        return $page
+            . '<div class="keep">'
+            . '<h2 class="section">Progresso por Modalidade</h2>'
+            . '<p class="section-desc">' . $desc . '</p>'
+            . $chart
+            . '</div>';
+    }
+
+    /**
      * Quebra de página com a logo no topo (fluxo normal — evita overlap do position:fixed no Dompdf).
      */
     private function htmlQuebraPaginaComLogo(string $logoHtml): string
@@ -1723,14 +1750,22 @@ HTML;
         }
         $type = (string) ($cfg['type'] ?? '');
         $isPie = in_array($type, ['pie', 'doughnut'], true);
+        $isModalidade = in_array($chartId, self::CHARTS_MODALIDADE, true);
         $class = $isPie
             ? 'chart-pie'
-            : (in_array($chartId, ['chart_progresso_principal'], true) ? 'chart-sm' : 'chart');
-        // Pizza: dimensões explícitas (Dompdf ignora max-height)
-        $out .= $isPie
-            ? '<img class="' . $class . '" src="' . $img . '" width="' . self::PIE_PDF_WIDTH
-                . '" height="' . self::PIE_PDF_HEIGHT . '" />'
-            : '<img class="' . $class . '" src="' . $img . '" />';
+            : ($isModalidade
+                ? 'chart-mod'
+                : (in_array($chartId, ['chart_progresso_principal'], true) ? 'chart-sm' : 'chart'));
+        // Dimensões explícitas: Dompdf ignora max-height e parte a página
+        if ($isPie) {
+            $out .= '<img class="' . $class . '" src="' . $img . '" width="' . self::PIE_PDF_WIDTH
+                . '" height="' . self::PIE_PDF_HEIGHT . '" />';
+        } elseif ($isModalidade) {
+            $out .= '<img class="' . $class . '" src="' . $img . '" width="' . self::MODALIDADE_PDF_WIDTH
+                . '" height="' . self::MODALIDADE_PDF_HEIGHT . '" />';
+        } else {
+            $out .= '<img class="' . $class . '" src="' . $img . '" />';
+        }
 
         return $out;
     }
