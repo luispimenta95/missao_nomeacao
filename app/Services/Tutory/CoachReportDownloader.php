@@ -52,6 +52,23 @@ class CoachReportDownloader
     private const PIE_RENDER_HEIGHT = 406;
 
     /**
+     * Fontes padrão do PDF (só famílias do Dompdf).
+     * DejaVu Sans é o padrão: vem com o Dompdf, é embutida no arquivo e cobre
+     * português (ã, ç, á). Helvetica/Times/Courier são as Base-14 do PDF
+     * (sempre disponíveis, mas sem esses glifos).
+     *
+     * @var array<string, string>
+     */
+    private const PDF_FONTES = [
+        'dejavu' => 'DejaVu Sans',
+        'helvetica' => 'Helvetica',
+        'times' => 'Times-Roman',
+        'courier' => 'Courier',
+    ];
+
+    private const PDF_FONTE_PADRAO = 'dejavu';
+
+    /**
      * Modelos de relatório a baixar (mesmo fluxo para cada índice).
      * model = segmento em /documentos/relatorios/{model}
      *
@@ -1039,16 +1056,15 @@ class CoachReportDownloader
         $seguroCurso = htmlspecialchars($curso, ENT_QUOTES, 'UTF-8');
         $seguroPeriodo = htmlspecialchars($periodo, ENT_QUOTES, 'UTF-8');
         $logoHtml = $this->montarHtmlLogoPdf();
-        $logoFontFace = $this->montarCssFonteLogoPdf();
         $page = $this->htmlQuebraPaginaComLogo($logoHtml);
         $pieCss = $this->cssChartPie();
+        $fontCss = $this->cssFamiliaFontePdf();
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
-{$logoFontFace}
-body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-.logo{text-align:center; margin:0 0 14px; color:#000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+body{font-family: {$fontCss}; font-size:12px; color:#222; margin:24px;}
+.logo{text-align:center; margin:0 0 14px; color:#000; font-family: {$fontCss}; font-weight:bold; line-height:0.95;}
 .logo .l1{font-size:18pt; letter-spacing:2pt;}
 .logo .l2{font-size:16pt; letter-spacing:1pt;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
@@ -1150,19 +1166,7 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 HTML;
 
         try {
-            $options = new Options;
-            $options->set('isRemoteEnabled', true);
-            $options->set('isFontSubsettingEnabled', true);
-            $options->set('defaultFont', 'DejaVu Sans');
-            $chroot = array_values(array_filter([
-                base_path(),
-                public_path(),
-                storage_path('fonts'),
-            ], 'is_dir'));
-            if ($chroot !== []) {
-                $options->setChroot($chroot);
-            }
-            $dompdf = new Dompdf($options);
+            $dompdf = new Dompdf($this->opcoesDompdf());
             $dompdf->loadHtml($pdfHtml, 'UTF-8');
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
@@ -1512,17 +1516,15 @@ HTML;
         $seguroMelhores = htmlspecialchars($melhoresTitulo, ENT_QUOTES, 'UTF-8');
         $seguroPiores = htmlspecialchars($pioresTitulo, ENT_QUOTES, 'UTF-8');
         $logoHtml = $this->montarHtmlLogoPdf();
-
-        $logoFontFace = $this->montarCssFonteLogoPdf();
         $page = $this->htmlQuebraPaginaComLogo($logoHtml);
         $pieCss = $this->cssChartPie();
+        $fontCss = $this->cssFamiliaFontePdf();
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
-{$logoFontFace}
-body{font-family: DejaVu Sans, sans-serif; font-size:12px; color:#222; margin:24px;}
-.logo{text-align:center; margin:0 0 14px; color:#000; font-family:'FredokaBrand', DejaVu Sans, sans-serif; font-weight:bold; line-height:0.95;}
+body{font-family: {$fontCss}; font-size:12px; color:#222; margin:24px;}
+.logo{text-align:center; margin:0 0 14px; color:#000; font-family: {$fontCss}; font-weight:bold; line-height:0.95;}
 .logo .l1{font-size:18pt; letter-spacing:2pt;}
 .logo .l2{font-size:16pt; letter-spacing:1pt;}
 h1{font-size:20px; margin:0 0 6px; text-align:center;}
@@ -1589,19 +1591,7 @@ h1{font-size:20px; margin:0 0 6px; text-align:center;}
 HTML;
 
         try {
-            $options = new Options;
-            $options->set('isRemoteEnabled', true);
-            $options->set('isFontSubsettingEnabled', true);
-            $options->set('defaultFont', 'DejaVu Sans');
-            $chroot = array_values(array_filter([
-                base_path(),
-                public_path(),
-                storage_path('fonts'),
-            ], 'is_dir'));
-            if ($chroot !== []) {
-                $options->setChroot($chroot);
-            }
-            $dompdf = new Dompdf($options);
+            $dompdf = new Dompdf($this->opcoesDompdf());
             $dompdf->loadHtml($pdfHtml, 'UTF-8');
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
@@ -1630,21 +1620,46 @@ HTML;
         return '<div class="logo"><div class="l1">MISSÃO</div><div class="l2">NOMEAÇÃO</div></div>';
     }
 
-    private function montarCssFonteLogoPdf(): string
+    /**
+     * Família padrão escolhida (env TUTORY_PDF_FONT: dejavu|helvetica|times|courier).
+     */
+    private function fontePdf(): string
     {
-        $path = storage_path('fonts/Fredoka-Bold.ttf');
-        if (! is_file($path)) {
-            return '';
+        $chave = strtolower(trim((string) env('TUTORY_PDF_FONT', self::PDF_FONTE_PADRAO)));
+        if ($chave === '') {
+            $chave = self::PDF_FONTE_PADRAO;
         }
 
-        $bytes = @file_get_contents($path);
-        if ($bytes === false || $bytes === '') {
-            return '';
+        return self::PDF_FONTES[$chave] ?? self::PDF_FONTES[self::PDF_FONTE_PADRAO];
+    }
+
+    private function cssFamiliaFontePdf(): string
+    {
+        $fonte = $this->fontePdf();
+
+        return match ($fonte) {
+            'Helvetica' => 'Helvetica, Arial, sans-serif',
+            'Times-Roman' => "Times, 'Times New Roman', serif",
+            'Courier' => 'Courier, monospace',
+            default => "'" . $fonte . "', Helvetica, sans-serif",
+        };
+    }
+
+    private function opcoesDompdf(): Options
+    {
+        $options = new Options;
+        $options->set('isRemoteEnabled', true);
+        $options->set('isFontSubsettingEnabled', true);
+        $options->set('defaultFont', $this->fontePdf());
+        $chroot = array_values(array_filter([
+            base_path(),
+            public_path(),
+        ], 'is_dir'));
+        if ($chroot !== []) {
+            $options->setChroot($chroot);
         }
 
-        $src = 'data:font/truetype;base64,' . base64_encode($bytes);
-
-        return "@font-face{font-family:'FredokaBrand';font-style:normal;font-weight:bold;src:url('{$src}') format('truetype');}";
+        return $options;
     }
 
     private function montarHtmlPanorama(DOMXPath $xp): string
