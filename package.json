@@ -5,7 +5,8 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "tutory:pdf": "node scripts/tutory-render-pdf.mjs"
+        "tutory:pdf": "node scripts/tutory-render-pdf.mjs",
+        "tutory:compose": "node scripts/tutory-compose-pdf.mjs"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

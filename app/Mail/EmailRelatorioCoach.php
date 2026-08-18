@@ -4,7 +4,7 @@ namespace App\Mail;
 
 class EmailRelatorioCoach extends BaseEmail
 {
-    public $subject = 'Seus Relatórios da Mentoria - Missão Nomeação';
+    public $subject = 'Seu Relatório da Mentoria - Missão Nomeação';
 
     /** @var list<string> */
     private array $anexoPaths;
@@ -26,7 +26,7 @@ class EmailRelatorioCoach extends BaseEmail
             $this->anexoPaths = [];
         }
 
-        $this->subject = 'Relatórios da Mentoria - Missão Nomeação';
+        $this->subject = 'Seu Relatório da Mentoria - Missão Nomeação';
     }
 
     public function build()

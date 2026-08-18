@@ -39,8 +39,8 @@ class RemoverPdfsAposEmailTest extends TestCase
 
     public function test_remove_pdfs_e_metricas_e_mantem_log(): void
     {
-        $pdf = $this->pasta.'/relatorio_questoes_20260815_1200_Giovanna_1.pdf';
-        $sidecar = $this->pasta.'/relatorio_questoes_20260815_1200_Giovanna_1.metricas.json';
+        $pdf = $this->pasta.'/relatorio_consolidado_20260815_1200_Giovanna_1.pdf';
+        $sidecar = $this->pasta.'/relatorio_consolidado_20260815_1200_Giovanna_1.metricas.json';
         $log = $this->pasta.'/log_download_20260815_120000.txt';
         file_put_contents($pdf, '%PDF-1.4 fake');
         file_put_contents($sidecar, '{}');
@@ -63,27 +63,18 @@ class RemoverPdfsAposEmailTest extends TestCase
             'recebe_email' => true,
         ]);
 
-        $pdfQuestoes = $this->pasta.'/relatorio_questoes_20260815_1200_Giovanna_1.pdf';
-        $pdfProgresso = $this->pasta.'/relatorio_progresso_20260815_1200_Giovanna_1.pdf';
-        $pdfDesempenho = $this->pasta.'/relatorio_desempenho_20260815_1200_Giovanna_1.pdf';
-        $pdfEstudos = $this->pasta.'/relatorio_aluno_20260815_1200_Giovanna_1.pdf';
-        $pdfHoras = $this->pasta.'/relatorio_horas-liquidas_20260815_1200_Giovanna_1.pdf';
-        file_put_contents($pdfQuestoes, '%PDF-1.4 fake');
-        file_put_contents($pdfProgresso, '%PDF-1.4 fake');
-        file_put_contents($pdfDesempenho, '%PDF-1.4 fake');
-        file_put_contents($pdfEstudos, '%PDF-1.4 fake');
-        file_put_contents($pdfHoras, '%PDF-1.4 fake');
+        $pdfConsolidado = $this->pasta.'/relatorio_consolidado_20260815_1200_Giovanna_1.pdf';
+        $pdfAntigo = $this->pasta.'/relatorio_questoes_20260815_1200_Giovanna_1.pdf';
+        file_put_contents($pdfConsolidado, '%PDF-1.4 fake');
+        file_put_contents($pdfAntigo, '%PDF-1.4 leftover');
 
         $this->chamar('enviarEmailsDosAlunos', $this->downloader());
 
         Mail::assertSent(EmailRelatorioCoach::class, function (EmailRelatorioCoach $mail) use ($aluno): bool {
             return $mail->hasTo($aluno->email);
         });
-        $this->assertFileDoesNotExist($pdfQuestoes);
-        $this->assertFileDoesNotExist($pdfProgresso);
-        $this->assertFileDoesNotExist($pdfDesempenho);
-        $this->assertFileDoesNotExist($pdfEstudos);
-        $this->assertFileDoesNotExist($pdfHoras);
+        $this->assertFileDoesNotExist($pdfConsolidado);
+        $this->assertFileDoesNotExist($pdfAntigo);
     }
 
     public function test_apaga_pdfs_mesmo_quando_email_e_pulado(): void

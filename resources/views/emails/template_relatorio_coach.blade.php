@@ -62,8 +62,7 @@
         <div class="content">
             <p>Olá, {{ $dados['nome'] }}!</p>
             <strong>
-                <p>Seus relatórios da mentoria
-             estão prontos.</p>
+            <p>Seu relatório consolidado da mentoria está pronto.</p>
             </strong>
             @if(!empty($dados['periodoLabel']))
             <p>Período: <strong>{{ $dados['periodoLabel'] }}</strong>.</p>
@@ -112,7 +111,7 @@
                 @endforeach
             </ul>
             @endif
-            <p>Os PDFs seguem em anexo neste e-mail.</p>
+            <p>O PDF segue em anexo neste e-mail.</p>
             <p>Qualquer dúvida, estamos à disposição.</p>
         </div>
         <div class="footer">

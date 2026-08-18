@@ -2,8 +2,8 @@
 <?php
 
 /**
- * Baixa os Relatórios do Coach no Tutory para os alunos ATIVOS da consulta
- * (todos os modelos do menu do mentor) e envia todos os PDFs em um único e-mail.
+ * Gera o Relatório consolidado do Coach no Tutory para os alunos ATIVOS
+ * (seções dos modelos do menu do mentor) e envia um único PDF por e-mail.
  *
  * CLI/HTTP puro — sem Selenium, sem Firefox, sem php-webdriver.
  *
@@ -27,7 +27,7 @@ $options = getopt('', ['periodo:', 'teste', 'help']);
 
 if (isset($options['help']) || ! isset($options['periodo'])) {
     fwrite(STDERR, <<<'HELP'
-Baixa os Relatórios do Coach no Tutory para alunos ativos (CLI/HTTP).
+Gera o relatório consolidado do Coach no Tutory para alunos ativos (CLI/HTTP).
 
 Uso:
   php scripts/baixar_relatorios_tutory.php --periodo=1

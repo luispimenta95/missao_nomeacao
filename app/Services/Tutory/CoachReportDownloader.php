@@ -8,9 +8,9 @@
  * 3. Para cada modelo em RELATORIOS[]:
  *    POST /intent/cadastrar-relatorio-coach (agrupamento=dia)
  *    GET /documentos/relatorios/{model}?key=...
- *    PDF oficial via Puppeteer (PDFWriter ou html2canvas no modelo desempenho)
- * 4. Reprocessa falhas (até 3x) por aluno+modelo
- * 5. Lista alunos do banco → localiza PDFs → um e-mail com todos os anexos se recebe_email
+ * 4. Puppeteer extrai as seções pedidas de cada página e monta UM PDF consolidado
+ * 5. Reprocessa falhas (até 3x) por aluno
+ * 6. Lista alunos do banco → localiza o PDF consolidado → um e-mail com 1 anexo se recebe_email
  */
 
 namespace App\Services\Tutory;
@@ -501,10 +501,13 @@ class CoachReportDownloader
     }
 
     /**
+     * Gera o token e baixa o HTML oficial do modelo (sem PDF individual).
+     *
      * @param  array{nome: string, id: string}  $aluno
      * @param  array{model: string, nome: string, slug: string}  $relatorio
+     * @return array{url: string, html: string, model: string}|null
      */
-    private function processarAluno(array $aluno, array $relatorio): ?string
+    private function abrirPaginaRelatorio(array $aluno, array $relatorio): ?array
     {
         $nome = $aluno['nome'];
         $id = $aluno['id'];
@@ -559,8 +562,6 @@ class CoachReportDownloader
         $reportUrl = self::BASE . '/documentos/relatorios/' . $model . '?key=' . rawurlencode($key);
         $this->log("[{$nome}] [{$rotulo}] Abrindo relatório (/documentos/relatorios/{$model})...");
 
-        $destino = $this->caminhoDestinoPdf($nome, $model, $id);
-
         $pagina = $this->client()
             ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
             ->get('/documentos/relatorios/' . $model, ['key' => $key]);
@@ -575,53 +576,26 @@ class CoachReportDownloader
         if ($model === 'questoes' && (! str_contains($html, 'main-numbers') || ! str_contains($html, 'tabela_questoes'))) {
             $this->log("[{$nome}] [{$rotulo}] AVISO: página sem Breve Panorama ou Performance por assunto");
         }
-        if ($model === 'progresso' && ! str_contains($html, 'chart_progresso_principal')) {
-            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem gráfico principal de progresso");
+        if ($model === 'progresso' && ! str_contains($html, 'insights-panel')) {
+            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem Painel de Insights");
         }
-        if ($model === 'aluno' && ! str_contains($html, 'chart_top_disciplina')) {
-            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem gráfico de disciplinas (Estudos)");
+        if ($model === 'aluno' && ! str_contains($html, 'tabela_estudos')) {
+            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem Histórico de Metas (Estudos)");
         }
-        if ($model === 'horas-liquidas' && ! str_contains($html, 'chart_pie_horas_disciplina')) {
-            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem gráfico de horas líquidas");
+        if ($model === 'horas-liquidas' && ! str_contains($html, 'chart_line_comparativo')) {
+            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem gráfico de desempenho ao longo do tempo");
         }
-        if ($model === 'desempenho' && ! str_contains($html, 'chart_panorama')) {
-            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem panorama de desempenho");
-        }
-
-        // Réplica do PDF do painel (mesmo PDFWriter/jsPDF do botão Baixar)
-        if ($this->gerarPdfComPuppeteer($nome, $reportUrl, $destino, $model, $rotulo)) {
-            if ($this->pdfContemSecoesObrigatorias($destino, $model)) {
-                $this->salvarMetricasRelatorioSeAplicavel($destino, $model, $html);
-
-                return $destino;
-            }
-            $this->log("[{$nome}] [{$rotulo}] PDF Puppeteer incompleto — tentando Dompdf");
-            @unlink($destino);
+        if ($model === 'desempenho' && ! str_contains($html, 'main-header-card')) {
+            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem cabeçalho moderno de desempenho");
         }
 
-        $this->log("[{$nome}] [{$rotulo}] Fallback Dompdf...");
+        $this->log("[{$nome}] [{$rotulo}] Página oficial pronta para extração");
 
-        if ($model === 'progresso') {
-            $salvo = $this->gerarPdfProgressoDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso);
-            if ($salvo !== null) {
-                $this->salvarMetricasRelatorioSeAplicavel($salvo, $model, $html);
-            }
-
-            return $salvo;
-        }
-
-        if ($model !== 'questoes') {
-            $this->log("[{$nome}] [{$rotulo}] Sem fallback Dompdf para este modelo");
-
-            return null;
-        }
-
-        $salvo = $this->gerarPdfDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso, $model);
-        if ($salvo !== null) {
-            $this->salvarMetricasRelatorioSeAplicavel($salvo, $model, $html);
-        }
-
-        return $salvo;
+        return [
+            'url' => $reportUrl,
+            'html' => $html,
+            'model' => $model,
+        ];
     }
 
     private function pdfContemSecoesObrigatorias(string $caminho, string $model = 'questoes'): bool
@@ -764,6 +738,121 @@ class CoachReportDownloader
         return true;
     }
 
+    /**
+     * Extrai as seções pedidas dos 5 HTMLs oficiais e gera um único PDF.
+     *
+     * @param  array<string, string>  $urlsPorModelo
+     */
+    private function gerarPdfConsolidadoComPuppeteer(
+        string $nome,
+        array $urlsPorModelo,
+        string $destino,
+    ): bool {
+        $script = function_exists('base_path')
+            ? base_path('scripts/tutory-compose-pdf.mjs')
+            : dirname(__DIR__, 3) . '/scripts/tutory-compose-pdf.mjs';
+
+        if (! is_file($script)) {
+            $this->log("[{$nome}] Script de consolidação ausente: {$script}");
+
+            return false;
+        }
+
+        $obrigatorios = ['desempenho', 'aluno', 'horas-liquidas', 'questoes', 'progresso'];
+        foreach ($obrigatorios as $model) {
+            if (empty($urlsPorModelo[$model])) {
+                $this->log("[{$nome}] URL ausente para o modelo {$model}");
+
+                return false;
+            }
+        }
+
+        $node = trim((string) env('NODE_BINARY', 'node')) ?: 'node';
+        $cmd = [
+            $node,
+            $script,
+            '--out', $destino,
+            '--url-desempenho', $urlsPorModelo['desempenho'],
+            '--url-aluno', $urlsPorModelo['aluno'],
+            '--url-horas-liquidas', $urlsPorModelo['horas-liquidas'],
+            '--url-questoes', $urlsPorModelo['questoes'],
+            '--url-progresso', $urlsPorModelo['progresso'],
+        ];
+        $cookie = $this->cookieHeader();
+        if ($cookie !== '') {
+            $cmd[] = '--cookie';
+            $cmd[] = $cookie;
+        }
+        if ($this->bearerToken !== null && $this->bearerToken !== '') {
+            $cmd[] = '--token';
+            $cmd[] = $this->bearerToken;
+        }
+
+        $this->log("[{$nome}] Compondo relatório único (seções extraídas via Puppeteer)...");
+
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $cwd = function_exists('base_path') ? base_path() : dirname($script, 2);
+        $proc = @proc_open($cmd, $descriptors, $pipes, $cwd, null);
+        if (! is_resource($proc)) {
+            $this->log("[{$nome}] Não foi possível iniciar Node/Puppeteer (compositor)");
+
+            return false;
+        }
+
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]) ?: '';
+        $stderr = stream_get_contents($pipes[2]) ?: '';
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+
+        if ($code !== 0 || ! is_file($destino) || filesize($destino) < 2000) {
+            $detail = trim($stderr !== '' ? $stderr : $stdout);
+            $this->log("[{$nome}] Compositor falhou (exit {$code}): " . $detail);
+
+            return false;
+        }
+
+        $this->log("[{$nome}] Relatório consolidado salvo: {$destino}");
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, string>  $htmlPorModelo
+     */
+    private function salvarMetricasConsolidado(string $pdfPath, array $htmlPorModelo): void
+    {
+        if ($pdfPath === '' || ! is_file($pdfPath)) {
+            return;
+        }
+
+        $metricas = [];
+        if (isset($htmlPorModelo['progresso']) && is_string($htmlPorModelo['progresso'])) {
+            $metricas = array_merge($metricas, $this->extrairMetricasConstancia($htmlPorModelo['progresso']));
+        }
+        if (isset($htmlPorModelo['questoes']) && is_string($htmlPorModelo['questoes'])) {
+            $metricas = array_merge($metricas, $this->extrairMetricasQuestoes($htmlPorModelo['questoes']));
+        }
+        if ($metricas === []) {
+            return;
+        }
+
+        $sidecar = $this->caminhoMetricasSidecar($pdfPath);
+        $payload = [
+            'gerado_em' => date('c'),
+            'periodo' => $this->periodo,
+            'model' => 'consolidado',
+            'metricas' => $metricas,
+        ];
+        file_put_contents($sidecar, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $this->log('Métricas de desempenho (consolidado) salvas: '.$sidecar);
+    }
+
     private function caminhoDestinoPdf(string $nomeAluno, string $model = 'questoes', ?string $id = null): string
     {
         $seguro = $this->sanitizarNomeArquivo($nomeAluno);
@@ -866,7 +955,7 @@ class CoachReportDownloader
     }
 
     /**
-     * Localiza os PDFs mais recentes do aluno (um por modelo em RELATORIOS) na pasta de download.
+     * Localiza o PDF consolidado mais recente do aluno na pasta de download.
      *
      * @return list<string>
      */
@@ -877,9 +966,7 @@ class CoachReportDownloader
         }
 
         $seguro = $this->sanitizarNomeArquivo($nomeAluno);
-        $modelos = array_column($this->relatorios(), 'model');
-        /** @var array<string, list<string>> $porModelo */
-        $porModelo = [];
+        $candidatos = [];
 
         foreach (scandir($this->pastaDownload) ?: [] as $arquivo) {
             if (! str_ends_with(mb_strtolower($arquivo), '.pdf')) {
@@ -889,26 +976,22 @@ class CoachReportDownloader
             if ($meta === null) {
                 continue;
             }
+            if ($meta['model'] !== 'consolidado') {
+                continue;
+            }
             if (! $this->nomesArquivoSaoCompativeis($seguro, $meta['nome'])) {
                 continue;
             }
-            if (! in_array($meta['model'], $modelos, true)) {
-                continue;
-            }
-            $porModelo[$meta['model']][] = $this->pastaDownload.'/'.$arquivo;
+            $candidatos[] = $this->pastaDownload.'/'.$arquivo;
         }
 
-        $encontrados = [];
-        foreach ($modelos as $model) {
-            $candidatos = $porModelo[$model] ?? [];
-            if ($candidatos === []) {
-                continue;
-            }
-            usort($candidatos, static fn (string $a, string $b): int => filemtime($b) <=> filemtime($a));
-            $encontrados[] = $candidatos[0];
+        if ($candidatos === []) {
+            return [];
         }
 
-        return $encontrados;
+        usort($candidatos, static fn (string $a, string $b): int => filemtime($b) <=> filemtime($a));
+
+        return [$candidatos[0]];
     }
 
     /**
@@ -948,10 +1031,6 @@ class CoachReportDownloader
 
         [$dtIni, $dtFim] = $this->datasPeriodoBr();
         $periodoLabel = $dtIni.' a '.$dtFim.' (período '.$this->periodo.')';
-        $nomePorModelo = [];
-        foreach ($this->relatorios() as $relatorio) {
-            $nomePorModelo[$relatorio['model']] = $relatorio['nome'];
-        }
 
         $enviados = 0;
         $pulados = 0;
@@ -972,23 +1051,7 @@ class CoachReportDownloader
             $nomesAnexos = [];
             foreach ($pdfs as $pdf) {
                 $this->log("[{$aluno->nome}] PDF: ".basename($pdf));
-                $meta = $this->extrairMetaDoArquivoPdf(basename($pdf));
-                if ($meta !== null && isset($nomePorModelo[$meta['model']])) {
-                    $nomesAnexos[] = $nomePorModelo[$meta['model']];
-                }
-            }
-
-            $modelosEsperados = array_column($this->relatorios(), 'model');
-            $modelosEncontrados = [];
-            foreach ($pdfs as $pdf) {
-                $meta = $this->extrairMetaDoArquivoPdf(basename($pdf));
-                if ($meta !== null) {
-                    $modelosEncontrados[] = $meta['model'];
-                }
-            }
-            $faltando = array_values(array_diff($modelosEsperados, $modelosEncontrados));
-            if ($faltando !== []) {
-                $this->log("[{$aluno->nome}] AVISO: faltam PDFs dos modelos: ".implode(', ', $faltando));
+                $nomesAnexos[] = 'Relatório consolidado';
             }
 
             $avaliacao = $this->avaliarDesempenhoDosPdfs($aluno->nome, $pdfs);
@@ -1025,7 +1088,7 @@ class CoachReportDownloader
                     [
                         'nome' => $aluno->nome,
                         'periodoLabel' => $periodoLabel,
-                        'relatorios' => $nomesAnexos !== [] ? $nomesAnexos : array_values($nomePorModelo),
+                        'relatorios' => $nomesAnexos !== [] ? $nomesAnexos : ['Relatório consolidado'],
                         'nivelDesempenho' => $resumo,
                         'textoDesempenho' => null,
                         'blocosDesempenho' => $blocos,
@@ -1513,7 +1576,14 @@ HTML;
             }
             $model = (string) ($meta['model'] ?? $json['model'] ?? '');
             $m = $json['metricas'];
-            if ($model === 'progresso') {
+            if ($model === 'consolidado') {
+                $dados['dias_analisados'] = $m['dias_analisados'] ?? null;
+                $dados['dias_estudados'] = $m['dias_estudados'] ?? null;
+                $dados['dias_falhados'] = $m['dias_falhados'] ?? null;
+                $dados['total_questoes'] = $m['total_questoes'] ?? null;
+                $dados['percentual_acertos'] = $m['percentual_acertos'] ?? null;
+                $dados['assuntos'] = is_array($m['assuntos'] ?? null) ? $m['assuntos'] : [];
+            } elseif ($model === 'progresso') {
                 $dados['dias_analisados'] = $m['dias_analisados'] ?? null;
                 $dados['dias_estudados'] = $m['dias_estudados'] ?? null;
                 $dados['dias_falhados'] = $m['dias_falhados'] ?? null;
@@ -2402,7 +2472,7 @@ HTML;
             'Fim:    ' . $fim->format('d/m/Y H:i:s'),
             'Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()),
             'Alunos: ' . $total,
-            'Modelos: ' . implode(', ', array_column($this->relatorios(), 'model')),
+            'Modelos-fonte: ' . implode(', ', array_column($this->relatorios(), 'model')) . ' → PDF consolidado',
             'PDFs: ' . count($pdfs),
             'Falhas: ' . count($falhas),
             "Pasta: {$this->pastaDownload}",
@@ -2432,8 +2502,8 @@ HTML;
         $inicio = new \DateTimeImmutable('now');
         $relatorios = $this->relatorios();
         $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
-        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + Puppeteer (PDFWriter ou html2canvas)');
-        $this->log('Relatórios: ' . implode(', ', array_map(
+        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + compositor Puppeteer (1 PDF)');
+        $this->log('Fontes: ' . implode(', ', array_map(
             static fn (array $r): string => $r['nome'] . ' (' . $r['model'] . ')',
             $relatorios
         )));
@@ -2460,36 +2530,30 @@ HTML;
             return;
         }
 
-        /** @var array<string, array{nome: string, sucesso: bool, arquivo: ?string, tentativas: int, meta: array{nome: string, id: string}, relatorio: array{model: string, nome: string, slug: string}}> $resultados */
+        /** @var array<string, array{nome: string, sucesso: bool, arquivo: ?string, tentativas: int, meta: array{nome: string, id: string}}> $resultados */
         $resultados = [];
         foreach ($alunos as $a) {
-            foreach ($relatorios as $relatorio) {
-                $chave = $a['nome'] . '|' . $relatorio['model'];
-                $resultados[$chave] = [
-                    'nome' => $a['nome'] . ' / ' . $relatorio['nome'],
-                    'sucesso' => false,
-                    'arquivo' => null,
-                    'tentativas' => 0,
-                    'meta' => $a,
-                    'relatorio' => $relatorio,
-                ];
-            }
+            $resultados[$a['id']] = [
+                'nome' => $a['nome'],
+                'sucesso' => false,
+                'arquivo' => null,
+                'tentativas' => 0,
+                'meta' => $a,
+            ];
         }
         $chaves = array_keys($resultados);
 
-        $processarLote = function (array $lista, int $rodada) use (&$resultados): void {
+        $processarLote = function (array $lista, int $rodada) use (&$resultados, $relatorios): void {
             $total = count($lista);
             foreach ($lista as $i => $chave) {
                 $resultados[$chave]['tentativas']++;
                 $t = $resultados[$chave]['tentativas'];
-                $rotulo = $resultados[$chave]['nome'];
+                $aluno = $resultados[$chave]['meta'];
+                $rotulo = $aluno['nome'];
                 $this->log(str_repeat('=', 50));
-                $this->log("[rodada {$rodada}] Item " . ($i + 1) . "/{$total}: {$rotulo} (tentativa {$t}/" . self::MAX_TENTATIVAS . ')');
+                $this->log("[rodada {$rodada}] Aluno " . ($i + 1) . "/{$total}: {$rotulo} (tentativa {$t}/" . self::MAX_TENTATIVAS . ')');
                 try {
-                    $arquivo = $this->processarAluno(
-                        $resultados[$chave]['meta'],
-                        $resultados[$chave]['relatorio']
-                    );
+                    $arquivo = $this->processarAlunoConsolidado($aluno, $relatorios);
                 } catch (Throwable $exc) {
                     $this->log("[{$rotulo}] ERRO: " . $exc->getMessage());
                     $arquivo = null;
@@ -2497,7 +2561,7 @@ HTML;
                 if ($arquivo !== null) {
                     $resultados[$chave]['sucesso'] = true;
                     $resultados[$chave]['arquivo'] = $arquivo;
-                    $this->log("[{$rotulo}] SUCESSO");
+                    $this->log("[{$rotulo}] SUCESSO (PDF consolidado)");
                 } else {
                     $resultados[$chave]['sucesso'] = false;
                     $resultados[$chave]['arquivo'] = null;
@@ -2537,7 +2601,7 @@ HTML;
         $this->log('Início: ' . $inicio->format('d/m/Y H:i:s'));
         $this->log('Fim:    ' . $fim->format('d/m/Y H:i:s'));
         $this->log('Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()));
-        $this->log('PDFs baixados: ' . count($pdfs));
+        $this->log('PDFs consolidados: ' . count($pdfs));
         $this->log('Falhas finais: ' . count($falhas));
         foreach ($chaves as $chave) {
             if ($resultados[$chave]['sucesso']) {
@@ -2547,5 +2611,42 @@ HTML;
         }
         $this->log("Arquivos em: {$this->pastaDownload}");
         $this->log("Log salvo em: {$log}");
+    }
+
+    /**
+     * Abre os 5 relatórios oficiais e compõe um único PDF com as seções pedidas.
+     *
+     * @param  array{nome: string, id: string}  $aluno
+     * @param  list<array{model: string, nome: string, slug: string}>  $relatorios
+     */
+    private function processarAlunoConsolidado(array $aluno, array $relatorios): ?string
+    {
+        $nome = $aluno['nome'];
+        /** @var array<string, string> $urls */
+        $urls = [];
+        /** @var array<string, string> $htmls */
+        $htmls = [];
+
+        foreach ($relatorios as $relatorio) {
+            $pagina = $this->abrirPaginaRelatorio($aluno, $relatorio);
+            if ($pagina === null) {
+                $this->log("[{$nome}] Falha ao abrir {$relatorio['nome']} — consolidado abortado");
+
+                return null;
+            }
+            $urls[$pagina['model']] = $pagina['url'];
+            $htmls[$pagina['model']] = $pagina['html'];
+        }
+
+        $destino = $this->caminhoDestinoPdf($nome, 'consolidado', $aluno['id']);
+        if (! $this->gerarPdfConsolidadoComPuppeteer($nome, $urls, $destino)) {
+            @unlink($destino);
+
+            return null;
+        }
+
+        $this->salvarMetricasConsolidado($destino, $htmls);
+
+        return $destino;
     }
 }
