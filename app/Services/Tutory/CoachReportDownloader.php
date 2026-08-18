@@ -38,6 +38,8 @@ class CoachReportDownloader
 
     private const MAX_TENTATIVAS = 3;
 
+    private const MARCA_DAGUA = 'Missão Nomeação';
+
     /**
      * Pizza no PDF Dompdf — meio-termo entre o original (~700×327, grande demais)
      * e o recorte 220×160 (pequeno demais). Mesma proporção ~1,38 do recorte,
@@ -1174,6 +1176,7 @@ HTML;
             $dompdf->loadHtml($pdfHtml, 'UTF-8');
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
+            $this->aplicarMarcaDaguaPdf($dompdf);
             $bytes = $dompdf->output() ?? '';
             if ($bytes === '' || strlen($bytes) < 500) {
                 $this->log("[{$nome}] Fallback Dompdf gerou PDF vazio");
@@ -2424,6 +2427,37 @@ HTML;
         return '<table class="assuntos"><thead><tr>'
             . '<td>Disciplina</td><td>Assunto</td><td>Taxa de Acertos</td>'
             . '</tr></thead><tbody>' . $body . '</tbody></table>';
+    }
+
+    /**
+     * Marca d'água diagonal, clara, em todas as páginas — não cobre a leitura.
+     */
+    private function aplicarMarcaDaguaPdf(Dompdf $dompdf): void
+    {
+        try {
+            $canvas = $dompdf->getCanvas();
+            $metrics = $dompdf->getFontMetrics();
+            $font = $metrics->getFont('DejaVu Sans', 'bold')
+                ?: $metrics->getFont('DejaVu Sans', 'normal');
+            if (! is_string($font) || $font === '') {
+                return;
+            }
+
+            $texto = self::MARCA_DAGUA;
+            $tamanho = 48.0;
+            $angulo = -32.0;
+            $largura = $metrics->getTextWidth($texto, $font, $tamanho);
+            $paginaW = $canvas->get_width();
+            $paginaH = $canvas->get_height();
+            $rad = deg2rad($angulo);
+            $x = ($paginaW / 2.0) - ($largura / 2.0) * cos($rad);
+            $y = ($paginaH / 2.0) - ($largura / 2.0) * sin($rad);
+            $cor = [0.52, 0.52, 0.52, 'alpha' => 0.12];
+
+            $canvas->page_text($x, $y, $texto, $font, $tamanho, $cor, 0.0, 1.2, $angulo);
+        } catch (Throwable) {
+            // Relatório segue válido sem a marca.
+        }
     }
 
     /**
