@@ -767,12 +767,8 @@ class CoachReportDownloader
             }
         }
 
-        if (! $this->podeUsarPuppeteer()) {
-            return false;
-        }
-
         $node = $this->binarioNode();
-        if ($node === null) {
+        if ($node === null || ! $this->podeUsarPuppeteer()) {
             return false;
         }
 
@@ -846,11 +842,47 @@ class CoachReportDownloader
     }
 
     /**
-     * Hostinger compartilhado normalmente não tem Node. O PDF sai pelo Dompdf.
+     * Hostinger pode ter Node (nodevenv) sem o pacote npm `puppeteer` e sem Chromium.
+     * Sem o pacote, o PDF sai pelo Dompdf — não rode `npm install` no shared hosting.
      */
     private function podeUsarPuppeteer(): bool
     {
-        return $this->binarioNode() !== null && $this->funcoesProcessoBloqueadas() === [];
+        return $this->motivoSemPuppeteer() === null;
+    }
+
+    /**
+     * Motivo para pular o compositor Node. Null = Puppeteer pode ser tentado.
+     */
+    private function motivoSemPuppeteer(): ?string
+    {
+        $engine = strtolower(trim((string) env('TUTORY_PDF_ENGINE', 'dompdf')));
+        if ($engine === '' || in_array($engine, ['dompdf', 'php'], true)) {
+            return 'TUTORY_PDF_ENGINE=dompdf';
+        }
+        $bloqueadas = $this->funcoesProcessoBloqueadas();
+        if ($bloqueadas !== []) {
+            return 'funções PHP bloqueadas ('.implode(', ', $bloqueadas).')';
+        }
+        if ($this->binarioNode() === null) {
+            return 'Node.js ausente';
+        }
+        if (! $this->pacotePuppeteerInstalado()) {
+            return 'pacote npm puppeteer ausente (não precisa instalar)';
+        }
+
+        return null;
+    }
+
+    private function pacotePuppeteerInstalado(): bool
+    {
+        $root = function_exists('base_path') ? base_path() : dirname(__DIR__, 3);
+        foreach (['puppeteer', 'puppeteer-core'] as $pkg) {
+            if (is_file($root.'/node_modules/'.$pkg.'/package.json')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function binarioNode(): ?string
@@ -3021,7 +3053,10 @@ HTML;
         $inicio = new \DateTimeImmutable('now');
         $relatorios = $this->relatorios();
         $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
-        $motor = $this->podeUsarPuppeteer() ? 'Puppeteer (Node)' : 'PHP/Dompdf (sem Node)';
+        $motivo = $this->motivoSemPuppeteer();
+        $motor = $motivo === null
+            ? 'Puppeteer (Node)'
+            : 'PHP/Dompdf ('.$motivo.')';
         $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via '.$motor);
         $this->log('Fontes: ' . implode(', ', array_map(
             static fn (array $r): string => $r['nome'] . ' (' . $r['model'] . ')',
@@ -3160,15 +3195,16 @@ HTML;
 
         $destino = $this->caminhoDestinoPdf($nome, 'consolidado', $aluno['id']);
         $ok = false;
-        if ($this->podeUsarPuppeteer()) {
+        $motivo = $this->motivoSemPuppeteer();
+        if ($motivo === null) {
             $ok = $this->gerarPdfConsolidadoComPuppeteer($nome, $urls, $destino);
+            if (! $ok) {
+                $this->log("[{$nome}] Compositor Puppeteer falhou — usando fallback PHP/Dompdf");
+            }
+        } else {
+            $this->log("[{$nome}] {$motivo} — gerando o consolidado com PHP/Dompdf");
         }
         if (! $ok) {
-            if ($this->podeUsarPuppeteer()) {
-                $this->log("[{$nome}] Compositor Puppeteer falhou — usando fallback PHP/Dompdf");
-            } else {
-                $this->log("[{$nome}] Servidor sem Node — gerando o consolidado com PHP/Dompdf");
-            }
             @unlink($destino);
             $ok = $this->gerarPdfConsolidadoDoHtml($nome, $htmls, $destino);
         }

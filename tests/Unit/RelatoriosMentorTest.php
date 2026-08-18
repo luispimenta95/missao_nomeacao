@@ -128,6 +128,34 @@ class RelatoriosMentorTest extends TestCase
         }
     }
 
+    public function test_motor_padrao_e_dompdf_sem_npm(): void
+    {
+        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $ref = new ReflectionClass($downloader);
+
+        $this->assertFalse($ref->getMethod('podeUsarPuppeteer')->invoke($downloader));
+        $this->assertStringContainsString(
+            'dompdf',
+            strtolower((string) $ref->getMethod('motivoSemPuppeteer')->invoke($downloader))
+        );
+    }
+
+    public function test_sem_pacote_puppeteer_nao_usa_o_compositor(): void
+    {
+        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $ref = new ReflectionClass($downloader);
+        $instalado = $ref->getMethod('pacotePuppeteerInstalado')->invoke($downloader);
+        $esperado = is_file(base_path('node_modules/puppeteer/package.json'))
+            || is_file(base_path('node_modules/puppeteer-core/package.json'));
+
+        $this->assertSame($esperado, $instalado);
+        if (! $instalado) {
+            $this->assertFalse($ref->getMethod('podeUsarPuppeteer')->invoke($downloader));
+            $motivo = (string) $ref->getMethod('motivoSemPuppeteer')->invoke($downloader);
+            $this->assertNotSame('', $motivo);
+        }
+    }
+
     public function test_fallback_dompdf_gera_pdf_consolidado_a_partir_dos_htmls(): void
     {
         $pasta = sys_get_temp_dir().'/tutory-consolidado-'.uniqid('', true);

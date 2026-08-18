@@ -12,7 +12,7 @@ class BaixarRelatoriosTutoryCommand extends Command
                             {--periodo= : 1 = dias 01–15; 2 = dia 16 até o último dia do mês}
                             {--teste : Baixa só o relatório da aluna Giovanna}';
 
-    protected $description = 'Gera um relatório consolidado do Coach (seções dos 5 modelos do menu) e envia por e-mail com um único PDF';
+    protected $description = 'Gera o relatório consolidado do Coach com PHP/Dompdf (sem npm/Node) e envia por e-mail';
 
     public function handle(): int
     {
@@ -29,6 +29,7 @@ class BaixarRelatoriosTutoryCommand extends Command
         if ($teste) {
             $this->warn('Modo --teste ativo: processa apenas Giovanna.');
         }
+        $this->line('PDF com PHP/Dompdf — não usa npm/Node. Ignore "npm: command not found".');
 
         try {
             $downloader = new CoachReportDownloader(
