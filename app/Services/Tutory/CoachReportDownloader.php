@@ -855,9 +855,9 @@ class CoachReportDownloader
      */
     private function motivoSemPuppeteer(): ?string
     {
-        $engine = strtolower(trim((string) env('TUTORY_PDF_ENGINE', 'auto')));
-        if (in_array($engine, ['dompdf', 'php'], true)) {
-            return 'TUTORY_PDF_ENGINE='.$engine;
+        $engine = strtolower(trim((string) env('TUTORY_PDF_ENGINE', 'dompdf')));
+        if ($engine === '' || in_array($engine, ['dompdf', 'php'], true)) {
+            return 'TUTORY_PDF_ENGINE=dompdf';
         }
         $bloqueadas = $this->funcoesProcessoBloqueadas();
         if ($bloqueadas !== []) {

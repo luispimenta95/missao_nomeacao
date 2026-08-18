@@ -2,7 +2,7 @@
 
 CLI PHP que baixa os relatórios do Coach dos alunos **ativos** no Tutory, **consolida as seções pedidas em um único PDF** e envia por e-mail aos alunos cadastrados no admin (`recebe_email=true`).
 
-No Hostinger compartilhado **não precisa de Node**. O PDF é montado com PHP/Dompdf a partir dos HTMLs oficiais. Puppeteer só entra se o servidor tiver Node disponível.
+No Hostinger compartilhado **não precisa de Node nem de npm**. O PDF é montado com PHP/Dompdf a partir dos HTMLs oficiais. Puppeteer é opcional e fica desligado por padrão.
 
 ## O que entra no PDF único
 
@@ -25,27 +25,26 @@ Performance por assunto aparece só uma vez, na implementação do relatório de
 3. Para **cada modelo** em `RELATORIOS` (mesmo token de geração):
    1. `POST /intent/cadastrar-relatorio-coach` (`alunos[]`, `dt_ini`, `dt_fim`, `agrupamento=dia`)
    2. `GET /documentos/relatorios/{model}?key=...` (HTML oficial; as páginas do Tutory **não são alteradas**)
-4. Monta **um** PDF: Puppeteer (`scripts/tutory-compose-pdf.mjs`) se houver Node; senão **PHP/Dompdf + QuickChart** com os HTMLs já baixados
+4. Monta **um** PDF com **PHP/Dompdf + QuickChart** (padrão no Hostinger; Puppeteer só se `TUTORY_PDF_ENGINE=puppeteer`)
 5. Reprocessa falhas por aluno (até 3 tentativas)
 6. Lista alunos do **admin** (`alunos`) → localiza o PDF `relatorio_consolidado_*` → avalia o desempenho e grava `last_performance` → envia **um único e-mail com 1 anexo** se `recebe_email=true` → **apaga todos os PDFs** da pasta de download (e os `.metricas.json` ao lado). Logs `log_download_*.txt` permanecem.
 
 O renderer individual `scripts/tutory-render-pdf.mjs` continua no repositório para uso pontual. **Não é necessário em produção sem Node.**
 
-## Hostinger / shared hosting (sem Puppeteer)
+## Hostinger / shared hosting (sem npm)
 
-Não rode `npm install` e não instale Chromium. O Hostinger pode ter `node` no PATH (ex.: v20) **sem** o pacote `puppeteer` — nesse caso o job **não** dispara o compositor e gera o consolidado com **PHP/Dompdf**. Gráficos passam pelo QuickChart (`quickchart.io`).
+**Não rode `npm install`.** O comando `npm` não existe nesse servidor e **não é necessário**. O PDF consolidado sai com PHP/Dompdf por padrão (`TUTORY_PDF_ENGINE=dompdf`).
 
-No `.env`:
-
-```env
-TUTORY_PDF_ENGINE=dompdf
+```bash
+php artisan tutory:baixar-relatorios --periodo=1 --teste
 ```
 
 Log esperado:
 
 ```
-Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via PHP/Dompdf (pacote npm puppeteer ausente (não precisa instalar))
-[Giovanna] pacote npm puppeteer ausente (não precisa instalar) — gerando o consolidado com PHP/Dompdf
+PDF com PHP/Dompdf — não usa npm/Node. Ignore "npm: command not found".
+Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via PHP/Dompdf (TUTORY_PDF_ENGINE=dompdf)
+[Giovanna] TUTORY_PDF_ENGINE=dompdf — gerando o consolidado com PHP/Dompdf
 ```
 
 ## Modelos-fonte (`RELATORIOS`)

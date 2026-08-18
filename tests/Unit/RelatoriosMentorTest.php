@@ -128,6 +128,18 @@ class RelatoriosMentorTest extends TestCase
         }
     }
 
+    public function test_motor_padrao_e_dompdf_sem_npm(): void
+    {
+        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $ref = new ReflectionClass($downloader);
+
+        $this->assertFalse($ref->getMethod('podeUsarPuppeteer')->invoke($downloader));
+        $this->assertStringContainsString(
+            'dompdf',
+            strtolower((string) $ref->getMethod('motivoSemPuppeteer')->invoke($downloader))
+        );
+    }
+
     public function test_sem_pacote_puppeteer_nao_usa_o_compositor(): void
     {
         $downloader = new CoachReportDownloader('1', false, static function (): void {});
