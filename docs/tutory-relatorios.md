@@ -27,7 +27,20 @@ Performance por assunto aparece só uma vez, na implementação do relatório de
 5. Reprocessa falhas por aluno (até 3 tentativas)
 6. Lista alunos do **admin** (`alunos`) → localiza o PDF `relatorio_consolidado_*` → avalia o desempenho e grava `last_performance` → envia **um único e-mail com 1 anexo** se `recebe_email=true` → **apaga todos os PDFs** da pasta de download (e os `.metricas.json` ao lado). Logs `log_download_*.txt` permanecem.
 
-O renderer individual `scripts/tutory-render-pdf.mjs` (PDFWriter/html2canvas de cada modelo) continua no repositório para uso pontual; o job agendado **não** gera mais cinco PDFs separados.
+O renderer individual `scripts/tutory-render-pdf.mjs` (PDFWriter/html2canvas de cada modelo) continua no repositório para uso pontual. No servidor, o job tenta o compositor Puppeteer; se o PHP não conseguir iniciar o Node (`proc_open` bloqueado ou `node` fora do PATH), monta o mesmo consolidado com **Dompdf + QuickChart** a partir dos HTMLs oficiais já baixados.
+
+## Hostinger / shared hosting
+
+O erro `Não foi possível iniciar Node/Puppeteer (compositor)` significa que o PHP CLI **não encontrou o Node** ou que `proc_open` está em `disable_functions`.
+
+1. No SSH: `which node` (ou `command -v node`)
+2. No `.env`, o caminho **absoluto**:
+   ```env
+   NODE_BINARY=/home/USUARIO/nodevenv/.../bin/node
+   ```
+3. `npm install` na raiz do projeto (baixa o Chromium do Puppeteer)
+
+Mesmo sem Node, o comando deve gerar o PDF pelo fallback PHP. Gráficos Chart.js/ECharts nesse fallback passam pelo QuickChart (`quickchart.io`).
 
 ## Modelos-fonte (`RELATORIOS`)
 

@@ -767,7 +767,20 @@ class CoachReportDownloader
             }
         }
 
-        $node = trim((string) env('NODE_BINARY', 'node')) ?: 'node';
+        $node = $this->binarioNode();
+        if ($node === null) {
+            $this->log("[{$nome}] Node.js não encontrado no PATH do PHP. Defina NODE_BINARY no .env com o caminho absoluto (ex.: /home/USUARIO/nodevenv/.../bin/node). PATH=".$this->pathAtualProcesso());
+
+            return false;
+        }
+
+        $bloqueadas = $this->funcoesProcessoBloqueadas();
+        if ($bloqueadas !== []) {
+            $this->log("[{$nome}] Funções de processo bloqueadas no PHP: ".implode(', ', $bloqueadas));
+
+            return false;
+        }
+
         $cmd = [
             $node,
             $script,
@@ -788,31 +801,18 @@ class CoachReportDownloader
             $cmd[] = $this->bearerToken;
         }
 
-        $this->log("[{$nome}] Compondo relatório único (seções extraídas via Puppeteer)...");
+        $this->log("[{$nome}] Compondo relatório único (Puppeteer via {$node})...");
 
-        $descriptors = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
-        $cwd = function_exists('base_path') ? base_path() : dirname($script, 2);
-        $proc = @proc_open($cmd, $descriptors, $pipes, $cwd, null);
-        if (! is_resource($proc)) {
-            $this->log("[{$nome}] Não foi possível iniciar Node/Puppeteer (compositor)");
+        $resultado = $this->executarProcesso($cmd, function_exists('base_path') ? base_path() : dirname($script, 2));
+        if (! $resultado['iniciou']) {
+            $this->log("[{$nome}] Não foi possível iniciar Node/Puppeteer (compositor): ".$resultado['erro']);
 
             return false;
         }
 
-        fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]) ?: '';
-        $stderr = stream_get_contents($pipes[2]) ?: '';
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        $code = proc_close($proc);
-
-        if ($code !== 0 || ! is_file($destino) || filesize($destino) < 2000) {
-            $detail = trim($stderr !== '' ? $stderr : $stdout);
-            $this->log("[{$nome}] Compositor falhou (exit {$code}): " . $detail);
+        if ($resultado['code'] !== 0 || ! is_file($destino) || filesize($destino) < 2000) {
+            $detail = trim($resultado['stderr'] !== '' ? $resultado['stderr'] : $resultado['stdout']);
+            $this->log("[{$nome}] Compositor falhou (exit {$resultado['code']}): ".$detail);
 
             return false;
         }
@@ -820,6 +820,163 @@ class CoachReportDownloader
         $this->log("[{$nome}] Relatório consolidado salvo: {$destino}");
 
         return true;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function funcoesProcessoBloqueadas(): array
+    {
+        $raw = strtolower((string) ini_get('disable_functions'));
+        if ($raw === '') {
+            return [];
+        }
+        $disabled = array_filter(array_map('trim', explode(',', $raw)));
+        $precisa = ['proc_open', 'proc_close'];
+        $bloqueadas = [];
+        foreach ($precisa as $fn) {
+            if (in_array($fn, $disabled, true) || ! function_exists($fn)) {
+                $bloqueadas[] = $fn;
+            }
+        }
+
+        return $bloqueadas;
+    }
+
+    private function pathAtualProcesso(): string
+    {
+        $path = getenv('PATH');
+
+        return is_string($path) && $path !== '' ? $path : '(vazio)';
+    }
+
+    private function binarioNode(): ?string
+    {
+        $configurado = trim((string) env('NODE_BINARY', ''));
+        $home = rtrim((string) (getenv('HOME') ?: ($_SERVER['HOME'] ?? '')), '/');
+        $candidatos = array_filter([
+            $configurado,
+            'node',
+            'nodejs',
+            '/usr/bin/node',
+            '/usr/local/bin/node',
+            '/opt/alt/alt-nodejs20/root/usr/bin/node',
+            '/opt/alt/alt-nodejs18/root/usr/bin/node',
+            $home !== '' ? $home.'/bin/node' : null,
+        ]);
+
+        foreach ([$home.'/nodevenv', $home.'/.nvm/versions/node'] as $base) {
+            if ($base === '/nodevenv' || $base === '/.nvm/versions/node') {
+                continue;
+            }
+            foreach (glob($base.'/*/bin/node') ?: [] as $found) {
+                $candidatos[] = $found;
+            }
+            foreach (glob($base.'/*/*/bin/node') ?: [] as $found) {
+                $candidatos[] = $found;
+            }
+        }
+
+        foreach ($candidatos as $bin) {
+            $resolvido = $this->resolverExecutavel((string) $bin);
+            if ($resolvido !== null) {
+                return $resolvido;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolverExecutavel(string $bin): ?string
+    {
+        if ($bin === '') {
+            return null;
+        }
+        if (str_contains($bin, '/') || str_starts_with($bin, '.')) {
+            return is_executable($bin) ? $bin : null;
+        }
+
+        $dirs = explode(':', $this->pathAtualProcesso());
+        $home = rtrim((string) (getenv('HOME') ?: ''), '/');
+        array_unshift($dirs, '/usr/local/bin', '/usr/bin', $home !== '' ? $home.'/bin' : '');
+        foreach (array_filter(array_unique($dirs)) as $dir) {
+            $full = rtrim((string) $dir, '/').'/'.$bin;
+            if (is_executable($full)) {
+                return $full;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<string>  $cmd
+     * @return array{iniciou: bool, code: int, stdout: string, stderr: string, erro: string}
+     */
+    private function executarProcesso(array $cmd, string $cwd): array
+    {
+        $vazio = [
+            'iniciou' => false,
+            'code' => -1,
+            'stdout' => '',
+            'stderr' => '',
+            'erro' => '',
+        ];
+        if (! function_exists('proc_open')) {
+            $vazio['erro'] = 'proc_open() indisponível neste PHP';
+
+            return $vazio;
+        }
+
+        $env = [];
+        foreach (['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TMPDIR', 'TMP', 'TEMP'] as $key) {
+            $val = getenv($key);
+            if (is_string($val) && $val !== '') {
+                $env[$key] = $val;
+            }
+        }
+        $env['PATH'] = '/usr/local/bin:/usr/bin:/bin:'.($env['PATH'] ?? '');
+        if (isset($env['HOME']) && $env['HOME'] !== '') {
+            $env['PATH'] = $env['HOME'].'/bin:'.$env['PATH'];
+        }
+
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $pipes = [];
+        $erro = '';
+        set_error_handler(static function (int $severity, string $message) use (&$erro): bool {
+            $erro = $message;
+
+            return true;
+        });
+        try {
+            $proc = proc_open($cmd, $descriptors, $pipes, $cwd, $env);
+        } finally {
+            restore_error_handler();
+        }
+
+        if (! is_resource($proc)) {
+            $vazio['erro'] = $erro !== '' ? $erro : 'proc_open retornou false';
+
+            return $vazio;
+        }
+
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]) ?: '';
+        $stderr = stream_get_contents($pipes[2]) ?: '';
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return [
+            'iniciou' => true,
+            'code' => proc_close($proc),
+            'stdout' => $stdout,
+            'stderr' => $stderr,
+            'erro' => '',
+        ];
     }
 
     /**
@@ -851,6 +1008,364 @@ class CoachReportDownloader
         ];
         file_put_contents($sidecar, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         $this->log('Métricas de desempenho (consolidado) salvas: '.$sidecar);
+    }
+
+    /**
+     * Fallback sem Node: monta o PDF consolidado com Dompdf + QuickChart
+     * a partir dos HTMLs oficiais já baixados.
+     *
+     * @param  array<string, string>  $htmlPorModelo
+     */
+    private function gerarPdfConsolidadoDoHtml(string $nome, array $htmlPorModelo, string $destino): bool
+    {
+        $this->log("[{$nome}] Fallback Dompdf: compondo o consolidado a partir dos HTMLs oficiais...");
+
+        $desempenho = $htmlPorModelo['desempenho'] ?? '';
+        $aluno = $htmlPorModelo['aluno'] ?? '';
+        $horas = $htmlPorModelo['horas-liquidas'] ?? '';
+        $questoes = $htmlPorModelo['questoes'] ?? '';
+        $progresso = $htmlPorModelo['progresso'] ?? '';
+
+        $xpDes = $this->loadDom($desempenho);
+        $xpAluno = $this->loadDom($aluno);
+        $xpHoras = $this->loadDom($horas);
+        $xpQuestoes = $this->loadDom($questoes);
+        $xpProgresso = $this->loadDom($progresso);
+
+        $header = $this->montarHtmlCabecalhoDesempenho($xpDes);
+        $metrics = $this->montarHtmlMetricasDesempenho($xpDes);
+        $chartHorasEstudo = $this->chartDesempenhoHorasEstudo($desempenho);
+        $chartPerformance = $this->chartDesempenhoPerformance($desempenho);
+        $estudos = $this->htmlTabelaPorId($xpAluno, 'tabela_estudos');
+        $revisoes = $this->htmlTabelaPorId($xpAluno, 'tabela_revisoes');
+        $revisoesLinhas = $this->contarLinhasTabela($xpAluno, 'tabela_revisoes');
+        $chartTempo = $this->chartImgHtml($horas, 'chart_line_comparativo', null);
+        $historicoHoras = $this->htmlTabelaPorId($xpHoras, 'tabela_horas_liquidas');
+        $panoramaQuestoes = $this->montarHtmlPanorama($xpQuestoes);
+        $chartQuestoes = $this->chartImgHtml($questoes, 'chart_questoes_dia', null);
+        $assuntos = $this->montarHtmlAssuntos($xpQuestoes);
+        $chartMotivacao = $this->chartImgHtml($progresso, 'chart_horas_diarias', null);
+        $insights = $this->montarHtmlMotivacaoProgresso($xpProgresso);
+
+        $descEstudos = htmlspecialchars($this->xpathText($xpAluno, "//h2[contains(@class,'section-5')]/following-sibling::p[1]")
+            ?: 'Histórico de metas cumpridas neste período', ENT_QUOTES, 'UTF-8');
+        $descRevisoes = htmlspecialchars($this->xpathText($xpAluno, "//h2[contains(@class,'section-4')]/following-sibling::p[1]")
+            ?: 'Revisões registradas no período', ENT_QUOTES, 'UTF-8');
+        $descTempo = htmlspecialchars($this->xpathText($xpHoras, "//h2[contains(@class,'section-2')]/following-sibling::p[1]")
+            ?: 'Comparativo entre horas brutas e horas líquidas', ENT_QUOTES, 'UTF-8');
+        $descHistHoras = htmlspecialchars($this->xpathText($xpHoras, "//h2[contains(@class,'section-4')]/following-sibling::p[1]")
+            ?: 'Histórico de horas cronometradas', ENT_QUOTES, 'UTF-8');
+        $descQuestoes = htmlspecialchars($this->xpathText($xpQuestoes, "//h2[contains(@class,'section-1')]/following-sibling::p[1]")
+            ?: 'Desempenho de questões no período', ENT_QUOTES, 'UTF-8');
+        $descAssuntos = htmlspecialchars($this->xpathText($xpQuestoes, "//h2[contains(@class,'section-4')]/following-sibling::p[1]")
+            ?: 'Desempenho de questões por assunto', ENT_QUOTES, 'UTF-8');
+        $descMotivacao = htmlspecialchars($this->xpathText($xpProgresso, "//*[contains(@class,'section-3-1')]")
+            ?: 'Comparativo das horas por dia com o horário atual', ENT_QUOTES, 'UTF-8');
+
+        $revisoesBloco = $revisoesLinhas > 0
+            ? $revisoes
+            : $revisoes.'<p class="empty">Nenhuma revisão registrada neste período.</p>';
+
+        $logoHtml = $this->montarHtmlLogoPdf();
+        $fontCss = $this->cssFamiliaFontePdf();
+        $pieCss = $this->cssChartPie();
+        $seguroNome = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
+
+        $pdfHtml = <<<HTML
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+body{font-family: {$fontCss}; font-size:12px; color:#1F2937; margin:20px; background:#F5F5F5;}
+.logo{text-align:center; margin:0 0 14px; color:#000; font-weight:bold; line-height:0.95;}
+.logo .l1{font-size:18pt; letter-spacing:2pt;}
+.logo .l2{font-size:16pt; letter-spacing:1pt;}
+.card{background:#fff; border-radius:12px; padding:14px 16px; margin:0 0 14px; border:1px solid #E5E7EB;}
+.kicker{font-size:10px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; color:#6B7280; margin:16px 0 6px;}
+h1{font-size:20px; margin:0 0 6px; padding-left:10px; border-left:4px solid #F4B942;}
+h2{font-size:15px; margin:0 0 6px; padding-left:10px; border-left:4px solid #F4B942;}
+.muted{color:#6B7280; margin:0 0 10px;}
+.metrics{width:100%; border-collapse:separate; border-spacing:8px 0; table-layout:fixed;}
+.metrics td{background:#fff; border:1px solid #E5E7EB; border-radius:8px; padding:10px; vertical-align:top;}
+.metrics .label{color:#6B7280; font-size:10px; margin:0 0 6px;}
+.metrics .value{font-size:16px; font-weight:bold; margin:0;}
+.two{width:100%; border-collapse:collapse;}
+.two td{width:50%; vertical-align:top; padding:4px;}
+.chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
+{$pieCss}
+table.data{width:100%; border-collapse:collapse; font-size:10px;}
+table.data thead td{background:#3264ff; color:#fff; font-weight:bold; padding:6px;}
+table.data tbody td{border-bottom:1px solid #eee; padding:6px; vertical-align:top;}
+.insights{border:3px solid #3264ff; border-radius:12px; padding:16px 18px; background:#fff; margin:8px 0 16px;}
+.insights h3{margin:0 0 10px; color:#3264ff; font-size:16px;}
+.insights p{margin:0 0 8px; font-size:13px; line-height:1.45;}
+.empty{color:#9CA3AF; text-align:center; font-size:12px; padding:8px;}
+.keep{page-break-inside:avoid;}
+</style></head><body>
+{$logoHtml}
+<div class="card keep">{$header}{$metrics}</div>
+<div class="kicker">Desempenho</div>
+<table class="two"><tr>
+  <td class="card"><h2>Horas de estudo</h2>{$chartHorasEstudo}</td>
+  <td class="card"><h2>Performance por Área</h2>{$chartPerformance}</td>
+</tr></table>
+<div class="kicker">Estudos</div>
+<div class="card">
+  <h2>Histórico de Metas</h2>
+  <p class="muted">{$descEstudos}</p>
+  {$estudos}
+</div>
+<div class="kicker">Revisões no período</div>
+<div class="card">
+  <h2>Revisões no Período</h2>
+  <p class="muted">{$descRevisoes}</p>
+  {$revisoesBloco}
+</div>
+<div class="kicker">Horas líquidas · desempenho ao longo do tempo</div>
+<div class="card">
+  <h2>Desempenho ao longo do Tempo</h2>
+  <p class="muted">{$descTempo}</p>
+  {$chartTempo}
+</div>
+<div class="kicker">Horas líquidas · histórico</div>
+<div class="card">
+  <h2>Histórico</h2>
+  <p class="muted">{$descHistHoras}</p>
+  {$historicoHoras}
+</div>
+<div class="kicker">Questões</div>
+<div class="card">
+  <h2>Breve Panorama</h2>
+  <p class="muted">{$descQuestoes}</p>
+  {$panoramaQuestoes}
+  {$chartQuestoes}
+</div>
+<div class="card">
+  <h2>Performance por assunto</h2>
+  <p class="muted">{$descAssuntos}</p>
+  {$assuntos}
+</div>
+<div class="kicker">Progresso no plano · motivação</div>
+<div class="card">
+  <h2>Motivação</h2>
+  <p class="muted">{$descMotivacao}</p>
+  {$chartMotivacao}
+</div>
+<div class="insights keep">
+  <h3>Painel de Insights</h3>
+  {$insights}
+</div>
+<p class="empty">Relatório consolidado de {$seguroNome}</p>
+</body></html>
+HTML;
+
+        try {
+            $dompdf = new Dompdf($this->opcoesDompdf());
+            $dompdf->loadHtml($pdfHtml, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            $bytes = $dompdf->output() ?? '';
+            if ($bytes === '' || strlen($bytes) < 500) {
+                $this->log("[{$nome}] Fallback Dompdf gerou PDF vazio");
+
+                return false;
+            }
+            file_put_contents($destino, $bytes);
+            $this->log("[{$nome}] Relatório consolidado (Dompdf) salvo: {$destino}");
+
+            return true;
+        } catch (Throwable $exc) {
+            $this->log("[{$nome}] Erro Dompdf (consolidado): ".$exc->getMessage());
+
+            return false;
+        }
+    }
+
+    private function montarHtmlCabecalhoDesempenho(DOMXPath $xp): string
+    {
+        $titulo = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' title-section ')]//h1")
+            ?: 'Seu desempenho';
+        $subtitulo = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' title-section ')]//p");
+        $aluno = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' aluno-details ')]//h4");
+        $curso = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' aluno-details ')]//p");
+
+        $out = '<h1>'.htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</h1>';
+        if ($subtitulo !== '') {
+            $out .= '<p class="muted">'.htmlspecialchars($subtitulo, ENT_QUOTES, 'UTF-8').'</p>';
+        }
+        if ($aluno !== '') {
+            $out .= '<p><b>'.htmlspecialchars($aluno, ENT_QUOTES, 'UTF-8').'</b></p>';
+        }
+        if ($curso !== '') {
+            $out .= '<p class="muted">'.htmlspecialchars($curso, ENT_QUOTES, 'UTF-8').'</p>';
+        }
+
+        return $out;
+    }
+
+    private function montarHtmlMetricasDesempenho(DOMXPath $xp): string
+    {
+        $cards = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' metric-card ')]");
+        if ($cards === false || $cards->length === 0) {
+            return '';
+        }
+        $cells = '';
+        foreach ($cards as $card) {
+            if (! $card instanceof DOMElement) {
+                continue;
+            }
+            $label = '';
+            $value = '';
+            foreach ($card->getElementsByTagName('p') as $p) {
+                $class = ' '.$p->getAttribute('class').' ';
+                $txt = trim((string) $p->textContent);
+                if (str_contains($class, ' metric-label ')) {
+                    $label = $txt;
+                }
+                if (str_contains($class, ' metric-value ')) {
+                    $value = $txt;
+                }
+            }
+            if ($label === '' && $value === '') {
+                continue;
+            }
+            $cells .= '<td><div class="label">'.htmlspecialchars($label, ENT_QUOTES, 'UTF-8').'</div>'
+                .'<div class="value">'.htmlspecialchars($value, ENT_QUOTES, 'UTF-8').'</div></td>';
+        }
+
+        return $cells !== '' ? '<table class="metrics"><tr>'.$cells.'</tr></table>' : '';
+    }
+
+    private function htmlTabelaPorId(DOMXPath $xp, string $id): string
+    {
+        $nodes = $xp->query('//*[@id="'.$id.'"]');
+        if ($nodes === false || $nodes->length === 0) {
+            return '<p class="empty">(Tabela indisponível)</p>';
+        }
+        $table = $nodes->item(0);
+        if (! $table instanceof DOMElement || $table->ownerDocument === null) {
+            return '<p class="empty">(Tabela indisponível)</p>';
+        }
+        $html = $table->ownerDocument->saveHTML($table) ?: '';
+        if ($html === '') {
+            return '<p class="empty">(Tabela vazia)</p>';
+        }
+
+        return str_replace('<table', '<table class="data"', $html);
+    }
+
+    private function contarLinhasTabela(DOMXPath $xp, string $id): int
+    {
+        $rows = $xp->query('//*[@id="'.$id.'"]//tbody/tr');
+
+        return $rows === false ? 0 : $rows->length;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extrairChartDataDesempenho(string $html): array
+    {
+        $pos = strpos($html, 'var chartData');
+        if ($pos === false) {
+            return [];
+        }
+        $start = strpos($html, '{', $pos);
+        if ($start === false) {
+            return [];
+        }
+        $js = $this->extrairObjetoJsBalanceado($html, $start);
+        if ($js === null) {
+            return [];
+        }
+        $json = preg_replace('/([{\[,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/', '$1"$2":', $js) ?? $js;
+        $json = str_replace("'", '"', $json);
+        $json = preg_replace('/,\s*([}\]])/', '$1', $json) ?? $json;
+        $data = json_decode($json, true);
+
+        return is_array($data) ? $data : [];
+    }
+
+    private function chartDesempenhoHorasEstudo(string $html): string
+    {
+        $data = $this->extrairChartDataDesempenho($html);
+        $horas = is_array($data['horasEstudo'] ?? null) ? $data['horasEstudo'] : [];
+        $labels = is_array($horas['labels'] ?? null) ? $horas['labels'] : [];
+        $serie = is_array($horas['horas'] ?? null) ? $horas['horas'] : [];
+        $mediaMap = is_array($horas['mediaTopAlunos'] ?? null) ? $horas['mediaTopAlunos'] : [];
+        if ($labels === []) {
+            return '<p class="empty">(Horas de estudo sem dados no período)</p>';
+        }
+        $media = [];
+        foreach ($labels as $label) {
+            $key = is_scalar($label) ? (string) $label : '';
+            $media[] = isset($mediaMap[$key]) ? $mediaMap[$key] : 0;
+        }
+        $cfg = [
+            'type' => 'bar',
+            'data' => [
+                'labels' => $labels,
+                'datasets' => [
+                    [
+                        'label' => 'Você',
+                        'data' => $serie,
+                        'backgroundColor' => '#3B82F6',
+                    ],
+                    [
+                        'type' => 'line',
+                        'label' => 'Top 10 alunos (média)',
+                        'data' => $media,
+                        'borderColor' => '#22C55E',
+                        'fill' => false,
+                        'pointRadius' => 0,
+                    ],
+                ],
+            ],
+            'options' => [
+                'legend' => ['display' => true],
+                'scales' => [
+                    'yAxes' => [['ticks' => ['beginAtZero' => true]]],
+                ],
+            ],
+        ];
+        $cfg = $this->aplicarDatalabelsOficiais($cfg, 'chart_horas_estudo');
+        $img = $this->quickChartPngDataUri($cfg);
+
+        return $img !== null
+            ? '<img class="chart" src="'.$img.'" />'
+            : '<p class="empty">(Gráfico de horas de estudo indisponível)</p>';
+    }
+
+    private function chartDesempenhoPerformance(string $html): string
+    {
+        $data = $this->extrairChartDataDesempenho($html);
+        $perf = is_array($data['performance'] ?? null) ? $data['performance'] : [];
+        $labels = is_array($perf['disciplinas'] ?? null) ? $perf['disciplinas'] : [];
+        $valores = is_array($perf['valores'] ?? null) ? $perf['valores'] : [];
+        if ($labels === []) {
+            return '<p class="empty">(Performance por área sem dados no período)</p>';
+        }
+        $cfg = [
+            'type' => 'radar',
+            'data' => [
+                'labels' => $labels,
+                'datasets' => [[
+                    'label' => 'Performance',
+                    'data' => $valores,
+                    'backgroundColor' => 'rgba(50, 100, 255, 0.2)',
+                    'borderColor' => '#3264ff',
+                ]],
+            ],
+            'options' => [
+                'legend' => ['display' => false],
+                'scale' => [
+                    'ticks' => ['beginAtZero' => true, 'max' => 100],
+                ],
+            ],
+        ];
+        $img = $this->quickChartPngDataUri($cfg);
+
+        return $img !== null
+            ? '<img class="chart" src="'.$img.'" />'
+            : '<p class="empty">(Gráfico de performance indisponível)</p>';
     }
 
     private function caminhoDestinoPdf(string $nomeAluno, string $model = 'questoes', ?string $id = null): string
@@ -2146,6 +2661,7 @@ HTML;
             'chart_horas_diarias',
             'chart_top_disciplinas',
             'chart_pizza_modalidades',
+            'chart_horas_estudo',
         ], true);
     }
 
@@ -2639,16 +3155,15 @@ HTML;
         }
 
         $destino = $this->caminhoDestinoPdf($nome, 'consolidado', $aluno['id']);
-        $ok = false;
-        for ($tentativa = 1; $tentativa <= 2; $tentativa++) {
-            if ($this->gerarPdfConsolidadoComPuppeteer($nome, $urls, $destino)) {
-                $ok = true;
-                break;
-            }
-            $this->log("[{$nome}] Composição tentativa {$tentativa}/2 falhou");
+        $ok = $this->gerarPdfConsolidadoComPuppeteer($nome, $urls, $destino);
+        if (! $ok) {
+            $this->log("[{$nome}] Puppeteer indisponível neste servidor — usando fallback PHP/Dompdf");
             @unlink($destino);
+            $ok = $this->gerarPdfConsolidadoDoHtml($nome, $htmls, $destino);
         }
         if (! $ok) {
+            @unlink($destino);
+
             return null;
         }
 
