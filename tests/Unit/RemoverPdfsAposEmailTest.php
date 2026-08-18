@@ -65,8 +65,14 @@ class RemoverPdfsAposEmailTest extends TestCase
 
         $pdfQuestoes = $this->pasta.'/relatorio_questoes_20260815_1200_Giovanna_1.pdf';
         $pdfProgresso = $this->pasta.'/relatorio_progresso_20260815_1200_Giovanna_1.pdf';
+        $pdfDesempenho = $this->pasta.'/relatorio_desempenho_20260815_1200_Giovanna_1.pdf';
+        $pdfEstudos = $this->pasta.'/relatorio_aluno_20260815_1200_Giovanna_1.pdf';
+        $pdfHoras = $this->pasta.'/relatorio_horas-liquidas_20260815_1200_Giovanna_1.pdf';
         file_put_contents($pdfQuestoes, '%PDF-1.4 fake');
         file_put_contents($pdfProgresso, '%PDF-1.4 fake');
+        file_put_contents($pdfDesempenho, '%PDF-1.4 fake');
+        file_put_contents($pdfEstudos, '%PDF-1.4 fake');
+        file_put_contents($pdfHoras, '%PDF-1.4 fake');
 
         $this->chamar('enviarEmailsDosAlunos', $this->downloader());
 
@@ -75,6 +81,9 @@ class RemoverPdfsAposEmailTest extends TestCase
         });
         $this->assertFileDoesNotExist($pdfQuestoes);
         $this->assertFileDoesNotExist($pdfProgresso);
+        $this->assertFileDoesNotExist($pdfDesempenho);
+        $this->assertFileDoesNotExist($pdfEstudos);
+        $this->assertFileDoesNotExist($pdfHoras);
     }
 
     public function test_apaga_pdfs_mesmo_quando_email_e_pulado(): void

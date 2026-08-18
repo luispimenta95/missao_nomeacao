@@ -9,7 +9,7 @@
  *   node scripts/tutory-render-pdf.mjs \
  *     --url "https://admin.tutory.com.br/documentos/relatorios/questoes?key=..." \
  *     --out "/path/relatorio.pdf" \
- *     [--model questoes|progresso] \
+ *     [--model questoes|progresso|aluno|horas-liquidas|desempenho] \
  *     [--cookie "PHPSESSID=..."] \
  *     [--token "BearerToken"]
  */
@@ -36,7 +36,7 @@ const cookieHeader = arg('cookie', '');
 const token = arg('token', '');
 
 if (!url || !out) {
-  console.error('Uso: node scripts/tutory-render-pdf.mjs --url URL --out FILE [--model questoes|progresso] [--cookie PHPSESSID=..] [--token TOKEN]');
+  console.error('Uso: node scripts/tutory-render-pdf.mjs --url URL --out FILE [--model questoes|progresso|aluno|horas-liquidas|desempenho] [--cookie PHPSESSID=..] [--token TOKEN]');
   process.exit(1);
 }
 
@@ -581,7 +581,7 @@ try {
   });
 
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
-  await page.waitForSelector('#btn_save', { timeout: 60000 });
+  await page.waitForSelector('#btn_save, #btn_download', { timeout: 60000 });
 
   if (model === 'progresso') {
     // Espera DADOS de TODOS os gráficos usados pelo PDFWriter (págs 1–9).
@@ -624,6 +624,73 @@ try {
         && chartReady('chart_progresso_resumo', 1)
         && chartReady('chart_progresso_revisao', 1)
         && chartReady('chart_progresso_exercicio', 1);
+    }, { timeout: 120000 });
+  } else if (model === 'aluno') {
+    await page.waitForFunction(() => {
+      if (!window.Chart || !Chart.instances) return false;
+      function findChartByCanvasId(id) {
+        for (const k of Object.keys(Chart.instances)) {
+          const inst = Chart.instances[k];
+          const canvas = inst.canvas || (inst.chart && inst.chart.canvas) || (inst.ctx && inst.ctx.canvas);
+          if (canvas && canvas.id === id) return inst.chart || inst;
+        }
+        return null;
+      }
+      function chartReady(id) {
+        const ch = findChartByCanvasId(id);
+        if (!ch) return false;
+        const canvas = ch.canvas || (ch.chart && ch.chart.canvas);
+        return canvas && (canvas.width || 0) >= 10;
+      }
+      return chartReady('chart_top_disciplina')
+        && chartReady('chart_pie_modalidade')
+        && chartReady('chart_tempo_dia')
+        && chartReady('chart_acertos')
+        && chartReady('chart_questoes_disciplina')
+        && chartReady('chart_pie_questoes')
+        && document.querySelectorAll('.row-numbers h5').length >= 1;
+    }, { timeout: 120000 });
+  } else if (model === 'horas-liquidas') {
+    await page.waitForFunction(() => {
+      if (!window.Chart || !Chart.instances) return false;
+      function findChartByCanvasId(id) {
+        for (const k of Object.keys(Chart.instances)) {
+          const inst = Chart.instances[k];
+          const canvas = inst.canvas || (inst.chart && inst.chart.canvas) || (inst.ctx && inst.ctx.canvas);
+          if (canvas && canvas.id === id) return inst.chart || inst;
+        }
+        return null;
+      }
+      function chartReady(id) {
+        const ch = findChartByCanvasId(id);
+        if (!ch) return false;
+        const canvas = ch.canvas || (ch.chart && ch.chart.canvas);
+        return canvas && (canvas.width || 0) >= 10;
+      }
+      return chartReady('chart_pie_horas_disciplina')
+        && chartReady('chart_line_comparativo')
+        && chartReady('chart_line_progresso_disciplinas')
+        && document.getElementById('tabela_horas_liquidas');
+    }, { timeout: 120000 });
+  } else if (model === 'desempenho') {
+    await page.waitForFunction(() => {
+      if (typeof echarts === 'undefined' || typeof html2canvas !== 'function') return false;
+      if (!document.getElementById('btn_download')) return false;
+      if (!document.querySelector('.main-header-card') || !document.querySelector('.metrics-grid')) return false;
+      const ids = [
+        'chart_panorama',
+        'chart_progresso_mensal',
+        'chart_modalidades',
+        'chart_progresso_disciplina',
+        'chart_horas_estudo',
+        'chart_performance',
+      ];
+      return ids.every((id) => {
+        const el = document.getElementById(id);
+        if (!el) return false;
+        const canvas = el.querySelector('canvas');
+        return canvas && (canvas.width || 0) > 10;
+      });
     }, { timeout: 120000 });
   } else {
     await page.waitForSelector('#chart_questoes_dia', { timeout: 60000 });
@@ -707,6 +774,15 @@ try {
       'chart_linha_evolucao_questoes',
       'chart_progresso_estudo',
       'chart_questoes_dia',
+      'chart_top_disciplina',
+      'chart_pie_modalidade',
+      'chart_tempo_dia',
+      'chart_acertos',
+      'chart_questoes_disciplina',
+      'chart_pie_questoes',
+      'chart_pie_horas_disciplina',
+      'chart_line_comparativo',
+      'chart_line_progresso_disciplinas',
     ]) {
       const ch = findChartByCanvasId(id);
       if (!ch || !ch.data) continue;
@@ -749,9 +825,18 @@ try {
   let filename = path.basename(outAbs);
 
   try {
-    await page.evaluate(stripPercentFromHoursCharts);
     await page.evaluate(aplicarDatasBrasileiras);
-    await page.evaluate((reportModel) => {
+    if (model === 'desempenho') {
+      await page.evaluate(() => {
+        const btn = document.getElementById('btn_download');
+        if (!btn) {
+          throw new Error('btn_download não encontrado na página de Desempenho');
+        }
+        btn.click();
+      });
+    } else {
+      await page.evaluate(stripPercentFromHoursCharts);
+      await page.evaluate((reportModel) => {
       if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
         throw new Error('PDFWriter não encontrado na página');
       }
@@ -780,7 +865,7 @@ try {
         if (!tx || !tx.data || !tx.data.labels || tx.data.labels.length < 2) {
           throw new Error('chart_tx_acerto incompleto (página 4)');
         }
-      } else {
+      } else if (reportModel === 'questoes') {
         const panoramaOk = document.querySelectorAll('.main-numbers h3').length >= 3;
         const assuntosOk = document.querySelectorAll('#tabela_questoes tbody tr').length > 0;
         if (!panoramaOk || !assuntosOk) {
@@ -837,20 +922,56 @@ try {
       }
       PDFWriter.output();
     }, model);
+    }
 
     const downloaded = await waitForDownload(downloadDir, 120000);
     if (!downloaded) {
       throw new Error('Timeout aguardando download do PDFWriter');
     }
     fs.copyFileSync(downloaded, outAbs);
-    via = 'PDFWriter-download';
+    via = model === 'desempenho' ? 'html2canvas-download' : 'PDFWriter-download';
     filename = path.basename(downloaded);
   } catch (downloadErr) {
-    // Fallback base64 do mesmo PDFWriter (NÃO usar page.pdf — gráficos saem errados)
+    // Fallback base64 (NÃO usar page.pdf — gráficos saem errados)
     try {
-      await page.evaluate(stripPercentFromHoursCharts);
       await page.evaluate(aplicarDatasBrasileiras);
-      const pdfBase64 = await page.evaluate(async () => {
+      let pdfBase64;
+      if (model === 'desempenho') {
+        pdfBase64 = await page.evaluate(async () => {
+          const JsPDF = window.jspdf && window.jspdf.jsPDF;
+          if (!JsPDF) {
+            throw new Error('jsPDF UMD não encontrado na página de Desempenho');
+          }
+          return await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Timeout gerando PDF desempenho base64')), 120000);
+            const proto = JsPDF.prototype;
+            const origSave = proto.save;
+            proto.save = function patchedSave(name) {
+              try {
+                const dataUri = this.output('datauristring');
+                const base64 = dataUri.split(',')[1] || '';
+                proto.save = origSave;
+                clearTimeout(timeout);
+                resolve({ filename: name || 'desempenho.pdf', base64 });
+              } catch (err) {
+                proto.save = origSave;
+                clearTimeout(timeout);
+                reject(err);
+              }
+            };
+            const btn = document.getElementById('btn_download');
+            if (!btn) {
+              proto.save = origSave;
+              clearTimeout(timeout);
+              reject(new Error('btn_download não encontrado'));
+              return;
+            }
+            btn.click();
+          });
+        });
+      } else {
+        await page.evaluate(stripPercentFromHoursCharts);
+        pdfBase64 = await page.evaluate(async () => {
         if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
           throw new Error('PDFWriter não encontrado na página');
         }
@@ -891,13 +1012,14 @@ try {
           }
         });
       });
+      }
 
       const buf = Buffer.from(pdfBase64.base64, 'base64');
       if (buf.length < 500) {
         throw new Error(`PDF base64 vazio (${buf.length} bytes)`);
       }
       fs.writeFileSync(outAbs, buf);
-      via = 'PDFWriter-base64';
+      via = model === 'desempenho' ? 'html2canvas-base64' : 'PDFWriter-base64';
       filename = pdfBase64.filename || filename;
     } catch (base64Err) {
       throw new Error(
