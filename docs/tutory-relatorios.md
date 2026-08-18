@@ -1,20 +1,35 @@
 # Relatórios do Coach (Tutory)
 
-CLI PHP **HTTP + Puppeteer** que baixa os relatórios do Coach dos alunos **ativos** no Tutory e envia os PDFs por e-mail aos alunos cadastrados no admin (`recebe_email=true`).
+CLI PHP **HTTP + Puppeteer** que baixa os relatórios do Coach dos alunos **ativos** no Tutory, **consolida as seções pedidas em um único PDF** e envia por e-mail aos alunos cadastrados no admin (`recebe_email=true`).
+
+## O que entra no PDF único
+
+Não é a junção dos cinco PDFs oficiais. O compositor abre cada página do Tutory, espera os gráficos reais e recorta só os blocos abaixo, reusando o CSS/layout moderno do **Desempenho (NOVO)**.
+
+| Origem | Seções extraídas | Fora do consolidado |
+|--------|------------------|---------------------|
+| **Desempenho (NOVO)** `desempenho` | Cabeçalho do aluno (`.main-header-card`) + cards de métricas (`.metrics-grid`) + as duas colunas Horas de estudo / Performance por Área (último `.two-col-grid`) | Ranking, panorama, progresso mensal, modalidades, progresso por disciplina, insights desse relatório, rodapé |
+| **Estudos** `aluno` | Histórico de Metas (`#tabela_estudos`) e Revisões no Período (`#tabela_revisoes`, omitido/avisado se vazio) | Panorama, gráficos de questões, performance por assunto (duplicata) |
+| **Horas Líquidas** `horas-liquidas` | Desempenho ao longo do Tempo (`#chart_line_comparativo`) e Histórico (`#tabela_horas_liquidas`) | Pizza por disciplina, progresso por disciplina |
+| **Questões** `questoes` | Breve Panorama (`.main-numbers`), gráfico principal (`#chart_questoes_dia`) e Performance por assunto (`#tabela_questoes`) | Bolha, top melhores/piores, evolução por matéria |
+| **Progresso do plano** `progresso` | Motivação (`#chart_horas_diarias`) e **Painel de Insights** (`.insights-panel`, em destaque visual) | Progresso principal, panorama, modalidades, desempenho de questões |
+
+Performance por assunto aparece só uma vez, na implementação do relatório de Questões.
 
 ## Fluxo
 
 1. `POST /intent/login` → sessão + Bearer (`adminUser.token`)
 2. `GET /alunos/consulta?status=ativos` → `data-id` de cada aluno
-3. Para **cada modelo** no array `RELATORIOS` (mesmo fluxo):
+3. Para **cada modelo** em `RELATORIOS` (mesmo token de geração):
    1. `POST /intent/cadastrar-relatorio-coach` (`alunos[]`, `dt_ini`, `dt_fim`, `agrupamento=dia`)
-   2. `GET /documentos/relatorios/{model}?key=...`
-   3. PDF oficial via **Puppeteer**: `PDFWriter.output()` (questões, progresso, estudos, horas líquidas) ou html2canvas/`#btn_download` (desempenho)
-   4. Fallback **Dompdf** + QuickChart se Node/Puppeteer falhar (`questoes` e `progresso`). No progresso, configs Chart.js com `backgroundColor: chartColors` são expandidas para cores fixas antes do QuickChart (Panorama, pizza e barras das páginas 2/4/5).
-4. Reprocessa falhas por aluno+modelo (até 3 tentativas)
-5. Lista alunos do **admin** (`alunos`) → localiza PDFs em `public/pdfs` pelo nome → avalia o desempenho e grava `last_performance` (nível em português do último relatório) → envia **um único e-mail** com todos os PDFs em anexo se `recebe_email=true` → **apaga todos os PDFs** da pasta de download (e os `.metricas.json` ao lado). Logs `log_download_*.txt` permanecem.
+   2. `GET /documentos/relatorios/{model}?key=...` (HTML oficial; as páginas do Tutory **não são alteradas**)
+4. `scripts/tutory-compose-pdf.mjs` abre as 5 URLs, rasteriza Chart.js/ECharts e imprime **um** PDF
+5. Reprocessa falhas por aluno (até 3 tentativas)
+6. Lista alunos do **admin** (`alunos`) → localiza o PDF `relatorio_consolidado_*` → avalia o desempenho e grava `last_performance` → envia **um único e-mail com 1 anexo** se `recebe_email=true` → **apaga todos os PDFs** da pasta de download (e os `.metricas.json` ao lado). Logs `log_download_*.txt` permanecem.
 
-## Modelos (`RELATORIOS`)
+O renderer individual `scripts/tutory-render-pdf.mjs` (PDFWriter/html2canvas de cada modelo) continua no repositório para uso pontual; o job agendado **não** gera mais cinco PDFs separados.
+
+## Modelos-fonte (`RELATORIOS`)
 
 Definidos em `CoachReportDownloader::RELATORIOS`:
 
@@ -28,14 +43,11 @@ Definidos em `CoachReportDownloader::RELATORIOS`:
 
 Os cinco modelos são os botões de `#modalGeraRelatorio` em Pesquisar Alunos. O token gerado em `cadastrar-relatorio-coach` vale para todos: muda só o segmento `/documentos/relatorios/{model}`.
 
-Desempenho (NOVO) gera o PDF com html2canvas + jsPDF (`#btn_download`). Os demais usam o `PDFWriter` do botão Baixar (`#btn_save`).
-
 ## Requisitos
 
 - PHP 8.2+
 - Node.js 18+ com `puppeteer` (`npm install`) — Chromium baixado pelo Puppeteer
 - Rede para `admin.tutory.com.br`
-- (Fallback Dompdf, só questões) extensão **gd** + acesso a `quickchart.io`
 - SMTP configurado (`MAIL_*`) para envio dos relatórios
 - Alunos cadastrados em `/admin/alunos` com o **mesmo nome** usado no Tutory (para casar o PDF)
 
@@ -69,17 +81,16 @@ php artisan tutory:baixar-relatorios --periodo=1 --teste
 php artisan tutory:baixar-relatorios --periodo=2 --teste
 ```
 
-Os PDFs já gerados **não são reescritos**: rode de novo o comando acima para sair com datas em `dd/mm/aaaa`.
+Arquivo gerado: `relatorio_consolidado_{Ymd_Hi}_{aluno}_{periodo}.pdf`  
+Exemplo: `relatorio_consolidado_20260818_2230_Giovanna_1.pdf`
 
-Arquivo gerado: `relatorio_{model}_{Ymd_Hi}_{aluno}_{periodo}.pdf`  
-Exemplos:
-- `relatorio_questoes_20260721_1830_Giovanna_1.pdf`
-- `relatorio_progresso_20260721_1830_Giovanna_1.pdf`
-- `relatorio_desempenho_20260721_1830_Giovanna_1.pdf`
-- `relatorio_aluno_20260721_1830_Giovanna_1.pdf`
-- `relatorio_horas-liquidas_20260721_1830_Giovanna_1.pdf`
+O envio de e-mail anexa o PDF consolidado mais recente do aluno para o `--periodo` informado. Depois do envio, **todos os PDFs da pasta são apagados**.
 
-O envio de e-mail anexa o PDF mais recente de **cada modelo** do aluno para o `--periodo` informado (aceita pequenas diferenças de digitação no nome). Depois do envio, **todos os PDFs da pasta são apagados**.
+Para renderizar um modelo isolado (debug, não usado no e-mail):
+
+```bash
+node scripts/tutory-render-pdf.mjs --url "https://admin.tutory.com.br/documentos/relatorios/questoes?key=..." --out /tmp/q.pdf --model questoes
+```
 
 ## Agendamento (Laravel Scheduler)
 
@@ -101,6 +112,8 @@ Conferir: `php artisan schedule:list`
 ## Gestão de desempenho (admin)
 
 Em `/admin/desempenho` o mentor edita as **faixas e textos** dos eixos do documento de parâmetros. O e-mail do aluno recebe um bloco por eixo aplicável.
+
+As métricas saem dos HTMLs oficiais de Progresso e Questões (mesmo cálculo de antes) e vão no sidecar `.metricas.json` do PDF consolidado.
 
 | Eixo | Métrica | Origem |
 |------|---------|--------|
