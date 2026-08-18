@@ -448,11 +448,22 @@ async function preparePage(browser) {
   const extraHeaders = { 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8' };
   if (token) extraHeaders.Authorization = `Bearer ${token}`;
   await page.setExtraHTTPHeaders(extraHeaders);
+
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    const u = req.url();
+    if (/googletagmanager|google-analytics|gtag\/js|facebook\.net|hotjar/i.test(u)) {
+      req.abort().catch(() => {});
+      return;
+    }
+    req.continue().catch(() => {});
+  });
+
   return page;
 }
 
 async function gotoReport(page, url) {
-  await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForSelector('#btn_save, #btn_download, .report-container, .report-aluno', {
     timeout: 60000,
   });
@@ -809,7 +820,7 @@ try {
   fs.writeFileSync(tmpHtml, html, 'utf8');
 
   await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 1 });
-  await page.setContent(html, { waitUntil: 'networkidle0', timeout: 120000 });
+  await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
   await sleep(500);
   await page.pdf({
     path: outAbs,

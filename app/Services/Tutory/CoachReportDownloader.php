@@ -2639,9 +2639,16 @@ HTML;
         }
 
         $destino = $this->caminhoDestinoPdf($nome, 'consolidado', $aluno['id']);
-        if (! $this->gerarPdfConsolidadoComPuppeteer($nome, $urls, $destino)) {
+        $ok = false;
+        for ($tentativa = 1; $tentativa <= 2; $tentativa++) {
+            if ($this->gerarPdfConsolidadoComPuppeteer($nome, $urls, $destino)) {
+                $ok = true;
+                break;
+            }
+            $this->log("[{$nome}] Composição tentativa {$tentativa}/2 falhou");
             @unlink($destino);
-
+        }
+        if (! $ok) {
             return null;
         }
 
