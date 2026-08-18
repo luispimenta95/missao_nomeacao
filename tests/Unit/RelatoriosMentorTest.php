@@ -156,6 +156,14 @@ class RelatoriosMentorTest extends TestCase
         }
     }
 
+    public function test_marca_dagua_e_missao_nomeacao(): void
+    {
+        $this->assertSame(
+            'Missão Nomeação',
+            (new ReflectionClass(CoachReportDownloader::class))->getConstant('MARCA_DAGUA')
+        );
+    }
+
     public function test_css_do_consolidado_nao_deixa_bloco_cinza_no_rodape(): void
     {
         $downloader = new CoachReportDownloader('1', false, static function (): void {});
@@ -227,6 +235,12 @@ class RelatoriosMentorTest extends TestCase
             $this->assertFileExists($destino);
             $this->assertGreaterThan(500, filesize($destino));
             $this->assertSame('%PDF', substr((string) file_get_contents($destino), 0, 4));
+
+            $pdftotext = trim((string) shell_exec('command -v pdftotext 2>/dev/null'));
+            if ($pdftotext !== '') {
+                $txt = (string) shell_exec(escapeshellcmd($pdftotext).' '.escapeshellarg($destino).' -');
+                $this->assertStringContainsString('Missão Nomeação', $txt);
+            }
         } finally {
             foreach (scandir($pasta) ?: [] as $arquivo) {
                 if ($arquivo === '.' || $arquivo === '..') {
