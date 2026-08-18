@@ -285,6 +285,14 @@ html, body {
   display: flow-root;
   margin-bottom: 8px;
 }
+.mn-desempenho .two-col-grid {
+  grid-template-columns: 1fr 1fr !important;
+}
+.mn-desempenho .card img,
+.mn-desempenho .chart-container {
+  max-height: 240px;
+  object-fit: contain;
+}
 .mn-legacy {
   background: var(--bg-card, #fff);
   border-radius: var(--radius-xl, 20px);
