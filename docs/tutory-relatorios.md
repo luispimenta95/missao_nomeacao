@@ -31,18 +31,22 @@ Performance por assunto aparece só uma vez, na implementação do relatório de
 
 O renderer individual `scripts/tutory-render-pdf.mjs` continua no repositório para uso pontual. **Não é necessário em produção sem Node.**
 
-## Hostinger / shared hosting (sem Node)
+## Hostinger / shared hosting (sem Puppeteer)
 
-Não instale Node. O job detecta a ausência e gera o consolidado com **PHP/Dompdf**. Gráficos Chart.js/ECharts passam pelo QuickChart (`quickchart.io`).
+Não rode `npm install` e não instale Chromium. O Hostinger pode ter `node` no PATH (ex.: v20) **sem** o pacote `puppeteer` — nesse caso o job **não** dispara o compositor e gera o consolidado com **PHP/Dompdf**. Gráficos passam pelo QuickChart (`quickchart.io`).
 
-No log, o esperado é:
+No `.env`:
+
+```env
+TUTORY_PDF_ENGINE=dompdf
+```
+
+Log esperado:
 
 ```
-Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via PHP/Dompdf (sem Node)
-[Giovanna] Servidor sem Node — gerando o consolidado com PHP/Dompdf
+Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via PHP/Dompdf (pacote npm puppeteer ausente (não precisa instalar))
+[Giovanna] pacote npm puppeteer ausente (não precisa instalar) — gerando o consolidado com PHP/Dompdf
 ```
-
-Não configure `NODE_BINARY` se o servidor não tem Node.
 
 ## Modelos-fonte (`RELATORIOS`)
 
@@ -76,7 +80,8 @@ LOGIN_PASSWORD=
 PASTA_DOWNLOAD=
 TIMEOUT=120
 APP_TIMEZONE=America/Sao_Paulo
-# NODE_BINARY=   # deixe vazio / omita se o servidor não tem Node
+TUTORY_PDF_ENGINE=dompdf
+# NODE_BINARY=
 # TUTORY_REPORT_GENERATE_URL=/intent/cadastrar-relatorio-coach
 # TUTORY_REPORT_AGRUPAMENTO=dia
 ```
