@@ -114,6 +114,20 @@ class RelatoriosMentorTest extends TestCase
         }
     }
 
+    public function test_sem_node_o_motor_do_pdf_e_dompdf(): void
+    {
+        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $ref = new ReflectionClass($downloader);
+        $bin = $ref->getMethod('binarioNode')->invoke($downloader);
+        $pode = $ref->getMethod('podeUsarPuppeteer')->invoke($downloader);
+
+        if ($bin === null) {
+            $this->assertFalse($pode);
+        } else {
+            $this->assertTrue(is_bool($pode));
+        }
+    }
+
     public function test_fallback_dompdf_gera_pdf_consolidado_a_partir_dos_htmls(): void
     {
         $pasta = sys_get_temp_dir().'/tutory-consolidado-'.uniqid('', true);

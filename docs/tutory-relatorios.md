@@ -1,6 +1,8 @@
 # Relatórios do Coach (Tutory)
 
-CLI PHP **HTTP + Puppeteer** que baixa os relatórios do Coach dos alunos **ativos** no Tutory, **consolida as seções pedidas em um único PDF** e envia por e-mail aos alunos cadastrados no admin (`recebe_email=true`).
+CLI PHP que baixa os relatórios do Coach dos alunos **ativos** no Tutory, **consolida as seções pedidas em um único PDF** e envia por e-mail aos alunos cadastrados no admin (`recebe_email=true`).
+
+No Hostinger compartilhado **não precisa de Node**. O PDF é montado com PHP/Dompdf a partir dos HTMLs oficiais. Puppeteer só entra se o servidor tiver Node disponível.
 
 ## O que entra no PDF único
 
@@ -23,24 +25,24 @@ Performance por assunto aparece só uma vez, na implementação do relatório de
 3. Para **cada modelo** em `RELATORIOS` (mesmo token de geração):
    1. `POST /intent/cadastrar-relatorio-coach` (`alunos[]`, `dt_ini`, `dt_fim`, `agrupamento=dia`)
    2. `GET /documentos/relatorios/{model}?key=...` (HTML oficial; as páginas do Tutory **não são alteradas**)
-4. `scripts/tutory-compose-pdf.mjs` abre as 5 URLs, rasteriza Chart.js/ECharts e imprime **um** PDF
+4. Monta **um** PDF: Puppeteer (`scripts/tutory-compose-pdf.mjs`) se houver Node; senão **PHP/Dompdf + QuickChart** com os HTMLs já baixados
 5. Reprocessa falhas por aluno (até 3 tentativas)
 6. Lista alunos do **admin** (`alunos`) → localiza o PDF `relatorio_consolidado_*` → avalia o desempenho e grava `last_performance` → envia **um único e-mail com 1 anexo** se `recebe_email=true` → **apaga todos os PDFs** da pasta de download (e os `.metricas.json` ao lado). Logs `log_download_*.txt` permanecem.
 
-O renderer individual `scripts/tutory-render-pdf.mjs` (PDFWriter/html2canvas de cada modelo) continua no repositório para uso pontual. No servidor, o job tenta o compositor Puppeteer; se o PHP não conseguir iniciar o Node (`proc_open` bloqueado ou `node` fora do PATH), monta o mesmo consolidado com **Dompdf + QuickChart** a partir dos HTMLs oficiais já baixados.
+O renderer individual `scripts/tutory-render-pdf.mjs` continua no repositório para uso pontual. **Não é necessário em produção sem Node.**
 
-## Hostinger / shared hosting
+## Hostinger / shared hosting (sem Node)
 
-O erro `Não foi possível iniciar Node/Puppeteer (compositor)` significa que o PHP CLI **não encontrou o Node** ou que `proc_open` está em `disable_functions`.
+Não instale Node. O job detecta a ausência e gera o consolidado com **PHP/Dompdf**. Gráficos Chart.js/ECharts passam pelo QuickChart (`quickchart.io`).
 
-1. No SSH: `which node` (ou `command -v node`)
-2. No `.env`, o caminho **absoluto**:
-   ```env
-   NODE_BINARY=/home/USUARIO/nodevenv/.../bin/node
-   ```
-3. `npm install` na raiz do projeto (baixa o Chromium do Puppeteer)
+No log, o esperado é:
 
-Mesmo sem Node, o comando deve gerar o PDF pelo fallback PHP. Gráficos Chart.js/ECharts nesse fallback passam pelo QuickChart (`quickchart.io`).
+```
+Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via PHP/Dompdf (sem Node)
+[Giovanna] Servidor sem Node — gerando o consolidado com PHP/Dompdf
+```
+
+Não configure `NODE_BINARY` se o servidor não tem Node.
 
 ## Modelos-fonte (`RELATORIOS`)
 
@@ -58,9 +60,9 @@ Os cinco modelos são os botões de `#modalGeraRelatorio` em Pesquisar Alunos. O
 
 ## Requisitos
 
-- PHP 8.2+
-- Node.js 18+ com `puppeteer` (`npm install`) — Chromium baixado pelo Puppeteer
-- Rede para `admin.tutory.com.br`
+- PHP 8.2+ com `php-gd` (Dompdf)
+- Rede para `admin.tutory.com.br` e `quickchart.io` (gráficos no fallback)
+- Node.js 18+ com `puppeteer` — **opcional**; só se quiser o compositor fiel ao navegador
 - SMTP configurado (`MAIL_*`) para envio dos relatórios
 - Alunos cadastrados em `/admin/alunos` com o **mesmo nome** usado no Tutory (para casar o PDF)
 
@@ -74,7 +76,7 @@ LOGIN_PASSWORD=
 PASTA_DOWNLOAD=
 TIMEOUT=120
 APP_TIMEZONE=America/Sao_Paulo
-# NODE_BINARY=node
+# NODE_BINARY=   # deixe vazio / omita se o servidor não tem Node
 # TUTORY_REPORT_GENERATE_URL=/intent/cadastrar-relatorio-coach
 # TUTORY_REPORT_AGRUPAMENTO=dia
 ```
@@ -86,8 +88,6 @@ Se `PASTA_DOWNLOAD` estiver vazio, usa `public/pdfs`.
 ## Uso
 
 ```bash
-npm install   # puppeteer + Chromium
-
 # Regenerar só a Giovanna (quinzena atual):
 # período 1 = dias 01–15; período 2 = dia 16 até o último dia do mês
 php artisan tutory:baixar-relatorios --periodo=1 --teste

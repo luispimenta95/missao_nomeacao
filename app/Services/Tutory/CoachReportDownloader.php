@@ -8,7 +8,7 @@
  * 3. Para cada modelo em RELATORIOS[]:
  *    POST /intent/cadastrar-relatorio-coach (agrupamento=dia)
  *    GET /documentos/relatorios/{model}?key=...
- * 4. Puppeteer extrai as seções pedidas de cada página e monta UM PDF consolidado
+ * 4. Monta UM PDF consolidado (Puppeteer se houver Node; senão PHP/Dompdf)
  * 5. Reprocessa falhas (até 3x) por aluno
  * 6. Lista alunos do banco → localiza o PDF consolidado → um e-mail com 1 anexo se recebe_email
  */
@@ -767,17 +767,12 @@ class CoachReportDownloader
             }
         }
 
-        $node = $this->binarioNode();
-        if ($node === null) {
-            $this->log("[{$nome}] Node.js não encontrado no PATH do PHP. Defina NODE_BINARY no .env com o caminho absoluto (ex.: /home/USUARIO/nodevenv/.../bin/node). PATH=".$this->pathAtualProcesso());
-
+        if (! $this->podeUsarPuppeteer()) {
             return false;
         }
 
-        $bloqueadas = $this->funcoesProcessoBloqueadas();
-        if ($bloqueadas !== []) {
-            $this->log("[{$nome}] Funções de processo bloqueadas no PHP: ".implode(', ', $bloqueadas));
-
+        $node = $this->binarioNode();
+        if ($node === null) {
             return false;
         }
 
@@ -848,6 +843,14 @@ class CoachReportDownloader
         $path = getenv('PATH');
 
         return is_string($path) && $path !== '' ? $path : '(vazio)';
+    }
+
+    /**
+     * Hostinger compartilhado normalmente não tem Node. O PDF sai pelo Dompdf.
+     */
+    private function podeUsarPuppeteer(): bool
+    {
+        return $this->binarioNode() !== null && $this->funcoesProcessoBloqueadas() === [];
     }
 
     private function binarioNode(): ?string
@@ -3018,7 +3021,8 @@ HTML;
         $inicio = new \DateTimeImmutable('now');
         $relatorios = $this->relatorios();
         $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
-        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + compositor Puppeteer (1 PDF)');
+        $motor = $this->podeUsarPuppeteer() ? 'Puppeteer (Node)' : 'PHP/Dompdf (sem Node)';
+        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via '.$motor);
         $this->log('Fontes: ' . implode(', ', array_map(
             static fn (array $r): string => $r['nome'] . ' (' . $r['model'] . ')',
             $relatorios
@@ -3155,9 +3159,16 @@ HTML;
         }
 
         $destino = $this->caminhoDestinoPdf($nome, 'consolidado', $aluno['id']);
-        $ok = $this->gerarPdfConsolidadoComPuppeteer($nome, $urls, $destino);
+        $ok = false;
+        if ($this->podeUsarPuppeteer()) {
+            $ok = $this->gerarPdfConsolidadoComPuppeteer($nome, $urls, $destino);
+        }
         if (! $ok) {
-            $this->log("[{$nome}] Puppeteer indisponível neste servidor — usando fallback PHP/Dompdf");
+            if ($this->podeUsarPuppeteer()) {
+                $this->log("[{$nome}] Compositor Puppeteer falhou — usando fallback PHP/Dompdf");
+            } else {
+                $this->log("[{$nome}] Servidor sem Node — gerando o consolidado com PHP/Dompdf");
+            }
             @unlink($destino);
             $ok = $this->gerarPdfConsolidadoDoHtml($nome, $htmls, $destino);
         }
