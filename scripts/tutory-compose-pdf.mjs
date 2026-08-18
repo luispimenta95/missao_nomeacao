@@ -281,6 +281,10 @@ html, body {
 .mn-kicker:first-child {
   margin-top: 0;
 }
+.mn-desempenho {
+  display: flow-root;
+  margin-bottom: 8px;
+}
 .mn-legacy {
   background: var(--bg-card, #fff);
   border-radius: var(--radius-xl, 20px);
@@ -398,9 +402,19 @@ html, body {
 @media print {
   .mn-insights-wrap,
   .main-header-card,
-  .metrics-grid,
-  .two-col-grid {
+  .metric-card {
     page-break-inside: avoid;
+  }
+  .metrics-grid,
+  .two-col-grid,
+  .mn-desempenho {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+  .mn-legacy,
+  .mn-kicker {
+    break-before: auto;
+    clear: both;
   }
   .mn-legacy table { page-break-inside: auto; }
 }
