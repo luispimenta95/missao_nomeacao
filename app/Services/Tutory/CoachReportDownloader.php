@@ -1104,36 +1104,13 @@ class CoachReportDownloader
         $logoHtml = $this->montarHtmlLogoPdf();
         $fontCss = $this->cssFamiliaFontePdf();
         $pieCss = $this->cssChartPie();
+        $css = $this->cssPdfConsolidado($fontCss, $pieCss);
         $seguroNome = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
 
         $pdfHtml = <<<HTML
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
-body{font-family: {$fontCss}; font-size:12px; color:#1F2937; margin:20px; background:#F5F5F5;}
-.logo{text-align:center; margin:0 0 14px; color:#000; font-weight:bold; line-height:0.95;}
-.logo .l1{font-size:18pt; letter-spacing:2pt;}
-.logo .l2{font-size:16pt; letter-spacing:1pt;}
-.card{background:#fff; border-radius:12px; padding:14px 16px; margin:0 0 14px; border:1px solid #E5E7EB;}
-.kicker{font-size:10px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; color:#6B7280; margin:16px 0 6px;}
-h1{font-size:20px; margin:0 0 6px; padding-left:10px; border-left:4px solid #F4B942;}
-h2{font-size:15px; margin:0 0 6px; padding-left:10px; border-left:4px solid #F4B942;}
-.muted{color:#6B7280; margin:0 0 10px;}
-.metrics{width:100%; border-collapse:separate; border-spacing:8px 0; table-layout:fixed;}
-.metrics td{background:#fff; border:1px solid #E5E7EB; border-radius:8px; padding:10px; vertical-align:top;}
-.metrics .label{color:#6B7280; font-size:10px; margin:0 0 6px;}
-.metrics .value{font-size:16px; font-weight:bold; margin:0;}
-.two{width:100%; border-collapse:collapse;}
-.two td{width:50%; vertical-align:top; padding:4px;}
-.chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 14px;}
-{$pieCss}
-table.data{width:100%; border-collapse:collapse; font-size:10px;}
-table.data thead td{background:#3264ff; color:#fff; font-weight:bold; padding:6px;}
-table.data tbody td{border-bottom:1px solid #eee; padding:6px; vertical-align:top;}
-.insights{border:3px solid #3264ff; border-radius:12px; padding:16px 18px; background:#fff; margin:8px 0 16px;}
-.insights h3{margin:0 0 10px; color:#3264ff; font-size:16px;}
-.insights p{margin:0 0 8px; font-size:13px; line-height:1.45;}
-.empty{color:#9CA3AF; text-align:center; font-size:12px; padding:8px;}
-.keep{page-break-inside:avoid;}
+{$css}
 </style></head><body>
 {$logoHtml}
 <div class="card keep">{$header}{$metrics}</div>
@@ -2447,6 +2424,44 @@ HTML;
         return '<table class="assuntos"><thead><tr>'
             . '<td>Disciplina</td><td>Assunto</td><td>Taxa de Acertos</td>'
             . '</tr></thead><tbody>' . $body . '</tbody></table>';
+    }
+
+    /**
+     * CSS do consolidado Dompdf. Sem fundo no body e sem border-radius:
+     * o Dompdf pinta esses boxes de novo em cada página e deixa um bloco
+     * cinza vazio no rodapé.
+     */
+    private function cssPdfConsolidado(string $fontCss, string $pieCss): string
+    {
+        return <<<CSS
+@page{margin:12mm 12mm 14mm;}
+html,body{font-family: {$fontCss}; font-size:12px; color:#1F2937; margin:0; padding:0; background:#ffffff;}
+.logo{text-align:center; margin:0 0 14px; color:#000; font-weight:bold; line-height:0.95;}
+.logo .l1{font-size:18pt; letter-spacing:2pt;}
+.logo .l2{font-size:16pt; letter-spacing:1pt;}
+.card{background:#fff; padding:12px 14px; margin:0 0 12px; border:1px solid #E5E7EB;}
+.kicker{font-size:10px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; color:#6B7280; margin:14px 0 6px;}
+h1{font-size:20px; margin:0 0 6px; padding-left:10px; border-left:4px solid #F4B942;}
+h2{font-size:15px; margin:0 0 6px; padding-left:10px; border-left:4px solid #F4B942;}
+.muted{color:#6B7280; margin:0 0 10px;}
+.metrics{width:100%; border-collapse:collapse; table-layout:fixed;}
+.metrics td{background:#fff; border:1px solid #E5E7EB; padding:10px; vertical-align:top;}
+.metrics .label{color:#6B7280; font-size:10px; margin:0 0 6px;}
+.metrics .value{font-size:16px; font-weight:bold; margin:0;}
+.two{width:100%; border-collapse:collapse;}
+.two td{width:50%; vertical-align:top; padding:4px;}
+.two td.card{margin:0;}
+.chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 12px;}
+{$pieCss}
+table.data{width:100%; border-collapse:collapse; font-size:10px;}
+table.data thead td{background:#3264ff; color:#fff; font-weight:bold; padding:6px;}
+table.data tbody td{border-bottom:1px solid #eee; padding:6px; vertical-align:top;}
+.insights{border:3px solid #3264ff; padding:16px 18px; background:#fff; margin:8px 0 12px;}
+.insights h3{margin:0 0 10px; color:#3264ff; font-size:16px;}
+.insights p{margin:0 0 8px; font-size:13px; line-height:1.45;}
+.empty{color:#9CA3AF; text-align:center; font-size:12px; padding:8px;}
+.keep{page-break-inside:avoid;}
+CSS;
     }
 
     private function cssChartPie(): string

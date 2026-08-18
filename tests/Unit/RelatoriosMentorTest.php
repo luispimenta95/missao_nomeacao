@@ -156,6 +156,18 @@ class RelatoriosMentorTest extends TestCase
         }
     }
 
+    public function test_css_do_consolidado_nao_deixa_bloco_cinza_no_rodape(): void
+    {
+        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $ref = new ReflectionClass($downloader);
+        $css = $ref->getMethod('cssPdfConsolidado')->invoke($downloader, 'DejaVu Sans', '');
+
+        $this->assertStringContainsString('@page{margin:', $css);
+        $this->assertStringContainsString('background:#ffffff', $css);
+        $this->assertStringNotContainsString('#F5F5F5', $css);
+        $this->assertStringNotContainsString('border-radius', $css);
+    }
+
     public function test_fallback_dompdf_gera_pdf_consolidado_a_partir_dos_htmls(): void
     {
         $pasta = sys_get_temp_dir().'/tutory-consolidado-'.uniqid('', true);
