@@ -3,7 +3,7 @@
 
 /**
  * Baixa os Relatórios do Coach no Tutory para os alunos ATIVOS da consulta
- * (questões + progresso do plano) e envia todos os PDFs em um único e-mail.
+ * (todos os modelos do menu do mentor) e envia todos os PDFs em um único e-mail.
  *
  * CLI/HTTP puro — sem Selenium, sem Firefox, sem php-webdriver.
  *

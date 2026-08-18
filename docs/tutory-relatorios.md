@@ -9,7 +9,7 @@ CLI PHP **HTTP + Puppeteer** que baixa os relatórios do Coach dos alunos **ativ
 3. Para **cada modelo** no array `RELATORIOS` (mesmo fluxo):
    1. `POST /intent/cadastrar-relatorio-coach` (`alunos[]`, `dt_ini`, `dt_fim`, `agrupamento=dia`)
    2. `GET /documentos/relatorios/{model}?key=...`
-   3. PDF oficial via **Puppeteer** (`scripts/tutory-render-pdf.mjs` → `PDFWriter.output()` com download nativo CDP, igual ao botão Baixar)
+   3. PDF oficial via **Puppeteer**: `PDFWriter.output()` (questões, progresso, estudos, horas líquidas) ou html2canvas/`#btn_download` (desempenho)
    4. Fallback **Dompdf** + QuickChart se Node/Puppeteer falhar (`questoes` e `progresso`). No progresso, configs Chart.js com `backgroundColor: chartColors` são expandidas para cores fixas antes do QuickChart (Panorama, pizza e barras das páginas 2/4/5).
 4. Reprocessa falhas por aluno+modelo (até 3 tentativas)
 5. Lista alunos do **admin** (`alunos`) → localiza PDFs em `public/pdfs` pelo nome → avalia o desempenho e grava `last_performance` (nível em português do último relatório) → envia **um único e-mail** com todos os PDFs em anexo se `recebe_email=true` → **apaga todos os PDFs** da pasta de download (e os `.metricas.json` ao lado). Logs `log_download_*.txt` permanecem.
@@ -18,12 +18,17 @@ CLI PHP **HTTP + Puppeteer** que baixa os relatórios do Coach dos alunos **ativ
 
 Definidos em `CoachReportDownloader::RELATORIOS`:
 
-| model (URL) | Nome |
-|-------------|------|
+| model (URL) | Nome no menu |
+|-------------|--------------|
+| `desempenho` | Desempenho |
+| `aluno` | Estudos |
+| `horas-liquidas` | Horas Líquidas |
 | `questoes` | Desempenho em Questões |
 | `progresso` | Progresso do plano |
 
-Para incluir outro relatório do painel, adicione um índice ao array com o `model` usado em `/documentos/relatorios/{model}`.
+Os cinco modelos são os botões de `#modalGeraRelatorio` em Pesquisar Alunos. O token gerado em `cadastrar-relatorio-coach` vale para todos: muda só o segmento `/documentos/relatorios/{model}`.
+
+Desempenho (NOVO) gera o PDF com html2canvas + jsPDF (`#btn_download`). Os demais usam o `PDFWriter` do botão Baixar (`#btn_save`).
 
 ## Requisitos
 
@@ -70,6 +75,9 @@ Arquivo gerado: `relatorio_{model}_{Ymd_Hi}_{aluno}_{periodo}.pdf`
 Exemplos:
 - `relatorio_questoes_20260721_1830_Giovanna_1.pdf`
 - `relatorio_progresso_20260721_1830_Giovanna_1.pdf`
+- `relatorio_desempenho_20260721_1830_Giovanna_1.pdf`
+- `relatorio_aluno_20260721_1830_Giovanna_1.pdf`
+- `relatorio_horas-liquidas_20260721_1830_Giovanna_1.pdf`
 
 O envio de e-mail anexa o PDF mais recente de **cada modelo** do aluno para o `--periodo` informado (aceita pequenas diferenças de digitação no nome). Depois do envio, **todos os PDFs da pasta são apagados**.
 

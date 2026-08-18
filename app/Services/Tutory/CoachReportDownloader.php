@@ -8,7 +8,7 @@
  * 3. Para cada modelo em RELATORIOS[]:
  *    POST /intent/cadastrar-relatorio-coach (agrupamento=dia)
  *    GET /documentos/relatorios/{model}?key=...
- *    PDF oficial via Puppeteer + PDFWriter/jsPDF (fallback Dompdf só em questões)
+ *    PDF oficial via Puppeteer (PDFWriter ou html2canvas no modelo desempenho)
  * 4. Reprocessa falhas (até 3x) por aluno+modelo
  * 5. Lista alunos do banco → localiza PDFs → um e-mail com todos os anexos se recebe_email
  */
@@ -70,12 +70,27 @@ class CoachReportDownloader
     ];
 
     /**
-     * Modelos de relatório a baixar (mesmo fluxo para cada índice).
+     * Modelos do menu "Gerar Relatório" do mentor (modal #modalGeraRelatorio).
      * model = segmento em /documentos/relatorios/{model}
      *
      * @var list<array{model: string, nome: string, slug: string}>
      */
     private const RELATORIOS = [
+        [
+            'model' => 'desempenho',
+            'nome' => 'Desempenho',
+            'slug' => 'desempenho',
+        ],
+        [
+            'model' => 'aluno',
+            'nome' => 'Estudos',
+            'slug' => 'aluno',
+        ],
+        [
+            'model' => 'horas-liquidas',
+            'nome' => 'Horas Líquidas',
+            'slug' => 'horas-liquidas',
+        ],
         [
             'model' => 'questoes',
             'nome' => 'Desempenho em Questões',
@@ -550,7 +565,7 @@ class CoachReportDownloader
             ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
             ->get('/documentos/relatorios/' . $model, ['key' => $key]);
 
-        if ($pagina->status() >= 400 || ! str_contains($pagina->body(), 'btn_save')) {
+        if ($pagina->status() >= 400 || (! str_contains($pagina->body(), 'btn_save') && ! str_contains($pagina->body(), 'btn_download'))) {
             $this->log("[{$nome}] [{$rotulo}] Página do relatório inválida (HTTP {$pagina->status()})");
 
             return null;
@@ -562,6 +577,15 @@ class CoachReportDownloader
         }
         if ($model === 'progresso' && ! str_contains($html, 'chart_progresso_principal')) {
             $this->log("[{$nome}] [{$rotulo}] AVISO: página sem gráfico principal de progresso");
+        }
+        if ($model === 'aluno' && ! str_contains($html, 'chart_top_disciplina')) {
+            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem gráfico de disciplinas (Estudos)");
+        }
+        if ($model === 'horas-liquidas' && ! str_contains($html, 'chart_pie_horas_disciplina')) {
+            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem gráfico de horas líquidas");
+        }
+        if ($model === 'desempenho' && ! str_contains($html, 'chart_panorama')) {
+            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem panorama de desempenho");
         }
 
         // Réplica do PDF do painel (mesmo PDFWriter/jsPDF do botão Baixar)
@@ -584,6 +608,12 @@ class CoachReportDownloader
             }
 
             return $salvo;
+        }
+
+        if ($model !== 'questoes') {
+            $this->log("[{$nome}] [{$rotulo}] Sem fallback Dompdf para este modelo");
+
+            return null;
         }
 
         $salvo = $this->gerarPdfDoHtml($nome, $id, $html, $dtIniIso, $dtFimIso, $model);
@@ -617,6 +647,31 @@ class CoachReportDownloader
                 || str_contains($bytes, 'Motivacao');
 
             return $temJsPdf && $temTexto && $imagens >= 5;
+        }
+
+        if ($model === 'aluno') {
+            $temTexto = str_contains($bytes, 'Seu Desempenho')
+                || str_contains($bytes, 'Desempenho')
+                || str_contains($bytes, 'Estudos')
+                || str_contains($bytes, 'Insights');
+
+            return $temJsPdf && $temTexto && $imagens >= 3;
+        }
+
+        if ($model === 'horas-liquidas') {
+            $temTexto = str_contains($bytes, 'Horas')
+                || str_contains($bytes, 'Liquida')
+                || str_contains($bytes, 'quidas');
+
+            return $temJsPdf && $temTexto && $imagens >= 2;
+        }
+
+        if ($model === 'desempenho') {
+            $temTexto = str_contains($bytes, 'Desempenho')
+                || str_contains($bytes, 'desempenho')
+                || str_contains($bytes, 'Relat');
+
+            return $temJsPdf && $temTexto && $imagens >= 2;
         }
 
         // jsPDF grava texto em literais PDF; aceita com ou sem acentos escapados
@@ -2377,7 +2432,7 @@ HTML;
         $inicio = new \DateTimeImmutable('now');
         $relatorios = $this->relatorios();
         $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
-        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + Puppeteer/PDFWriter (fallback Dompdf em questões)');
+        $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + Puppeteer (PDFWriter ou html2canvas)');
         $this->log('Relatórios: ' . implode(', ', array_map(
             static fn (array $r): string => $r['nome'] . ' (' . $r['model'] . ')',
             $relatorios
