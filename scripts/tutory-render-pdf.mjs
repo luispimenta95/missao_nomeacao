@@ -200,10 +200,9 @@ const browserChartUtils = () => {
   return { findChartByCanvasId, freezeAllCharts, labelCount };
 };
 
-/** Remove rótulos de % em gráficos de horas estudadas (Chart.js v2). */
+/** Remove rótulos de % em gráficos de horas (pizza/barras). O diário ganha horas nos vértices. */
 function stripPercentFromHoursCharts() {
-  const hoursIds = new Set([
-    'chart_horas_diarias',
+  const hideIds = new Set([
     'chart_top_disciplinas',
     'chart_pizza_modalidades',
   ]);
@@ -214,7 +213,7 @@ function stripPercentFromHoursCharts() {
     const chart = inst.chart || inst;
     const canvas = inst.canvas || (chart && chart.canvas) || (inst.ctx && inst.ctx.canvas);
     const id = canvas && canvas.id ? canvas.id : '';
-    if (!hoursIds.has(id) || !chart || !chart.options) continue;
+    if (!hideIds.has(id) || !chart || !chart.options) continue;
 
     chart.options.plugins = chart.options.plugins || {};
     chart.options.plugins.datalabels = Object.assign({}, chart.options.plugins.datalabels || {}, {
@@ -243,6 +242,74 @@ function stripPercentFromHoursCharts() {
           };
         }
       }
+    }
+    n += 1;
+  }
+  return n;
+}
+
+function labelHoursOnChartVertices() {
+  const hoursIds = new Set(['chart_horas_diarias']);
+  if (!window.Chart || !Chart.instances) return 0;
+
+  function formatHourLabel(value) {
+    const raw = (value && typeof value === 'object' && 'y' in value) ? value.y : value;
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return '';
+    const rounded = Math.round(num * 10) / 10;
+    if (rounded === 0) return '';
+    const txt = Number.isInteger(rounded)
+      ? String(rounded)
+      : String(rounded).replace('.', ',');
+    return `${txt}h`;
+  }
+
+  let n = 0;
+  for (const k of Object.keys(Chart.instances)) {
+    const inst = Chart.instances[k];
+    const chart = inst.chart || inst;
+    const canvas = inst.canvas || (chart && chart.canvas) || (inst.ctx && inst.ctx.canvas);
+    const id = canvas && canvas.id ? canvas.id : '';
+    if (!hoursIds.has(id) || !chart || !chart.options) continue;
+
+    const labels = {
+      display: true,
+      clamp: true,
+      clip: false,
+      color: '#111827',
+      backgroundColor: 'rgba(255,255,255,0.85)',
+      borderRadius: 3,
+      padding: { top: 1, right: 3, bottom: 1, left: 3 },
+      font: { size: 9, weight: 'bold' },
+      offset: 4,
+      formatter: formatHourLabel,
+      align(ctx) {
+        return ctx.datasetIndex === 0 ? 'end' : 'start';
+      },
+      anchor(ctx) {
+        return ctx.datasetIndex === 0 ? 'end' : 'start';
+      },
+    };
+
+    chart.options.plugins = chart.options.plugins || {};
+    chart.options.plugins.datalabels = Object.assign({}, chart.options.plugins.datalabels || {}, labels);
+    chart.options.datalabels = Object.assign({}, chart.options.datalabels || {}, labels);
+
+    chart.options.layout = chart.options.layout || {};
+    const padding = chart.options.layout.padding;
+    if (typeof padding === 'number') {
+      chart.options.layout.padding = {
+        top: Math.max(padding, 18),
+        right: padding,
+        bottom: Math.max(padding, 18),
+        left: padding,
+      };
+    } else {
+      const base = padding && typeof padding === 'object' ? padding : {};
+      chart.options.layout.padding = Object.assign({}, base, {
+        top: Math.max(Number(base.top) || 0, 18),
+        bottom: Math.max(Number(base.bottom) || 0, 18),
+      });
     }
     n += 1;
   }
@@ -717,8 +784,9 @@ try {
   // Datas no padrão brasileiro (DD/MM) antes de congelar os gráficos
   await page.evaluate(aplicarDatasBrasileiras);
 
-  // Remove % de gráficos de horas antes de congelar o canvas
+  // Sem % em pizza/barras de horas; horas nos vértices do gráfico diário
   await page.evaluate(stripPercentFromHoursCharts);
+  await page.evaluate(labelHoursOnChartVertices);
 
   // Congela Chart.js v2 e redesenha frames finais (getChart não existe no v2 do painel)
   const frozen = await page.evaluate(() => {
@@ -836,6 +904,7 @@ try {
       });
     } else {
       await page.evaluate(stripPercentFromHoursCharts);
+      await page.evaluate(labelHoursOnChartVertices);
       await page.evaluate((reportModel) => {
       if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
         throw new Error('PDFWriter não encontrado na página');
@@ -971,6 +1040,7 @@ try {
         });
       } else {
         await page.evaluate(stripPercentFromHoursCharts);
+        await page.evaluate(labelHoursOnChartVertices);
         pdfBase64 = await page.evaluate(async () => {
         if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
           throw new Error('PDFWriter não encontrado na página');

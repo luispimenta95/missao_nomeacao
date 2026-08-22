@@ -2731,7 +2731,46 @@ CSS;
 
         if ($type === 'line') {
             if ($isHours) {
-                return $this->ocultarDatalabels($data);
+                $data['options'] = is_array($data['options'] ?? null) ? $data['options'] : [];
+                $data['options']['plugins'] = is_array($data['options']['plugins'] ?? null)
+                    ? $data['options']['plugins']
+                    : [];
+                $data['options']['layout'] = is_array($data['options']['layout'] ?? null)
+                    ? $data['options']['layout']
+                    : [];
+                $data['options']['plugins']['datalabels'] = [
+                    'anchor' => 'end',
+                    'align' => 'end',
+                    'offset' => 4,
+                    'clamp' => true,
+                    'clip' => false,
+                    'color' => '#111827',
+                    'backgroundColor' => 'rgba(255,255,255,0.85)',
+                    'borderRadius' => 3,
+                    'padding' => 3,
+                    'font' => ['size' => 9, 'weight' => 'bold'],
+                    'formatter' => '__DATALABEL_HOURS__',
+                ];
+                if (isset($data['data']['datasets']) && is_array($data['data']['datasets'])) {
+                    foreach ($data['data']['datasets'] as $i => $ds) {
+                        if (! is_array($ds)) {
+                            continue;
+                        }
+                        $data['data']['datasets'][$i]['datalabels'] = [
+                            'align' => $i === 0 ? 'end' : 'start',
+                            'anchor' => $i === 0 ? 'end' : 'start',
+                        ];
+                    }
+                }
+                $padding = is_array($data['options']['layout']['padding'] ?? null)
+                    ? $data['options']['layout']['padding']
+                    : [];
+                $data['options']['layout']['padding'] = array_merge($padding, [
+                    'top' => max((int) ($padding['top'] ?? 0), 22),
+                    'bottom' => max((int) ($padding['bottom'] ?? 0), 18),
+                ]);
+
+                return $data;
             }
             $isQuestoesDia = $canvasId === 'chart_questoes_dia';
             $data['options']['plugins']['datalabels'] = [
@@ -2833,7 +2872,7 @@ CSS;
             $replacements = [
                 '"__DATALABEL_QUESTOES__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
                 '"__DATALABEL_PERCENT__"' => 'function(value){return Number(value).toFixed(0)+"%";}',
-                '"__DATALABEL_HOURS__"' => 'function(value){return Number(value).toFixed(0)+"h";}',
+                '"__DATALABEL_HOURS__"' => 'function(value){var n=Number(value&&typeof value==="object"&&value.y!=null?value.y:value);if(!isFinite(n))return "";var r=Math.round(n*10)/10;if(r===0)return "";return (Math.abs(r%1)<1e-9?String(Math.round(r)):String(r).replace(".",","))+"h";}',
                 '"__DATALABEL_BUBBLE_PERCENT__"' => 'function(value){return value&&value.r!=null?Number(value.r*10).toFixed(0)+"%":"";}',
                 // legado
                 '"__DATALABEL_FORMATTER__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
