@@ -252,7 +252,8 @@ class RelatoriosMentorTest extends TestCase
             $pdftotext = trim((string) shell_exec('command -v pdftotext 2>/dev/null'));
             if ($pdftotext !== '') {
                 $txt = (string) shell_exec(escapeshellcmd($pdftotext).' '.escapeshellarg($destino).' -');
-                $this->assertStringContainsString('Missão Nomeação', $txt);
+                $this->assertStringContainsString('MISSÃO', $txt);
+                $this->assertStringContainsString('NOMEAÇÃO', $txt);
                 $this->assertStringContainsString('Giovanna', $txt);
                 $this->assertStringContainsString('Total de Horas', $txt);
                 $this->assertStringContainsString('Revisões no Período', $txt);
