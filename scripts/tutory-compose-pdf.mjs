@@ -225,9 +225,23 @@ function aplicarDatasBrasileiras() {
   return { forcar };
 }
 
-function stripPercentFromHoursCharts() {
+/** Rótulos de horas nos vértices do gráfico de motivação (Chart.js v2). */
+function labelHoursOnChartVertices() {
   const hoursIds = new Set(['chart_horas_diarias']);
   if (!window.Chart || !Chart.instances) return 0;
+
+  function formatHourLabel(value) {
+    const raw = (value && typeof value === 'object' && 'y' in value) ? value.y : value;
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return '';
+    const rounded = Math.round(num * 10) / 10;
+    if (rounded === 0) return '';
+    const txt = Number.isInteger(rounded)
+      ? String(rounded)
+      : String(rounded).replace('.', ',');
+    return `${txt}h`;
+  }
+
   let n = 0;
   for (const k of Object.keys(Chart.instances)) {
     const inst = Chart.instances[k];
@@ -235,15 +249,46 @@ function stripPercentFromHoursCharts() {
     const canvas = inst.canvas || (chart && chart.canvas) || (inst.ctx && inst.ctx.canvas);
     const id = canvas && canvas.id ? canvas.id : '';
     if (!hoursIds.has(id) || !chart || !chart.options) continue;
+
+    const labels = {
+      display: true,
+      clamp: true,
+      clip: false,
+      color: '#111827',
+      backgroundColor: 'rgba(255,255,255,0.85)',
+      borderRadius: 3,
+      padding: { top: 1, right: 3, bottom: 1, left: 3 },
+      font: { size: 9, weight: 'bold' },
+      offset: 4,
+      formatter: formatHourLabel,
+      align(ctx) {
+        return ctx.datasetIndex === 0 ? 'end' : 'start';
+      },
+      anchor(ctx) {
+        return ctx.datasetIndex === 0 ? 'end' : 'start';
+      },
+    };
+
     chart.options.plugins = chart.options.plugins || {};
-    chart.options.plugins.datalabels = Object.assign({}, chart.options.plugins.datalabels || {}, {
-      display: false,
-      formatter() { return ''; },
-    });
-    chart.options.datalabels = Object.assign({}, chart.options.datalabels || {}, {
-      display: false,
-      formatter() { return ''; },
-    });
+    chart.options.plugins.datalabels = Object.assign({}, chart.options.plugins.datalabels || {}, labels);
+    chart.options.datalabels = Object.assign({}, chart.options.datalabels || {}, labels);
+
+    chart.options.layout = chart.options.layout || {};
+    const padding = chart.options.layout.padding;
+    if (typeof padding === 'number') {
+      chart.options.layout.padding = {
+        top: Math.max(padding, 18),
+        right: padding,
+        bottom: Math.max(padding, 18),
+        left: padding,
+      };
+    } else {
+      const base = padding && typeof padding === 'object' ? padding : {};
+      chart.options.layout.padding = Object.assign({}, base, {
+        top: Math.max(Number(base.top) || 0, 18),
+        bottom: Math.max(Number(base.bottom) || 0, 18),
+      });
+    }
     n += 1;
   }
   return n;
@@ -483,7 +528,7 @@ async function gotoReport(page, url) {
 
 async function prepareCharts(page) {
   await page.evaluate(aplicarDatasBrasileiras);
-  await page.evaluate(stripPercentFromHoursCharts);
+  await page.evaluate(labelHoursOnChartVertices);
   await page.evaluate(() => {
     if (!window.Chart || !Chart.instances) return;
     for (const k of Object.keys(Chart.instances)) {

@@ -90,6 +90,7 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('chart_questoes_dia', $src);
         $this->assertStringContainsString('#tabela_questoes', $src);
         $this->assertStringContainsString('chart_horas_diarias', $src);
+        $this->assertStringContainsString('labelHoursOnChartVertices', $src);
         $this->assertStringContainsString('.insights-panel', $src);
         $this->assertStringContainsString('mn-insights-wrap', $src);
         $this->assertStringContainsString('--url-desempenho', $src);
@@ -187,6 +188,19 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringNotContainsString('chartDesempenhoPerformance', $php);
         $this->assertStringContainsString('Revisões no Período', $php);
         $this->assertStringContainsString('montarHtmlMetricasDesempenho', $php);
+    }
+
+    public function test_grafico_de_horas_diarias_tem_rotulos_nos_vertices(): void
+    {
+        $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());
+        $this->assertStringContainsString('__DATALABEL_HOURS__', $php);
+        $this->assertStringContainsString("'formatter' => '__DATALABEL_HOURS__'", $php);
+
+        $script = (string) file_get_contents(base_path('scripts/tutory-compose-pdf.mjs'));
+        $this->assertStringContainsString('labelHoursOnChartVertices', $script);
+        $this->assertStringContainsString('chart_horas_diarias', $script);
+        $this->assertStringContainsString('return `${txt}h`', $script);
+        $this->assertStringNotContainsString('stripPercentFromHoursCharts', $script);
     }
 
     public function test_fallback_dompdf_gera_pdf_consolidado_a_partir_dos_htmls(): void
