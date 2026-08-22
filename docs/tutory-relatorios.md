@@ -10,8 +10,8 @@ Não é a junção dos cinco PDFs oficiais. O compositor abre cada página do Tu
 
 | Origem | Seções extraídas | Fora do consolidado |
 |--------|------------------|---------------------|
-| **Desempenho (NOVO)** `desempenho` | Cabeçalho do aluno (`.main-header-card`) + cards de métricas (`.metrics-grid`) + as duas colunas Horas de estudo / Performance por Área (último `.two-col-grid`) | Ranking, panorama, progresso mensal, modalidades, progresso por disciplina, insights desse relatório, rodapé |
-| **Estudos** `aluno` | Histórico de Metas (`#tabela_estudos`) e Revisões no Período (`#tabela_revisoes`, omitido/avisado se vazio) | Panorama, gráficos de questões, performance por assunto (duplicata) |
+| **Desempenho (NOVO)** `desempenho` | Cabeçalho do aluno (`.main-header-card`) + cards de métricas (`.metrics-grid`) | Ranking, panorama, gráficos Horas de estudo / Performance por Área, progresso mensal, modalidades, progresso por disciplina, insights desse relatório, rodapé |
+| **Estudos** `aluno` | Revisões no Período (`#tabela_revisoes`, omitido/avisado se vazio) | Histórico de Metas (`#tabela_estudos`), panorama, gráficos de questões, performance por assunto (duplicata) |
 | **Horas Líquidas** `horas-liquidas` | Desempenho ao longo do Tempo (`#chart_line_comparativo`) e Histórico (`#tabela_horas_liquidas`) | Pizza por disciplina, progresso por disciplina |
 | **Questões** `questoes` | Breve Panorama (`.main-numbers`), gráfico principal (`#chart_questoes_dia`) e Performance por assunto (`#tabela_questoes`) | Bolha, top melhores/piores, evolução por matéria |
 | **Progresso do plano** `progresso` | Motivação (`#chart_horas_diarias`) e **Painel de Insights** (`.insights-panel`, em destaque visual) | Progresso principal, panorama, modalidades, desempenho de questões |

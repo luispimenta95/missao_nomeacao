@@ -84,10 +84,6 @@ class RelatoriosMentorTest extends TestCase
 
         $this->assertStringContainsString('.main-header-card', $src);
         $this->assertStringContainsString('.metrics-grid', $src);
-        $this->assertStringContainsString('chart_horas_estudo', $src);
-        $this->assertStringContainsString('chart_performance', $src);
-        $this->assertStringContainsString('h2.section-5', $src);
-        $this->assertStringContainsString('#tabela_estudos', $src);
         $this->assertStringContainsString('#tabela_revisoes', $src);
         $this->assertStringContainsString('chart_line_comparativo', $src);
         $this->assertStringContainsString('#tabela_horas_liquidas', $src);
@@ -97,6 +93,11 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('.insights-panel', $src);
         $this->assertStringContainsString('mn-insights-wrap', $src);
         $this->assertStringContainsString('--url-desempenho', $src);
+        $this->assertStringNotContainsString('chart_horas_estudo', $src);
+        $this->assertStringNotContainsString('chart_performance', $src);
+        $this->assertStringNotContainsString("htmlFromHeading('h2.section-5')", $src);
+        $this->assertStringNotContainsString('extracted.desempenho.twoCol', $src);
+        $this->assertStringNotContainsString('extracted.aluno.estudos', $src);
         $this->assertStringNotContainsString('chart_panorama', $src);
         $this->assertStringNotContainsString('chart_bolha_questoes', $src);
         $this->assertStringNotContainsString('chart_pie_horas_disciplina', $src);
@@ -176,6 +177,18 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringNotContainsString('border-radius', $css);
     }
 
+    public function test_consolidado_nao_inclui_desempenho_nem_historico_de_metas(): void
+    {
+        $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());
+        $this->assertStringNotContainsString('<h2>Histórico de Metas</h2>', $php);
+        $this->assertStringNotContainsString('Performance por Área', $php);
+        $this->assertStringNotContainsString('Horas de estudo', $php);
+        $this->assertStringNotContainsString('chartDesempenhoHorasEstudo', $php);
+        $this->assertStringNotContainsString('chartDesempenhoPerformance', $php);
+        $this->assertStringContainsString('Revisões no Período', $php);
+        $this->assertStringContainsString('montarHtmlMetricasDesempenho', $php);
+    }
+
     public function test_fallback_dompdf_gera_pdf_consolidado_a_partir_dos_htmls(): void
     {
         $pasta = sys_get_temp_dir().'/tutory-consolidado-'.uniqid('', true);
@@ -240,6 +253,12 @@ class RelatoriosMentorTest extends TestCase
             if ($pdftotext !== '') {
                 $txt = (string) shell_exec(escapeshellcmd($pdftotext).' '.escapeshellarg($destino).' -');
                 $this->assertStringContainsString('Missão Nomeação', $txt);
+                $this->assertStringContainsString('Giovanna', $txt);
+                $this->assertStringContainsString('Total de Horas', $txt);
+                $this->assertStringContainsString('Revisões no Período', $txt);
+                $this->assertStringNotContainsString('Histórico de Metas', $txt);
+                $this->assertStringNotContainsString('Performance por Área', $txt);
+                $this->assertStringNotContainsString('Horas de estudo', $txt);
             }
         } finally {
             foreach (scandir($pasta) ?: [] as $arquivo) {
