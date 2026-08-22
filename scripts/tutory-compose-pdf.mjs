@@ -285,14 +285,6 @@ html, body {
   display: flow-root;
   margin-bottom: 8px;
 }
-.mn-desempenho .two-col-grid {
-  grid-template-columns: 1fr 1fr !important;
-}
-.mn-desempenho .card img,
-.mn-desempenho .chart-container {
-  max-height: 240px;
-  object-fit: contain;
-}
 .mn-legacy {
   background: var(--bg-card, #fff);
   border-radius: var(--radius-xl, 20px);
@@ -402,8 +394,7 @@ html, body {
   .mn-legacy .col-2 {
     width: 100%;
   }
-  .metrics-grid,
-  .two-col-grid {
+  .metrics-grid {
     grid-template-columns: 1fr !important;
   }
 }
@@ -414,7 +405,6 @@ html, body {
     page-break-inside: avoid;
   }
   .metrics-grid,
-  .two-col-grid,
   .mn-desempenho {
     page-break-inside: auto;
     break-inside: auto;
@@ -511,82 +501,29 @@ async function prepareCharts(page) {
 
 async function extractDesempenho(page) {
   await gotoReport(page, urls.desempenho);
-  await page.waitForFunction(() => {
-    if (!document.querySelector('.main-header-card') || !document.querySelector('.metrics-grid')) {
-      return false;
-    }
-    const ids = ['chart_horas_estudo', 'chart_performance'];
-    return ids.every((id) => {
-      const el = document.getElementById(id);
-      if (!el) return false;
-      const canvas = el.querySelector('canvas');
-      return canvas && (canvas.width || 0) > 10;
-    });
-  }, { timeout: 120000 });
-  await prepareCharts(page);
+  await page.waitForFunction(() => (
+    Boolean(document.querySelector('.main-header-card') && document.querySelector('.metrics-grid'))
+  ), { timeout: 120000 });
 
   const css = await page.evaluate(() => (
     Array.from(document.querySelectorAll('style')).map((s) => s.textContent || '').join('\n')
   ));
 
   return page.evaluate(() => {
-    function rasterizeRoot(root) {
-      if (!root) return;
-      if (typeof echarts !== 'undefined') {
-        const nodes = root.querySelectorAll
-          ? Array.from(root.querySelectorAll('div[id^="chart_"], .chart-container'))
-          : [];
-        if (root.id && String(root.id).startsWith('chart_')) nodes.push(root);
-        for (const el of nodes) {
-          try {
-            const inst = echarts.getInstanceByDom(el);
-            if (inst && typeof inst.getDataURL === 'function') {
-              const img = document.createElement('img');
-              img.src = inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: 'transparent' });
-              img.alt = el.id || 'gráfico';
-              img.style.width = '100%';
-              img.style.height = 'auto';
-              img.style.display = 'block';
-              el.innerHTML = '';
-              el.appendChild(img);
-            }
-          } catch (e) {}
-        }
-      }
-      const canvases = root.querySelectorAll ? Array.from(root.querySelectorAll('canvas')) : [];
-      for (const canvas of canvases) {
-        try {
-          if ((canvas.width || 0) < 4) continue;
-          const img = document.createElement('img');
-          img.src = canvas.toDataURL('image/png');
-          img.alt = canvas.id || 'gráfico';
-          img.style.maxWidth = '100%';
-          img.style.width = '100%';
-          img.style.height = 'auto';
-          canvas.replaceWith(img);
-        } catch (e) {}
-      }
-    }
     function htmlOf(sel) {
       const el = document.querySelector(sel);
-      if (!el) return '';
-      rasterizeRoot(el);
-      return el.outerHTML;
+      return el ? el.outerHTML : '';
     }
-    const grids = Array.from(document.querySelectorAll('.two-col-grid'));
-    const lastGrid = grids.length ? grids[grids.length - 1] : null;
-    if (lastGrid) rasterizeRoot(lastGrid);
     return {
       header: htmlOf('.main-header-card'),
       metrics: htmlOf('.metrics-grid'),
-      twoCol: lastGrid ? lastGrid.outerHTML : '',
     };
   }).then((parts) => ({ ...parts, css }));
 }
 
 async function extractAluno(page) {
   await gotoReport(page, urls.aluno);
-  await page.waitForSelector('#tabela_estudos, h2.section-5', { timeout: 60000 });
+  await page.waitForSelector('#tabela_revisoes, h2.section-4, #tabela_estudos, h2.section-5', { timeout: 60000 });
   await prepareCharts(page);
   return page.evaluate(() => {
     function rasterizeRoot(root) {
@@ -616,10 +553,9 @@ async function extractAluno(page) {
       }
       return wrap.innerHTML;
     }
-    const estudos = htmlFromHeading('h2.section-5');
     const revisoes = htmlFromHeading('h2.section-4');
     const revisoesRows = document.querySelectorAll('#tabela_revisoes tbody tr').length;
-    return { estudos, revisoes, revisoesRows };
+    return { revisoes, revisoesRows };
   });
 }
 
@@ -781,8 +717,7 @@ function block(kicker, inner, extraClass = 'mn-legacy') {
 function buildHtml(extracted) {
   const desempenhoCss = extracted.desempenho.css || '';
   const parts = [];
-  parts.push(block('', `${extracted.desempenho.header}${extracted.desempenho.metrics}${extracted.desempenho.twoCol}`, 'mn-desempenho'));
-  parts.push(block('Estudos', extracted.aluno.estudos));
+  parts.push(block('', `${extracted.desempenho.header}${extracted.desempenho.metrics}`, 'mn-desempenho'));
   if (extracted.aluno.revisoes && extracted.aluno.revisoes.trim()) {
     let revisoesHtml = extracted.aluno.revisoes;
     if (extracted.aluno.revisoesRows === 0 && !/mn-empty/.test(revisoesHtml)) {
@@ -829,7 +764,6 @@ try {
 
   const missing = [];
   if (!extracted.desempenho.header || !extracted.desempenho.metrics) missing.push('desempenho');
-  if (!extracted.aluno.estudos) missing.push('estudos');
   if (!extracted.horas.tempo || !extracted.horas.historico) missing.push('horas-liquidas');
   if (!extracted.questoes.panorama || !extracted.questoes.assuntos) missing.push('questoes');
   if (!extracted.progresso.motivacao || !extracted.progresso.insights) missing.push('progresso');
@@ -866,8 +800,6 @@ try {
     sections: {
       desempenhoHeader: Boolean(extracted.desempenho.header),
       desempenhoMetrics: Boolean(extracted.desempenho.metrics),
-      desempenhoTwoCol: Boolean(extracted.desempenho.twoCol),
-      estudos: Boolean(extracted.aluno.estudos),
       revisoes: Boolean(extracted.aluno.revisoes),
       horasTempo: Boolean(extracted.horas.tempo),
       horasHistorico: Boolean(extracted.horas.historico),

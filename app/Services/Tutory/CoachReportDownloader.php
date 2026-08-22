@@ -581,8 +581,8 @@ class CoachReportDownloader
         if ($model === 'progresso' && ! str_contains($html, 'insights-panel')) {
             $this->log("[{$nome}] [{$rotulo}] AVISO: página sem Painel de Insights");
         }
-        if ($model === 'aluno' && ! str_contains($html, 'tabela_estudos')) {
-            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem Histórico de Metas (Estudos)");
+        if ($model === 'aluno' && ! str_contains($html, 'tabela_revisoes')) {
+            $this->log("[{$nome}] [{$rotulo}] AVISO: página sem Revisões no Período (Estudos)");
         }
         if ($model === 'horas-liquidas' && ! str_contains($html, 'chart_line_comparativo')) {
             $this->log("[{$nome}] [{$rotulo}] AVISO: página sem gráfico de desempenho ao longo do tempo");
@@ -1071,9 +1071,6 @@ class CoachReportDownloader
 
         $header = $this->montarHtmlCabecalhoDesempenho($xpDes);
         $metrics = $this->montarHtmlMetricasDesempenho($xpDes);
-        $chartHorasEstudo = $this->chartDesempenhoHorasEstudo($desempenho);
-        $chartPerformance = $this->chartDesempenhoPerformance($desempenho);
-        $estudos = $this->htmlTabelaPorId($xpAluno, 'tabela_estudos');
         $revisoes = $this->htmlTabelaPorId($xpAluno, 'tabela_revisoes');
         $revisoesLinhas = $this->contarLinhasTabela($xpAluno, 'tabela_revisoes');
         $chartTempo = $this->chartImgHtml($horas, 'chart_line_comparativo', null);
@@ -1084,8 +1081,6 @@ class CoachReportDownloader
         $chartMotivacao = $this->chartImgHtml($progresso, 'chart_horas_diarias', null);
         $insights = $this->montarHtmlMotivacaoProgresso($xpProgresso);
 
-        $descEstudos = htmlspecialchars($this->xpathText($xpAluno, "//h2[contains(@class,'section-5')]/following-sibling::p[1]")
-            ?: 'Histórico de metas cumpridas neste período', ENT_QUOTES, 'UTF-8');
         $descRevisoes = htmlspecialchars($this->xpathText($xpAluno, "//h2[contains(@class,'section-4')]/following-sibling::p[1]")
             ?: 'Revisões registradas no período', ENT_QUOTES, 'UTF-8');
         $descTempo = htmlspecialchars($this->xpathText($xpHoras, "//h2[contains(@class,'section-2')]/following-sibling::p[1]")
@@ -1116,17 +1111,6 @@ class CoachReportDownloader
 </style></head><body>
 {$logoHtml}
 <div class="card keep">{$header}{$metrics}</div>
-<div class="kicker">Desempenho</div>
-<table class="two"><tr>
-  <td class="card"><h2>Horas de estudo</h2>{$chartHorasEstudo}</td>
-  <td class="card"><h2>Performance por Área</h2>{$chartPerformance}</td>
-</tr></table>
-<div class="kicker">Estudos</div>
-<div class="card">
-  <h2>Histórico de Metas</h2>
-  <p class="muted">{$descEstudos}</p>
-  {$estudos}
-</div>
 <div class="kicker">Revisões no período</div>
 <div class="card">
   <h2>Revisões no Período</h2>
@@ -1272,115 +1256,6 @@ HTML;
         $rows = $xp->query('//*[@id="'.$id.'"]//tbody/tr');
 
         return $rows === false ? 0 : $rows->length;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function extrairChartDataDesempenho(string $html): array
-    {
-        $pos = strpos($html, 'var chartData');
-        if ($pos === false) {
-            return [];
-        }
-        $start = strpos($html, '{', $pos);
-        if ($start === false) {
-            return [];
-        }
-        $js = $this->extrairObjetoJsBalanceado($html, $start);
-        if ($js === null) {
-            return [];
-        }
-        $json = preg_replace('/([{\[,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/', '$1"$2":', $js) ?? $js;
-        $json = str_replace("'", '"', $json);
-        $json = preg_replace('/,\s*([}\]])/', '$1', $json) ?? $json;
-        $data = json_decode($json, true);
-
-        return is_array($data) ? $data : [];
-    }
-
-    private function chartDesempenhoHorasEstudo(string $html): string
-    {
-        $data = $this->extrairChartDataDesempenho($html);
-        $horas = is_array($data['horasEstudo'] ?? null) ? $data['horasEstudo'] : [];
-        $labels = is_array($horas['labels'] ?? null) ? $horas['labels'] : [];
-        $serie = is_array($horas['horas'] ?? null) ? $horas['horas'] : [];
-        $mediaMap = is_array($horas['mediaTopAlunos'] ?? null) ? $horas['mediaTopAlunos'] : [];
-        if ($labels === []) {
-            return '<p class="empty">(Horas de estudo sem dados no período)</p>';
-        }
-        $media = [];
-        foreach ($labels as $label) {
-            $key = is_scalar($label) ? (string) $label : '';
-            $media[] = isset($mediaMap[$key]) ? $mediaMap[$key] : 0;
-        }
-        $cfg = [
-            'type' => 'bar',
-            'data' => [
-                'labels' => $labels,
-                'datasets' => [
-                    [
-                        'label' => 'Você',
-                        'data' => $serie,
-                        'backgroundColor' => '#3B82F6',
-                    ],
-                    [
-                        'type' => 'line',
-                        'label' => 'Top 10 alunos (média)',
-                        'data' => $media,
-                        'borderColor' => '#22C55E',
-                        'fill' => false,
-                        'pointRadius' => 0,
-                    ],
-                ],
-            ],
-            'options' => [
-                'legend' => ['display' => true],
-                'scales' => [
-                    'yAxes' => [['ticks' => ['beginAtZero' => true]]],
-                ],
-            ],
-        ];
-        $cfg = $this->aplicarDatalabelsOficiais($cfg, 'chart_horas_estudo');
-        $img = $this->quickChartPngDataUri($cfg);
-
-        return $img !== null
-            ? '<img class="chart" src="'.$img.'" />'
-            : '<p class="empty">(Gráfico de horas de estudo indisponível)</p>';
-    }
-
-    private function chartDesempenhoPerformance(string $html): string
-    {
-        $data = $this->extrairChartDataDesempenho($html);
-        $perf = is_array($data['performance'] ?? null) ? $data['performance'] : [];
-        $labels = is_array($perf['disciplinas'] ?? null) ? $perf['disciplinas'] : [];
-        $valores = is_array($perf['valores'] ?? null) ? $perf['valores'] : [];
-        if ($labels === []) {
-            return '<p class="empty">(Performance por área sem dados no período)</p>';
-        }
-        $cfg = [
-            'type' => 'radar',
-            'data' => [
-                'labels' => $labels,
-                'datasets' => [[
-                    'label' => 'Performance',
-                    'data' => $valores,
-                    'backgroundColor' => 'rgba(50, 100, 255, 0.2)',
-                    'borderColor' => '#3264ff',
-                ]],
-            ],
-            'options' => [
-                'legend' => ['display' => false],
-                'scale' => [
-                    'ticks' => ['beginAtZero' => true, 'max' => 100],
-                ],
-            ],
-        ];
-        $img = $this->quickChartPngDataUri($cfg);
-
-        return $img !== null
-            ? '<img class="chart" src="'.$img.'" />'
-            : '<p class="empty">(Gráfico de performance indisponível)</p>';
     }
 
     private function caminhoDestinoPdf(string $nomeAluno, string $model = 'questoes', ?string $id = null): string
@@ -2482,9 +2357,6 @@ h2{font-size:15px; margin:0 0 6px; padding-left:10px; border-left:4px solid #F4B
 .metrics td{background:#fff; border:1px solid #E5E7EB; padding:10px; vertical-align:top;}
 .metrics .label{color:#6B7280; font-size:10px; margin:0 0 6px;}
 .metrics .value{font-size:16px; font-weight:bold; margin:0;}
-.two{width:100%; border-collapse:collapse;}
-.two td{width:50%; vertical-align:top; padding:4px;}
-.two td.card{margin:0;}
 .chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 12px;}
 {$pieCss}
 table.data{width:100%; border-collapse:collapse; font-size:10px;}
