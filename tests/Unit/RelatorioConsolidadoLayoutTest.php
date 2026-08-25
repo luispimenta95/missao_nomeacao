@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Services\Tutory\PdfPreview;
 use App\Services\Tutory\RelatorioConsolidadoLayout;
 use Tests\TestCase;
 
@@ -73,12 +74,13 @@ class RelatorioConsolidadoLayoutTest extends TestCase
     public function test_css_nao_usa_border_radius_nem_fundo_cinza_de_rodape(): void
     {
         $css = RelatorioConsolidadoLayout::css("'Inter'", '');
-        $this->assertStringContainsString('@page{margin:27mm 16mm 16mm 16mm;}', $css);
+        $this->assertStringContainsString('@page{margin:34mm 16mm 18mm 16mm;}', $css);
         $this->assertStringContainsString('background:#ffffff', $css);
         $this->assertStringNotContainsString('#F5F5F5', $css);
         $this->assertStringNotContainsString('border-radius', $css);
         $this->assertStringNotContainsString('Montserrat', $css);
         $this->assertStringNotContainsString('kpi-hot', $css);
+        $this->assertDoesNotMatchRegularExpression('/html,body\{[^}]*margin:0/', $css);
     }
 
     public function test_cards_se_reorganizam_conforme_a_quantidade(): void
@@ -128,5 +130,51 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertLessThan($posTitulo, $posNome);
         $this->assertStringContainsString('mn-sec-keep', $html);
         $this->assertStringContainsString('Curso X', $html);
+    }
+
+    public function test_nome_e_tabelas_nao_invadem_a_faixa_do_cabecalho(): void
+    {
+        $pdftotext = trim((string) shell_exec('command -v pdftotext 2>/dev/null'));
+        if ($pdftotext === '') {
+            $this->markTestSkipped('pdftotext ausente');
+        }
+
+        $pdf = (new PdfPreview)->gerar('dejavu');
+        $tmp = sys_get_temp_dir().'/mn-spacing-'.uniqid('', true).'.pdf';
+        file_put_contents($tmp, $pdf);
+
+        try {
+            $bbox = (string) shell_exec(escapeshellcmd($pdftotext).' -bbox '.escapeshellarg($tmp).' -');
+            $this->assertMatchesRegularExpression(
+                '/<word[^>]*yMin="([0-9.]+)"[^>]*>GIOVANNA<\/word>/',
+                $bbox
+            );
+            preg_match('/<word[^>]*yMin="([0-9.]+)"[^>]*>MISSÃO<\/word>/', $bbox, $cab);
+            preg_match('/<word[^>]*yMin="([0-9.]+)"[^>]*>GIOVANNA<\/word>/', $bbox, $nome);
+            $this->assertNotEmpty($cab);
+            $this->assertNotEmpty($nome);
+            $yCab = (float) $cab[1];
+            $yNome = (float) $nome[1];
+            $this->assertLessThan(40.0, $yCab);
+            $this->assertGreaterThan(90.0, $yNome);
+            $this->assertGreaterThan($yCab + 50.0, $yNome);
+
+            preg_match_all(
+                '/<page[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>Confira<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DISCIPLINA<\/word>/u',
+                $bbox,
+                $pares,
+                PREG_SET_ORDER
+            );
+            $this->assertNotEmpty($pares);
+            foreach ($pares as $par) {
+                $this->assertGreaterThan(
+                    30.0,
+                    (float) $par[2] - (float) $par[1],
+                    'Introdução da seção deve ter folga antes da tabela'
+                );
+            }
+        } finally {
+            @unlink($tmp);
+        }
     }
 }

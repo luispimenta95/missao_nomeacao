@@ -2616,10 +2616,17 @@ HTML;
                     'lineWidth' => 0.5,
                 ]);
                 $ticks = is_array($ax['ticks'] ?? null) ? $ax['ticks'] : [];
-                $ax['ticks'] = array_merge($ticks, [
+                $tickExtras = [
                     'fontSize' => 9,
                     'fontColor' => RelatorioConsolidadoLayout::TEXTO_SEC,
-                ]);
+                ];
+                if ($axis === 'xAxes') {
+                    $tickExtras['autoSkip'] = true;
+                    $tickExtras['maxTicksLimit'] = 8;
+                    $tickExtras['maxRotation'] = 45;
+                    $tickExtras['minRotation'] = 0;
+                }
+                $ax['ticks'] = array_merge($ticks, $tickExtras);
                 $existing[$j] = $ax;
             }
             $data['options']['scales'][$axis] = $existing;
@@ -2822,13 +2829,13 @@ HTML;
                 ? $data['options']['layout']
                 : [];
             $data['options']['plugins']['datalabels'] = [
-                'anchor' => 'end',
-                'align' => 'end',
-                'offset' => 3,
+                'anchor' => 'center',
+                'align' => 'top',
+                'offset' => 8,
                 'clamp' => true,
                 'clip' => false,
                 'color' => RelatorioConsolidadoLayout::AZUL,
-                'backgroundColor' => 'rgba(255,255,255,0.72)',
+                'backgroundColor' => 'rgba(255,255,255,0.82)',
                 'borderWidth' => 0,
                 'padding' => 2,
                 'font' => ['size' => 8, 'weight' => 'bold'],
@@ -2840,8 +2847,9 @@ HTML;
                         continue;
                     }
                     $data['data']['datasets'][$i]['datalabels'] = [
-                        'align' => $i % 2 === 0 ? 'end' : 'start',
-                        'anchor' => $i % 2 === 0 ? 'end' : 'start',
+                        'align' => $i % 2 === 0 ? 'top' : 'bottom',
+                        'anchor' => 'center',
+                        'offset' => 8,
                     ];
                 }
             }
@@ -2849,8 +2857,8 @@ HTML;
                 ? $data['options']['layout']['padding']
                 : [];
             $data['options']['layout']['padding'] = array_merge($padding, [
-                'top' => max((int) ($padding['top'] ?? 0), 22),
-                'bottom' => max((int) ($padding['bottom'] ?? 0), 18),
+                'top' => max((int) ($padding['top'] ?? 0), 28),
+                'bottom' => max((int) ($padding['bottom'] ?? 0), 24),
             ]);
 
             return $data;
