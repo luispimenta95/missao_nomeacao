@@ -12,14 +12,14 @@ final class PdfPreview
     public function gerar(?string $chaveFonte = null): string
     {
         $chave = PdfFontes::normalizar($chaveFonte);
+        if (in_array($chave, ['times', 'courier'], true)) {
+            $chave = PdfFontes::diretorioInter() !== null ? 'inter' : 'dejavu';
+        }
         $fontCss = PdfFontes::css($chave);
         $css = RelatorioConsolidadoLayout::css($fontCss, '', PdfFontes::fontFaceCss($chave));
         $rotulo = RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-01'));
 
-        $desempenho = RelatorioConsolidadoLayout::alunoBloco(
-            'Giovanna',
-            'Pré-edital · Delegado de Polícia — São Paulo'
-        ).RelatorioConsolidadoLayout::cards([
+        $cards = RelatorioConsolidadoLayout::cards([
             ['label' => 'Total de Horas', 'value' => '32h'],
             ['label' => '% de acertos', 'value' => '78,1%'],
             ['label' => 'Questões', 'value' => '248'],
@@ -27,8 +27,9 @@ final class PdfPreview
         ]);
 
         $ritmo = RelatorioConsolidadoLayout::grafico(
-            'Horas planejadas × horas (brutas) estudadas',
-            '<p class="empty">Gráfico omitido neste preview de fonte.</p>'
+            RelatorioConsolidadoLayout::TITULO_GRAFICO_PLANEJADAS,
+            '<p class="empty">Gráfico omitido neste preview de fonte.</p>',
+            RelatorioConsolidadoLayout::LEGENDA_HORAS_ESTUDADAS
         );
 
         $insights = RelatorioConsolidadoLayout::insights([
@@ -42,7 +43,7 @@ final class PdfPreview
         $questoes = RelatorioConsolidadoLayout::cards([
             ['label' => 'Questões realizadas', 'value' => '248'],
             ['label' => 'Acertos', 'value' => '194'],
-            ['label' => 'Percentual de acertos', 'value' => '78,1%', 'destaque' => true],
+            ['label' => 'Percentual de acertos', 'value' => '78,1%'],
         ]);
 
         $assuntos = RelatorioConsolidadoLayout::tabela(
@@ -73,13 +74,24 @@ final class PdfPreview
             ['numeric' => [2, 3]]
         );
 
-        $secoes = RelatorioConsolidadoLayout::secao('Seu desempenho', '', $desempenho)
+        $secoes = RelatorioConsolidadoLayout::alunoNome('Giovanna')
+            .RelatorioConsolidadoLayout::secao(
+                'Seu desempenho',
+                'Pré-edital · Delegado de Polícia — São Paulo',
+                $cards,
+                'mn-sec-keep'
+            )
             .RelatorioConsolidadoLayout::secao('Ritmo de estudos', '', $ritmo)
-            .RelatorioConsolidadoLayout::secao('Painel de Insights', '', $insights)
+            .RelatorioConsolidadoLayout::secao('Painel de Insights', '', $insights, 'mn-sec-insights')
             .RelatorioConsolidadoLayout::secao('Desempenho em questões', 'Confira o seu desempenho de questões no período', $questoes)
-            .RelatorioConsolidadoLayout::secao('Performance por assunto', 'Amostra de texto com acentuação: ação, ciência, constituição, órgão.', $assuntos)
-            .RelatorioConsolidadoLayout::secao('Revisões no período', '', $revisoes)
-            .RelatorioConsolidadoLayout::secao('Histórico completo', '', $historico);
+            .RelatorioConsolidadoLayout::secao('Performance por assunto', 'Amostra de texto com acentuação: ação, ciência, constituição, órgão.', $assuntos, 'mn-sec-table')
+            .RelatorioConsolidadoLayout::secao('Revisões no período', '', $revisoes, 'mn-sec-table')
+            .RelatorioConsolidadoLayout::secao(
+                'Histórico completo',
+                RelatorioConsolidadoLayout::INTRO_HISTORICO,
+                $historico,
+                'mn-sec-table'
+            );
 
         $html = <<<HTML
 <!DOCTYPE html>
@@ -91,6 +103,7 @@ final class PdfPreview
 HTML;
 
         $dompdf = new Dompdf(PdfFontes::opcoesDompdf($chave));
+        PdfFontes::aplicarNoDompdf($dompdf);
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();

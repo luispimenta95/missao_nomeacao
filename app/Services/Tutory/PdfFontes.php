@@ -3,6 +3,7 @@
 namespace App\Services\Tutory;
 
 use App\Models\Configuracao;
+use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
@@ -102,20 +103,14 @@ final class PdfFontes
             return '';
         }
 
-        $pesos = [
-            400 => 'Inter-Regular.ttf',
-            500 => 'Inter-Medium.ttf',
-            600 => 'Inter-SemiBold.ttf',
-            700 => 'Inter-Bold.ttf',
-        ];
         $css = '';
-        foreach ($pesos as $peso => $arquivo) {
+        foreach (self::arquivosInter() as $peso => $arquivo) {
             $path = $dir.DIRECTORY_SEPARATOR.$arquivo;
             if (! is_file($path)) {
                 continue;
             }
-            $url = str_replace('\\', '/', (string) realpath($path));
-            $css .= "@font-face{font-family:'Inter';font-style:normal;font-weight:{$peso};src:url('file://{$url}') format('truetype');}";
+            $rel = 'resources/fonts/inter/'.$arquivo;
+            $css .= "@font-face{font-family:'Inter';font-style:normal;font-weight:{$peso};src:url('{$rel}') format('truetype');}";
         }
 
         return $css;
@@ -140,6 +135,21 @@ final class PdfFontes
         return self::OPCOES[$chave]['familia'];
     }
 
+    /**
+     * Fonte efetiva do canvas/Dompdf. Inter entra pelo @font-face;
+     * se não registrar, o fallback precisa ser DejaVu Sans — nunca Times.
+     */
+    public static function defaultFontDompdf(?string $chave = null): string
+    {
+        $chave = self::resolver($chave);
+        $familia = self::OPCOES[$chave]['familia'];
+        if ($chave === 'inter' || strcasecmp($familia, 'Inter') === 0) {
+            return 'DejaVu Sans';
+        }
+
+        return $familia;
+    }
+
     public static function css(?string $chave = null): string
     {
         $chave = self::resolver($chave);
@@ -159,7 +169,7 @@ final class PdfFontes
         $options = new Options;
         $options->set('isRemoteEnabled', true);
         $options->set('isFontSubsettingEnabled', true);
-        $options->set('defaultFont', self::familiaDompdf($chave));
+        $options->set('defaultFont', self::defaultFontDompdf($chave));
         $chroot = array_values(array_filter([
             function_exists('base_path') ? base_path() : null,
             function_exists('public_path') ? public_path() : null,
@@ -171,6 +181,58 @@ final class PdfFontes
         return $options;
     }
 
+    /**
+     * Garante que o HTML resolva as TTFs relativas ao chroot e tenta
+     * registrar Inter no FontMetrics (canvas + fallback sem Times).
+     */
+    public static function aplicarNoDompdf(Dompdf $dompdf): void
+    {
+        try {
+            if (function_exists('base_path')) {
+                $dompdf->setBasePath(base_path());
+            }
+        } catch (Throwable) {
+            // Base path é opcional; @font-face relativo ainda pode resolver pelo chroot.
+        }
+
+        $dir = self::diretorioInter();
+        if ($dir === null) {
+            return;
+        }
+
+        try {
+            $metrics = $dompdf->getFontMetrics();
+        } catch (Throwable) {
+            return;
+        }
+
+        $pesos = [
+            400 => ['weight' => 'normal', 'style' => 'normal'],
+            500 => ['weight' => 500, 'style' => 'normal'],
+            600 => ['weight' => 600, 'style' => 'normal'],
+            700 => ['weight' => 'bold', 'style' => 'normal'],
+        ];
+        foreach (self::arquivosInter() as $peso => $arquivo) {
+            $path = $dir.DIRECTORY_SEPARATOR.$arquivo;
+            if (! is_file($path) || ! isset($pesos[$peso])) {
+                continue;
+            }
+            $abs = realpath($path);
+            if (! is_string($abs) || $abs === '') {
+                continue;
+            }
+            try {
+                $metrics->registerFont([
+                    'family' => 'Inter',
+                    'weight' => $pesos[$peso]['weight'],
+                    'style' => $pesos[$peso]['style'],
+                ], 'file://'.$abs);
+            } catch (Throwable) {
+                // Sem Inter registrado, defaultFont DejaVu Sans cobre o corpo.
+            }
+        }
+    }
+
     public static function normalizar(?string $chave): string
     {
         $chave = strtolower(trim((string) $chave));
@@ -179,6 +241,19 @@ final class PdfFontes
         }
 
         return $chave;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function arquivosInter(): array
+    {
+        return [
+            400 => 'Inter-Regular.ttf',
+            500 => 'Inter-Medium.ttf',
+            600 => 'Inter-SemiBold.ttf',
+            700 => 'Inter-Bold.ttf',
+        ];
     }
 
     private static function resolver(?string $chave): string
