@@ -195,7 +195,9 @@ final class RelatorioConsolidadoLayout
         $percentCol = $opts['percent_col'] ?? null;
         $class = $opts['class'] ?? 'mn-table';
 
-        $html = '<table class="'.$class.'"><thead><tr>';
+        $html = '<table class="'.$class.'"><thead>';
+        $colspan = max(count($headers), 1);
+        $html .= '<tr class="mn-table-band"><th colspan="'.$colspan.'"></th></tr><tr>';
         foreach ($headers as $i => $h) {
             $align = isset($numeric[$i]) || $i === $percentCol ? ' class="num"' : '';
             $html .= '<th'.$align.'>'.htmlspecialchars($h, ENT_QUOTES, 'UTF-8').'</th>';
@@ -309,13 +311,14 @@ img{max-width:100%; height:auto;}
 .mn-kpis td.kpi{background:#ffffff; border:1px solid {$borda}; padding:16px 16px 18px; vertical-align:top;}
 .kpi-label{font-size:8.5pt; font-weight:500; color:{$sec}; letter-spacing:0.04em; text-transform:uppercase; margin:0 0 8px; line-height:1.25;}
 .kpi-value{font-size:19pt; font-weight:700; color:{$azul}; line-height:1.1;}
-.mn-chart{margin:8px 0 28px; page-break-inside:avoid;}
+.mn-chart{margin:8px 0 28px; padding-top:56px; page-break-inside:avoid;}
 .mn-chart-title{font-size:11pt; font-weight:600; color:{$azul}; margin:0 0 8px;}
 .mn-chart-note{font-size:9.5pt; font-weight:400; color:{$sec}; margin:0 0 14px;}
 .chart{width:100%; max-width:100%; margin:10px 0 0;}
 {$pieCss}
 .mn-table{width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed; margin:12px 0 0;}
 .mn-table thead{display:table-header-group;}
+.mn-table-band th{height:44px; padding:0; border:0; background:#ffffff; font-size:1px; line-height:0; color:#ffffff;}
 .mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:8.5pt; letter-spacing:0.03em; text-transform:uppercase; padding:11px 12px; text-align:left; vertical-align:middle;}
 .mn-table th.num,.mn-table td.num{text-align:right; white-space:nowrap; width:18%;}
 .mn-table td{border-bottom:1px solid #EEF0F3; padding:11px 12px; vertical-align:top; color:{$texto}; word-wrap:break-word; font-size:9pt; font-weight:400; line-height:1.4;}
@@ -333,6 +336,14 @@ img{max-width:100%; height:auto;}
 .empty{color:#6B7280; text-align:left; font-size:10pt; padding:8px 0;}
 .keep{page-break-inside:avoid;}
 CSS;
+    }
+
+    public static function documento(string $css, string $rotuloPeriodo, string $corpo): string
+    {
+        unset($rotuloPeriodo);
+
+        return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'.$css
+            .'</style></head><body>'.$corpo.'</body></html>';
     }
 
     public static function aplicarCabecalhoRodape(Dompdf $dompdf, string $rotuloPeriodo): void
@@ -360,10 +371,10 @@ CSS;
             $cinza = self::hexToRgb(self::TEXTO_SEC);
 
             $marca = self::textoCabecalhoEsquerdo();
-            $canvas->page_text($left, 26.0, $marca, $bold, 8.0, $azul);
+            $canvas->page_text($left, 22.0, $marca, $bold, 8.0, $azul);
             $rotuloW = $metrics->getTextWidth($rotuloPeriodo, $regular, 8.0);
-            $canvas->page_text($right - $rotuloW, 26.0, $rotuloPeriodo, $regular, 8.0, $cinza);
-            $canvas->page_line($left, 48.0, $right, 48.0, $ouro, 0.6);
+            $canvas->page_text($right - $rotuloW, 22.0, $rotuloPeriodo, $regular, 8.0, $cinza);
+            $canvas->page_line($left, 42.0, $right, 42.0, $ouro, 0.6);
 
             $pag = 'Página {PAGE_NUM} de {PAGE_COUNT}';
             $pagW = $metrics->getTextWidth('Página 00 de 00', $regular, 7.5);

@@ -1158,8 +1158,11 @@ class CoachReportDownloader
                 'mn-sec-table'
             );
 
-        return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'.$css
-            .'</style></head><body>'.$secoes.'</body></html>';
+        return RelatorioConsolidadoLayout::documento(
+            $css,
+            RelatorioConsolidadoLayout::rotuloPeriodo($this->periodo),
+            $secoes
+        );
     }
 
     /**

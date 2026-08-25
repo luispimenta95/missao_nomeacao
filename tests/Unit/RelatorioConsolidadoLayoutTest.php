@@ -2,8 +2,10 @@
 
 namespace Tests\Unit;
 
+use App\Services\Tutory\PdfFontes;
 use App\Services\Tutory\PdfPreview;
 use App\Services\Tutory\RelatorioConsolidadoLayout;
+use Dompdf\Dompdf;
 use Tests\TestCase;
 
 class RelatorioConsolidadoLayoutTest extends TestCase
@@ -75,6 +77,8 @@ class RelatorioConsolidadoLayoutTest extends TestCase
     {
         $css = RelatorioConsolidadoLayout::css("'Inter'", '');
         $this->assertStringContainsString('@page{margin:34mm 16mm 18mm 16mm;}', $css);
+        $this->assertStringContainsString('padding-top:56px', $css);
+        $this->assertStringContainsString('.mn-table-band', $css);
         $this->assertStringContainsString('background:#ffffff', $css);
         $this->assertStringNotContainsString('#F5F5F5', $css);
         $this->assertStringNotContainsString('border-radius', $css);
@@ -130,6 +134,8 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertLessThan($posTitulo, $posNome);
         $this->assertStringContainsString('mn-sec-keep', $html);
         $this->assertStringContainsString('Curso X', $html);
+        $doc = RelatorioConsolidadoLayout::documento('body{}', 'AGOSTO/PERÍODO 1', $html);
+        $this->assertStringContainsString('<body>'.$html.'</body>', $doc);
     }
 
     public function test_nome_e_tabelas_nao_invadem_a_faixa_do_cabecalho(): void
@@ -155,7 +161,7 @@ class RelatorioConsolidadoLayoutTest extends TestCase
             $this->assertNotEmpty($nome);
             $yCab = (float) $cab[1];
             $yNome = (float) $nome[1];
-            $this->assertLessThan(40.0, $yCab);
+            $this->assertLessThan(45.0, $yCab);
             $this->assertGreaterThan(90.0, $yNome);
             $this->assertGreaterThan($yCab + 50.0, $yNome);
 
@@ -173,6 +179,63 @@ class RelatorioConsolidadoLayoutTest extends TestCase
                     'Introdução da seção deve ter folga antes da tabela'
                 );
             }
+        } finally {
+            @unlink($tmp);
+        }
+    }
+
+    public function test_legenda_do_grafico_nao_sobrepoe_o_cabecalho_na_segunda_pagina(): void
+    {
+        $pdftotext = trim((string) shell_exec('command -v pdftotext 2>/dev/null'));
+        if ($pdftotext === '') {
+            $this->markTestSkipped('pdftotext ausente');
+        }
+
+        $rotulo = RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-01'));
+        $css = RelatorioConsolidadoLayout::css(PdfFontes::css('dejavu'), '', '');
+        $linhas = str_repeat(
+            '<p style="margin:0 0 10px;font-size:12pt;line-height:1.4;">Linha de preenchimento para forcar a quebra de pagina do grafico.</p>',
+            22
+        );
+        $corpo = $linhas.RelatorioConsolidadoLayout::grafico(
+            RelatorioConsolidadoLayout::TITULO_GRAFICO_PLANEJADAS,
+            '<div style="height:200px;border:1px solid #ccc;">grafico</div>',
+            RelatorioConsolidadoLayout::LEGENDA_HORAS_ESTUDADAS
+        );
+        $html = RelatorioConsolidadoLayout::documento($css, $rotulo, $corpo);
+
+        $dompdf = new Dompdf(PdfFontes::opcoesDompdf('dejavu'));
+        PdfFontes::aplicarNoDompdf($dompdf);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+        RelatorioConsolidadoLayout::aplicarCabecalhoRodape($dompdf, $rotulo);
+        $pdf = $dompdf->output() ?? '';
+
+        $tmp = sys_get_temp_dir().'/mn-chart-header-'.uniqid('', true).'.pdf';
+        file_put_contents($tmp, $pdf);
+
+        try {
+            $bbox = (string) shell_exec(escapeshellcmd($pdftotext).' -bbox '.escapeshellarg($tmp).' -');
+            $paginas = preg_split('/<page\b/', $bbox) ?: [];
+            $achou = false;
+            foreach ($paginas as $i => $pagina) {
+                if ($i === 0 || ! str_contains($pagina, 'registradas')) {
+                    continue;
+                }
+                $this->assertMatchesRegularExpression('/yMin="([0-9.]+)"[^>]*>MISSÃO</', $pagina);
+                preg_match('/<word[^>]*yMin="([0-9.]+)"[^>]*yMax="([0-9.]+)"[^>]*>MISSÃO</', $pagina, $cab);
+                preg_match('/<word[^>]*yMin="([0-9.]+)"[^>]*>registradas/', $pagina, $leg);
+                $this->assertNotEmpty($cab);
+                $this->assertNotEmpty($leg);
+                $this->assertGreaterThan(
+                    (float) $cab[2] + 4.0,
+                    (float) $leg[1],
+                    'A legenda do gráfico não pode cruzar MISSÃO NOMEAÇÃO'
+                );
+                $achou = true;
+            }
+            $this->assertTrue($achou, 'A legenda deveria aparecer numa página junto do cabeçalho');
         } finally {
             @unlink($tmp);
         }

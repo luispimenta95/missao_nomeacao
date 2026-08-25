@@ -93,14 +93,7 @@ final class PdfPreview
                 'mn-sec-table'
             );
 
-        $html = <<<HTML
-<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-{$css}
-</style></head><body>
-{$secoes}
-</body></html>
-HTML;
+        $html = RelatorioConsolidadoLayout::documento($css, $rotulo, $secoes);
 
         $dompdf = new Dompdf(PdfFontes::opcoesDompdf($chave));
         PdfFontes::aplicarNoDompdf($dompdf);

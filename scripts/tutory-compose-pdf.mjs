@@ -437,7 +437,7 @@ html, body {
   color: var(--mn-sec);
   margin: 0 0 14px;
 }
-.mn-chart { margin: 8px 0 28px; break-inside: avoid; page-break-inside: avoid; }
+.mn-chart { margin: 8px 0 28px; padding-top: 20px; break-inside: avoid; page-break-inside: avoid; }
 .mn-sec-body table {
   width: 100%;
   border-collapse: collapse;
