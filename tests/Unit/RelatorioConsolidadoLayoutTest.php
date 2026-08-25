@@ -69,6 +69,35 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('color:'.RelatorioConsolidadoLayout::VERMELHO, $html);
         $this->assertStringContainsString('color:'.RelatorioConsolidadoLayout::VERDE, $html);
         $this->assertStringNotContainsString('background:'.RelatorioConsolidadoLayout::VERMELHO.'">Improbidade', $html);
+        $this->assertStringNotContainsString('mn-table-band', $html);
+        $this->assertStringContainsString('class="z"', $html);
+        $this->assertMatchesRegularExpression('/<td class="num">/', $html);
+    }
+
+    public function test_css_tabelas_e_espacamentos_seguem_o_comando(): void
+    {
+        $css = RelatorioConsolidadoLayout::css("'Inter'", '');
+        $this->assertStringContainsString('@page{margin:34mm 16mm 18mm 16mm;}', $css);
+        $this->assertStringContainsString('.mn-sec{margin:0 0 28px;}', $css);
+        $this->assertStringContainsString('.mn-sec-intro{font-size:10.5pt; font-weight:400; color:#4B5563; margin:7px 0 0;', $css);
+        $this->assertStringContainsString('.mn-sec-body{margin-top:14px;}', $css);
+        $this->assertStringContainsString('border-spacing:14px 0', $css);
+        $this->assertStringContainsString('.mn-kpis td.kpi{background:#ffffff; border:1px solid #E6E8EC; padding:18px 18px;', $css);
+        $this->assertStringContainsString('.mn-chart{margin:8px 0 16px;', $css);
+        $this->assertStringContainsString('.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:auto; margin:0;}', $css);
+        $this->assertStringContainsString('padding:9px 11px', $css);
+        $this->assertStringContainsString('height:auto', $css);
+        $this->assertStringContainsString('.mn-table tr{page-break-inside:avoid;', $css);
+        $this->assertStringContainsString('.mn-table tbody tr:first-child,.mn-table tbody tr:nth-child(2){page-break-before:avoid;}', $css);
+        $this->assertStringContainsString('white-space:nowrap', $css);
+        $this->assertStringContainsString('width:1%', $css);
+        $this->assertStringNotContainsString('width:18%', $css);
+        $this->assertStringNotContainsString('.mn-table{width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed;', $css);
+        $this->assertStringNotContainsString('mn-table-band', $css);
+        $this->assertStringNotContainsString('padding-top:56px', $css);
+        $this->assertStringNotContainsString('#F5F5F5', $css);
+        $this->assertStringNotContainsString('border-radius', $css);
+        $this->assertDoesNotMatchRegularExpression('/html,body\{[^}]*margin:0/', $css);
     }
 
     public function test_css_nao_usa_border_radius_nem_fundo_cinza_de_rodape(): void
@@ -159,18 +188,32 @@ class RelatorioConsolidadoLayoutTest extends TestCase
             $this->assertGreaterThan(90.0, $yNome);
             $this->assertGreaterThan($yCab + 50.0, $yNome);
 
+            $pares = [];
             preg_match_all(
-                '/<page[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>Confira<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DISCIPLINA<\/word>/u',
+                '/<word[^>]*yMin="([0-9.]+)"[^>]*>Amostra<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DISCIPLINA<\/word>/u',
                 $bbox,
-                $pares,
+                $assunto,
                 PREG_SET_ORDER
             );
+            preg_match_all(
+                '/<word[^>]*yMin="([0-9.]+)"[^>]*>cronometradas<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DATA<\/word>/u',
+                $bbox,
+                $historico,
+                PREG_SET_ORDER
+            );
+            $pares = array_merge($assunto, $historico);
             $this->assertNotEmpty($pares);
             foreach ($pares as $par) {
+                $delta = (float) $par[2] - (float) $par[1];
                 $this->assertGreaterThan(
-                    30.0,
-                    (float) $par[2] - (float) $par[1],
-                    'Introdução da seção deve ter folga antes da tabela'
+                    18.0,
+                    $delta,
+                    'Texto secundário não pode grudar no cabeçalho da tabela'
+                );
+                $this->assertLessThan(
+                    55.0,
+                    $delta,
+                    'Folga intro→tabela não deve virar faixa vazia'
                 );
             }
         } finally {
