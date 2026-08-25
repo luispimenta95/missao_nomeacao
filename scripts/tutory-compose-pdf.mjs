@@ -41,6 +41,7 @@ const urls = {
   questoes: arg('url-questoes'),
   progresso: arg('url-progresso'),
 };
+const rotuloPeriodo = arg('rotulo-periodo', '');
 const cookieHeader = arg('cookie', '');
 const token = arg('token', '');
 
@@ -48,7 +49,7 @@ if (!out || Object.values(urls).some((u) => !u)) {
   console.error(
     'Uso: node scripts/tutory-compose-pdf.mjs --out FILE'
     + ' --url-desempenho URL --url-aluno URL --url-horas-liquidas URL'
-    + ' --url-questoes URL --url-progresso URL [--cookie PHPSESSID=..] [--token TOKEN]',
+    + ' --url-questoes URL --url-progresso URL [--cookie PHPSESSID=..] [--token TOKEN] [--rotulo-periodo TEXTO]',
   );
   process.exit(1);
 }
@@ -295,11 +296,22 @@ function labelHoursOnChartVertices() {
 }
 
 const COMPOSER_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+:root {
+  --mn-azul: #001D3D;
+  --mn-ouro: #BF8F00;
+  --mn-texto: #1F2937;
+  --mn-sec: #4B5563;
+  --mn-borda: #E6E8EC;
+  --mn-zebra: #F8F9FB;
+}
 html, body {
   padding-top: 0 !important;
-  padding-bottom: 24px !important;
+  padding-bottom: 8px !important;
+  font-family: Inter, "DejaVu Sans", Helvetica, Arial, sans-serif !important;
+  color: var(--mn-texto);
+  background: #fff !important;
 }
 .report-top-bar,
 .actions,
@@ -307,159 +319,159 @@ html, body {
 #btn_download,
 #btn_whatsapp_link,
 #theme_toggle,
-.no-print {
+.no-print,
+.watermark,
+[class*="watermark"],
+.marca-dagua {
   display: none !important;
 }
 .mn-unified {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 12px 16px 32px;
+  padding: 4px 8px 16px;
 }
-.mn-kicker {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--texto-secundario, #6B7280);
-  margin: 28px 0 12px;
+.mn-sec {
+  margin: 0 0 28px;
+  break-inside: auto;
 }
-.mn-kicker:first-child {
-  margin-top: 0;
+.mn-sec-head {
+  break-after: avoid;
+  page-break-after: avoid;
 }
-.mn-desempenho {
-  display: flow-root;
-  margin-bottom: 8px;
-}
-.mn-legacy {
-  background: var(--bg-card, #fff);
-  border-radius: var(--radius-xl, 20px);
-  box-shadow: var(--sombra-card, 0 2px 8px rgba(0,0,0,0.08));
-  padding: 20px 22px;
-  margin-bottom: 20px;
-  color: var(--texto-primario, #1F2937);
-}
-.mn-legacy h2 {
+.mn-sec-title {
   font-size: 18px;
   font-weight: 700;
+  color: var(--mn-azul);
+  margin: 0;
+  padding: 0 0 0 10px;
+  border-left: 3px solid var(--mn-ouro);
+  line-height: 1.2;
+}
+.mn-sec-intro {
+  font-size: 13px;
+  color: var(--mn-sec);
+  margin: 7px 0 0;
+  padding-left: 13px;
+}
+.mn-sec-body { margin-top: 14px; }
+.mn-sec-body h1,
+.mn-sec-body h2,
+.mn-sec-body h6,
+.mn-kicker { display: none !important; }
+.mn-aluno-nome, .title-section h1, .aluno-details h4 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mn-azul);
+  margin: 0 0 4px;
+}
+.aluno-details p, .title-section p {
+  font-size: 13px;
+  color: var(--mn-sec);
+  margin: 0;
+}
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.metric-card, .main-numbers {
+  background: #fff;
+  border: 1px solid var(--mn-borda);
+  border-radius: 4px;
+  padding: 16px 14px 18px;
+  box-shadow: none !important;
+  text-align: left;
+  margin: 0;
+}
+.metric-label, .main-numbers p {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--mn-sec);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   margin: 0 0 8px;
-  padding-left: 12px;
-  border-left: 4px solid var(--cor-destaque, #F4B942);
-  color: var(--texto-primario, #1F2937);
 }
-.mn-legacy h2 + p,
-.mn-legacy p[class^="section-"] {
-  color: var(--texto-secundario, #6B7280);
-  font-size: 14px;
-  margin: 0 0 14px;
-}
-.mn-legacy table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.mn-legacy img {
-  max-width: 100%;
-  height: auto;
-  display: block;
+.metric-value, .main-numbers h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mn-azul);
+  margin: 0;
 }
 .mn-legacy .row {
   display: flex;
   flex-wrap: wrap;
-  margin-left: -8px;
-  margin-right: -8px;
+  gap: 12px;
+  margin: 0;
 }
-.mn-legacy .col-4,
-.mn-legacy .col-6,
-.mn-legacy .col-2 {
-  padding: 8px;
+.mn-legacy .col-4, .mn-legacy .col-6, .mn-legacy .col-2 {
+  padding: 0;
   box-sizing: border-box;
+  flex: 1 1 160px;
 }
-.mn-legacy .col-4 { width: 33.333%; }
-.mn-legacy .col-6 { width: 50%; }
-.mn-legacy .col-2 { width: 16.666%; }
-.mn-legacy .main-numbers {
-  background: var(--bg-card, #fff);
-  border: 1px solid var(--borda-cor, #E5E7EB);
-  border-radius: 12px;
-  padding: 12px 8px;
-  text-align: center;
-  margin: 0;
+.mn-chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mn-azul);
+  margin: 0 0 10px;
 }
-.mn-legacy .main-numbers p {
-  font-weight: 500;
-  color: var(--texto-secundario, #6B7280);
-  font-size: 12px;
-  margin: 0;
+.mn-chart { margin: 0 0 18px; break-inside: avoid; page-break-inside: avoid; }
+.mn-sec-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.mn-sec-body thead { display: table-header-group; }
+.mn-sec-body thead td, .mn-sec-body thead th {
+  background: var(--mn-azul) !important;
+  color: #fff !important;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  padding: 9px 11px;
+  text-align: left;
 }
-.mn-legacy .main-numbers h3 {
-  font-weight: 700;
-  color: var(--texto-primario, #1F2937);
-  font-size: 22px;
-  margin: 6px 0 0;
+.mn-sec-body tbody td {
+  border-bottom: 1px solid #EEF0F3;
+  padding: 9px 11px;
+  vertical-align: top;
+  word-wrap: break-word;
+}
+.mn-sec-body tbody tr:nth-child(even) td { background: var(--mn-zebra); }
+.mn-sec-body tbody tr { break-inside: avoid; page-break-inside: avoid; }
+.mn-sec-body img {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 .mn-empty {
-  color: var(--texto-terciario, #9CA3AF);
+  color: #6B7280;
   font-size: 13px;
-  text-align: center;
-  padding: 12px 8px;
+  text-align: left;
+  padding: 8px 0;
   margin: 0;
 }
-.mn-insights-wrap {
-  background: var(--bg-card, #fff);
-  border: 3px solid var(--cor-principal, #3264ff);
-  border-radius: var(--radius-xl, 20px);
-  box-shadow: 0 10px 32px rgba(50, 100, 255, 0.18);
-  padding: 28px 28px 24px;
-  margin: 8px 0 28px;
-  page-break-inside: avoid;
+.insights-panel {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
 }
-.mn-insights-wrap .insights-panel {
-  background: transparent;
-  padding: 0;
-  margin: 0;
-}
-.mn-insights-wrap h6 {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--cor-principal, #3264ff);
-  margin: 0 0 16px;
-  letter-spacing: -0.02em;
-}
-.mn-insights-wrap p {
-  font-size: 16px;
-  line-height: 1.55;
-  color: var(--texto-primario, #1F2937);
-  margin: 0 0 10px;
-  font-weight: 400;
-}
-@media (max-width: 768px) {
-  .mn-legacy .col-4,
-  .mn-legacy .col-6,
-  .mn-legacy .col-2 {
-    width: 100%;
-  }
-  .metrics-grid {
-    grid-template-columns: 1fr !important;
-  }
+.insights-panel p {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--mn-texto);
+  margin: 0 0 8px;
+  padding: 8px 0 8px 12px;
+  border-left: 2px solid var(--mn-ouro);
 }
 @media print {
-  .mn-insights-wrap,
-  .main-header-card,
-  .metric-card {
+  .mn-sec-head, .mn-chart, .metric-card, .main-header-card {
+    break-inside: avoid;
     page-break-inside: avoid;
   }
-  .metrics-grid,
-  .mn-desempenho {
-    page-break-inside: auto;
-    break-inside: auto;
-  }
-  .mn-legacy,
-  .mn-kicker {
-    break-before: auto;
-    clear: both;
-  }
-  .mn-legacy table { page-break-inside: auto; }
+  .mn-sec-body table { page-break-inside: auto; }
 }
 `;
 
@@ -753,16 +765,34 @@ async function extractProgresso(page) {
   });
 }
 
-function block(kicker, inner, extraClass = 'mn-legacy') {
+function block(title, inner, extraClass = 'mn-legacy', intro = '') {
   if (!inner || !String(inner).trim()) return '';
-  const kickerHtml = kicker ? `<p class="mn-kicker">${kicker}</p>` : '';
-  return `${kickerHtml}<section class="${extraClass}">${inner}</section>`;
+  const introHtml = intro ? `<p class="mn-sec-intro">${intro}</p>` : '';
+  return `<section class="mn-sec ${extraClass}">
+    <div class="mn-sec-head"><h2 class="mn-sec-title">${title}</h2>${introHtml}</div>
+    <div class="mn-sec-body">${inner}</div>
+  </section>`;
+}
+
+function chartBlock(subtitle, inner) {
+  if (!inner || !String(inner).trim()) return '';
+  const title = subtitle ? `<p class="mn-chart-title">${subtitle}</p>` : '';
+  return `<div class="mn-chart">${title}${inner}</div>`;
 }
 
 function buildHtml(extracted) {
-  const desempenhoCss = extracted.desempenho.css || '';
   const parts = [];
-  parts.push(block('', `${extracted.desempenho.header}${extracted.desempenho.metrics}`, 'mn-desempenho'));
+  parts.push(block(
+    'Seu desempenho',
+    `${extracted.desempenho.header || ''}${extracted.desempenho.metrics || ''}`,
+    'mn-desempenho',
+  ));
+  const ritmo = chartBlock('Horas brutas × horas líquidas', extracted.horas.tempo)
+    + chartBlock('Horas planejadas × horas (brutas) estudadas', extracted.progresso.motivacao);
+  parts.push(block('Ritmo de estudos', ritmo));
+  parts.push(block('Painel de Insights', extracted.progresso.insights || ''));
+  parts.push(block('Desempenho em questões', extracted.questoes.panorama || ''));
+  parts.push(block('Performance por assunto', extracted.questoes.assuntos || ''));
   if (extracted.aluno.revisoes && extracted.aluno.revisoes.trim()) {
     let revisoesHtml = extracted.aluno.revisoes;
     if (extracted.aluno.revisoesRows === 0 && !/mn-empty/.test(revisoesHtml)) {
@@ -770,12 +800,7 @@ function buildHtml(extracted) {
     }
     parts.push(block('Revisões no período', revisoesHtml));
   }
-  parts.push(block('Horas líquidas · desempenho ao longo do tempo', extracted.horas.tempo));
-  parts.push(block('Horas líquidas · histórico', extracted.horas.historico));
-  parts.push(block('Questões', `${extracted.questoes.panorama}`));
-  parts.push(block('Performance por assunto', extracted.questoes.assuntos));
-  parts.push(block('Progresso no plano · motivação', extracted.progresso.motivacao));
-  parts.push(block('', extracted.progresso.insights, 'mn-insights-wrap'));
+  parts.push(block('Histórico completo', extracted.horas.historico || ''));
 
   return `<!DOCTYPE html>
 <html lang="pt-BR" data-theme="light">
@@ -784,8 +809,6 @@ function buildHtml(extracted) {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Relatório consolidado</title>
   <link rel="stylesheet" href="https://static.tutory.com.br/vendor/bootstrap/bootstrap.4.5.0.min.css" />
-  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.13.1/css/all.css" />
-  <style>${desempenhoCss}</style>
   <style>${COMPOSER_CSS}</style>
 </head>
 <body class="report-container">
@@ -827,7 +850,15 @@ try {
     path: outAbs,
     format: 'A4',
     printBackground: true,
-    margin: { top: '12mm', right: '10mm', bottom: '14mm', left: '10mm' },
+    displayHeaderFooter: true,
+    headerTemplate: `<div style="font-family:Inter,Helvetica,sans-serif;font-size:8px;width:100%;padding:0 20mm;color:#001D3D;display:flex;justify-content:space-between;">
+      <span style="font-weight:700;">MISSÃO NOMEAÇÃO</span>
+      <span style="color:#4B5563;">${rotuloPeriodo.replace(/</g, '')}</span>
+    </div>`,
+    footerTemplate: `<div style="font-family:Inter,Helvetica,sans-serif;font-size:8px;width:100%;padding:0 20mm;color:#4B5563;text-align:right;">
+      Página <span class="pageNumber"></span> de <span class="totalPages"></span>
+    </div>`,
+    margin: { top: '18mm', right: '20mm', bottom: '16mm', left: '20mm' },
   });
   try { fs.unlinkSync(tmpHtml); } catch (_) {}
 

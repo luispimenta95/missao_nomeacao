@@ -85,12 +85,11 @@ class PdfDatasTest extends TestCase
         );
     }
 
-    public function test_nao_inverte_data_ambigua_sozinha(): void
+    public function test_compacta_ano_nos_rotulos_de_grafico(): void
     {
-        $this->assertSame('01/08/2026', PdfDatas::textoParaBr('01/08/2026'));
         $this->assertSame(
-            '01/08/2026 a 15/08/2026',
-            PdfDatas::textoParaBr('01/08/2026 a 15/08/2026', true)
+            ['01/08', '02/08', '15/08'],
+            PdfDatas::listaParaBrCompacta(['2026/08/01', '2026/08/02', '08/15/2026'])
         );
     }
 }

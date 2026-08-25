@@ -89,13 +89,21 @@ class AvaliadorDesempenhoTest extends TestCase
             $out['blocos'],
             static fn ($b) => ($b['eixo'] ?? '') === 'assunto'
         ));
-        $this->assertCount(1, $assuntos);
-        $this->assertSame('critico', $assuntos[0]['faixa']); // pior % define a faixa
-        $this->assertCount(2, $assuntos[0]['itens'] ?? []);
-        $this->assertStringContainsString('Improbidade', $assuntos[0]['itens'][0] ?? '');
-        $this->assertStringContainsString('Poder Judiciário', $assuntos[0]['itens'][1] ?? '');
-        $this->assertStringContainsString('Improbidade', $assuntos[0]['texto'] ?? '');
-        $this->assertStringContainsString('gargalos', mb_strtolower($assuntos[0]['texto'] ?? ''));
+        $this->assertCount(2, $assuntos);
+        $porFaixa = [];
+        foreach ($assuntos as $bloco) {
+            $porFaixa[$bloco['faixa']] = $bloco;
+        }
+        $this->assertSame('critico', $porFaixa['critico']['faixa']);
+        $this->assertCount(1, $porFaixa['critico']['itens'] ?? []);
+        $this->assertStringContainsString('Improbidade', $porFaixa['critico']['itens'][0] ?? '');
+        $this->assertStringContainsString('Improbidade', $porFaixa['critico']['texto'] ?? '');
+        $this->assertStringContainsString('gargalos', mb_strtolower($porFaixa['critico']['texto'] ?? ''));
+        $this->assertSame('Quero adiantar minha análise', $porFaixa['critico']['cta']['label'] ?? null);
+        $this->assertNotEmpty($porFaixa['critico']['cta']['url'] ?? null);
+        $this->assertSame('abaixo_media', $porFaixa['abaixo_media']['faixa']);
+        $this->assertCount(1, $porFaixa['abaixo_media']['itens'] ?? []);
+        $this->assertStringContainsString('Poder Judiciário', $porFaixa['abaixo_media']['itens'][0] ?? '');
 
         $soAbaixo = $svc->avaliarRelatorio([
             'nome' => 'Lara',

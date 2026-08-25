@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Services\Tutory\CoachReportDownloader;
+use App\Services\Tutory\RelatorioConsolidadoLayout;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -92,8 +93,13 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('chart_horas_diarias', $src);
         $this->assertStringContainsString('labelHoursOnChartVertices', $src);
         $this->assertStringContainsString('.insights-panel', $src);
-        $this->assertStringContainsString('mn-insights-wrap', $src);
+        $this->assertStringContainsString('mn-sec-title', $src);
+        $this->assertStringContainsString('Seu desempenho', $src);
+        $this->assertStringContainsString('Ritmo de estudos', $src);
+        $this->assertStringContainsString('Painel de Insights', $src);
+        $this->assertStringContainsString('Histórico completo', $src);
         $this->assertStringContainsString('--url-desempenho', $src);
+        $this->assertStringContainsString('--rotulo-periodo', $src);
         $this->assertStringNotContainsString('chart_horas_estudo', $src);
         $this->assertStringNotContainsString('chart_performance', $src);
         $this->assertStringNotContainsString("htmlFromHeading('h2.section-5')", $src);
@@ -158,12 +164,13 @@ class RelatoriosMentorTest extends TestCase
         }
     }
 
-    public function test_marca_dagua_e_missao_nomeacao(): void
+    public function test_nao_aplica_marca_dagua_diagonal(): void
     {
-        $this->assertSame(
-            'Missão Nomeação',
-            (new ReflectionClass(CoachReportDownloader::class))->getConstant('MARCA_DAGUA')
-        );
+        $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());
+        $this->assertStringNotContainsString('aplicarMarcaDaguaPdf', $php);
+        $this->assertStringContainsString('aplicarCabecalhoRodape', $php);
+        $this->assertSame('AGOSTO • PERÍODO 1', RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10')));
+        $this->assertSame('AGOSTO • PERÍODO 2', RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-08-20')));
     }
 
     public function test_css_do_consolidado_nao_deixa_bloco_cinza_no_rodape(): void
@@ -186,8 +193,10 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringNotContainsString('Horas de estudo', $php);
         $this->assertStringNotContainsString('chartDesempenhoHorasEstudo', $php);
         $this->assertStringNotContainsString('chartDesempenhoPerformance', $php);
-        $this->assertStringContainsString('Revisões no Período', $php);
+        $this->assertStringContainsString('Revisões no período', $php);
         $this->assertStringContainsString('montarHtmlMetricasDesempenho', $php);
+        $this->assertStringContainsString('Ritmo de estudos', $php);
+        $this->assertStringContainsString('Histórico completo', $php);
     }
 
     public function test_grafico_de_horas_diarias_tem_rotulos_nos_vertices(): void
@@ -269,11 +278,29 @@ class RelatoriosMentorTest extends TestCase
                 $this->assertStringContainsString('MISSÃO', $txt);
                 $this->assertStringContainsString('NOMEAÇÃO', $txt);
                 $this->assertStringContainsString('Giovanna', $txt);
-                $this->assertStringContainsString('Total de Horas', $txt);
-                $this->assertStringContainsString('Revisões no Período', $txt);
+                $this->assertStringContainsStringIgnoringCase('Total de Horas', $txt);
+                $this->assertStringContainsString('Seu desempenho', $txt);
+                $this->assertStringContainsString('Painel de Insights', $txt);
+                $this->assertStringContainsString('Desempenho em questões', $txt);
+                $this->assertStringContainsString('Performance por assunto', $txt);
+                $this->assertStringContainsString('Revisões no período', $txt);
+                $this->assertStringContainsString('Histórico completo', $txt);
                 $this->assertStringNotContainsString('Histórico de Metas', $txt);
                 $this->assertStringNotContainsString('Performance por Área', $txt);
                 $this->assertStringNotContainsString('Horas de estudo', $txt);
+                $this->assertStringNotContainsString('Breve Panorama', $txt);
+                $posDes = mb_strpos($txt, 'Seu desempenho');
+                $posInsights = mb_strpos($txt, 'Painel de Insights');
+                $posQuestoes = mb_strpos($txt, 'Desempenho em questões');
+                $posAssuntos = mb_strpos($txt, 'Performance por assunto');
+                $posRevisoes = mb_strpos($txt, 'Revisões no período');
+                $posHist = mb_strpos($txt, 'Histórico completo');
+                $this->assertNotFalse($posDes);
+                $this->assertGreaterThan($posDes, $posInsights);
+                $this->assertGreaterThan($posInsights, $posQuestoes);
+                $this->assertGreaterThan($posQuestoes, $posAssuntos);
+                $this->assertGreaterThan($posAssuntos, $posRevisoes);
+                $this->assertGreaterThan($posRevisoes, $posHist);
             }
         } finally {
             foreach (scandir($pasta) ?: [] as $arquivo) {

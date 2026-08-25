@@ -6,17 +6,27 @@ No Hostinger compartilhado **não precisa de Node nem de npm**. O PDF é montado
 
 ## O que entra no PDF único
 
-Não é a junção dos cinco PDFs oficiais. O compositor abre cada página do Tutory, espera os gráficos reais e recorta só os blocos abaixo, reusando o CSS/layout moderno do **Desempenho (NOVO)**.
+Não é a junção dos cinco PDFs oficiais. O compositor extrai os dados da Tutory **sem alterá-los** e monta um único produto visual da Missão Nomeação, em seções modulares (a quantidade de páginas é consequência do conteúdo).
 
-| Origem | Seções extraídas | Fora do consolidado |
-|--------|------------------|---------------------|
-| **Desempenho (NOVO)** `desempenho` | Cabeçalho do aluno (`.main-header-card`) + cards de métricas (`.metrics-grid`) | Ranking, panorama, gráficos Horas de estudo / Performance por Área, progresso mensal, modalidades, progresso por disciplina, insights desse relatório, rodapé |
-| **Estudos** `aluno` | Revisões no Período (`#tabela_revisoes`, omitido/avisado se vazio) | Histórico de Metas (`#tabela_estudos`), panorama, gráficos de questões, performance por assunto (duplicata) |
-| **Horas Líquidas** `horas-liquidas` | Desempenho ao longo do Tempo (`#chart_line_comparativo`) e Histórico (`#tabela_horas_liquidas`) | Pizza por disciplina, progresso por disciplina |
-| **Questões** `questoes` | Breve Panorama (`.main-numbers`), gráfico principal (`#chart_questoes_dia`) e Performance por assunto (`#tabela_questoes`) | Bolha, top melhores/piores, evolução por matéria |
-| **Progresso do plano** `progresso` | Motivação (`#chart_horas_diarias`) e **Painel de Insights** (`.insights-panel`, em destaque visual) | Progresso principal, panorama, modalidades, desempenho de questões |
+Ordem fixa:
 
-Performance por assunto aparece só uma vez, na implementação do relatório de Questões.
+1. **Seu desempenho** — nome, curso e cards de métricas (`.main-header-card` + `.metrics-grid`)
+2. **Ritmo de estudos** — horas brutas × líquidas (`#chart_line_comparativo`) e horas planejadas × horas (brutas) estudadas (`#chart_horas_diarias`)
+3. **Painel de Insights** — `.insights-panel`, sem título duplicado
+4. **Desempenho em questões** — cards do panorama (`.main-numbers`) e gráfico do período (`#chart_questoes_dia`)
+5. **Performance por assunto** — `#tabela_questoes` (percentual colorido só no indicador)
+6. **Revisões no período** — `#tabela_revisoes`
+7. **Histórico completo** — `#tabela_horas_liquidas`
+
+| Origem | Fora do consolidado |
+|--------|---------------------|
+| **Desempenho (NOVO)** `desempenho` | Ranking, panorama, gráficos Horas de estudo / Performance por Área, progresso mensal, modalidades, progresso por disciplina, insights desse relatório, rodapé |
+| **Estudos** `aluno` | Histórico de Metas (`#tabela_estudos`), panorama, gráficos de questões, performance por assunto (duplicata) |
+| **Horas Líquidas** `horas-liquidas` | Pizza por disciplina, progresso por disciplina |
+| **Questões** `questoes` | Bolha, top melhores/piores, evolução por matéria |
+| **Progresso do plano** `progresso` | Progresso principal, panorama, modalidades, desempenho de questões |
+
+Performance por assunto aparece só uma vez, na implementação do relatório de Questões. Identidade: azul `#001D3D`, dourado `#BF8F00`, Inter, cabeçalho `MISSÃO NOMEAÇÃO` / `MÊS • PERÍODO N`, rodapé `Página X de Y`. Sem marca d'água diagonal.
 
 ## Fluxo
 

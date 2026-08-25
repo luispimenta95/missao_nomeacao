@@ -26,6 +26,7 @@ class RelatorioPdfAdminTest extends TestCase
             ->get(route('relatorios-pdf.index'))
             ->assertOk()
             ->assertSee('PDF do relatório')
+            ->assertSee('Inter')
             ->assertSee('DejaVu Sans')
             ->assertSee('Helvetica');
 

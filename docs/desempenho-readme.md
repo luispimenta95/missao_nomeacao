@@ -44,9 +44,9 @@ Você estudou em {X} dos {Y} dias analisados, deixando {Z} dias sem estudar.
 {NOME}, você alcançou {PERCENTUAL_ACERTOS}% de acertos no período.
 ```
 
-### Assunto (um único bloco)
+### Assunto (críticos e abaixo da média em blocos separados)
 
-Os assuntos com rendimento ≤ 75% entram em **um único bloco**, com N bullets (um por assunto). Use `{LISTA_ASSUNTOS}` e o texto de fechamento:
+Assuntos com rendimento ≤ 60% entram no bloco **crítico** (com botão *Quero adiantar minha análise*). Assuntos entre 61% e 75% entram no bloco **abaixo da média**. Use `{LISTA_ASSUNTOS}` e o texto de fechamento:
 
 ```text
 {LISTA_ASSUNTOS}

@@ -24,7 +24,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 0,
                         'valor_max' => 0,
                         'ordem' => 1,
-                        'texto_email' => 'Você estudou em todos os {Y} dias analisados, sem deixar nenhum dia zerado. Sua constância foi excelente — parabéns! Preserve essa dedicação nos próximos períodos; ela é a base do seu projeto de vida.',
+                        'texto_email' => 'Você estudou em todos os {Y} dias analisados, sem deixar nenhum dia zerado. Sua constância foi excelente, parabéns! Continue preservando essa dedicação nos próximos períodos.',
                     ],
                     [
                         'codigo' => 'bom',
@@ -32,7 +32,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 1,
                         'valor_max' => 3,
                         'ordem' => 2,
-                        'texto_email' => 'Você estudou em {X} dos {Y} dias analisados, deixando {Z} dia(s) sem estudar. Sua constância foi boa e a frequência no período ficou satisfatória — ainda assim, dá para deixar ainda mais consistente.',
+                        'texto_email' => 'Você estudou em {X} dos {Y} dias analisados, deixando {Z} dias sem estudar. Sua constância foi boa. Você conseguiu manter uma frequência satisfatória durante o período, mas pode melhorar.',
                     ],
                     [
                         'codigo' => 'brigando',
@@ -40,7 +40,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 4,
                         'valor_max' => 10,
                         'ordem' => 3,
-                        'texto_email' => 'Você estudou em {X} dos {Y} dias analisados, deixando {Z} dias sem estudar. A briga com a constância está forte neste período. No próximo ciclo, priorize manter contato quase diário com o seu compromisso pessoal de estudos.',
+                        'texto_email' => 'Você estudou em {X} dos {Y} dias analisados, deixando {Z} dias sem estudar. Vejo que a briga com a constância nos estudos está forte, ein?! No próximo período, procure manter um contato mais frequente com o seu compromisso pessoal.',
                     ],
                     [
                         'codigo' => 'critico',
@@ -48,7 +48,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 11,
                         'valor_max' => null,
                         'ordem' => 4,
-                        'texto_email' => 'Você estudou em {X} dos {Y} dias analisados, deixando {Z} dias sem estudar. Sua constância está em nível crítico: foram muitos dias sem contato com os estudos. A prioridade agora é retomar o quanto antes — você tem um projeto de vida para realizar.',
+                        'texto_email' => 'Você estudou em {X} dos {Y} dias analisados, deixando {Z} dias sem estudar. Sua constância está em nível crítico. Você ficou muitos dias sem contato com os estudos e sua prioridade no próximo período deve ser retornar o quanto antes. Ou você se esqueceu que quer mudar de vida?',
                     ],
                 ],
             ],
@@ -64,7 +64,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 0,
                         'valor_max' => 49,
                         'ordem' => 1,
-                        'texto_email' => '{NOME}, você realizou {TOTAL_QUESTOES} questões no período. Esse volume está crítico e ainda é insuficiente para avaliarmos seu percentual de acertos com segurança. Priorize aumentar a quantidade de questões no próximo período.',
+                        'texto_email' => '{NOME}, você realizou {TOTAL_QUESTOES} questões durante o período. Esse volume está em nível crítico e é insuficiente para avaliarmos seu percentual de acertos com segurança. Sua prioridade para o próximo período deve ser aumentar a quantidade de questões realizadas.',
                     ],
                     [
                         'codigo' => 'volume_baixo',
@@ -72,7 +72,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 50,
                         'valor_max' => 99,
                         'ordem' => 2,
-                        'texto_email' => '{NOME}, você realizou {TOTAL_QUESTOES} questões no período. O volume ainda está abaixo do recomendado e deixa a análise do percentual pouco conclusiva. Busque chegar a pelo menos 100 questões no próximo período para uma leitura mais segura do seu desempenho.',
+                        'texto_email' => '{NOME}, você realizou {TOTAL_QUESTOES} questões durante o período. Esse volume está abaixo do recomendado e torna a análise do seu percentual de acertos pouco conclusiva. Procure aumentar a quantidade de questões para pelo menos 100 no próximo período para termos uma avaliação mais segura do seu desempenho.',
                     ],
                     [
                         'codigo' => 'volume_suficiente',
@@ -80,7 +80,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 100,
                         'valor_max' => 500,
                         'ordem' => 3,
-                        'texto_email' => '{NOME}, você realizou {TOTAL_QUESTOES} questões no período. Esse volume é suficiente para avaliarmos seu percentual de acertos com mais segurança.',
+                        'texto_email' => '{NOME}, você realizou {TOTAL_QUESTOES} questões durante o período. Esse volume é suficiente para avaliarmos seu percentual de acertos com maior segurança.',
                     ],
                     [
                         'codigo' => 'volume_alto',
@@ -88,7 +88,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 501,
                         'valor_max' => null,
                         'ordem' => 4,
-                        'texto_email' => '{NOME}, você realizou {TOTAL_QUESTOES} questões no período. Volume alto de treinamento — dá para avaliar o percentual de acertos com bastante segurança. Excelente empenho!',
+                        'texto_email' => '{NOME}, você realizou {TOTAL_QUESTOES} questões durante o período. Você arrebentou! Esse é um volume alto de treinamento e permite avaliar seu percentual de acertos com mais segurança. Parabéns pelo empenho!',
                     ],
                 ],
             ],
@@ -104,7 +104,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 0,
                         'valor_max' => 60,
                         'ordem' => 1,
-                        'texto_email' => '{NOME}, você alcançou {PERCENTUAL_ACERTOS}% de acertos no período. Esse resultado foi sinalizado como CRÍTICO e merece uma análise mais próxima dos conteúdos e da forma de revisão.',
+                        'texto_email' => '{NOME}, você alcançou {PERCENTUAL_ACERTOS}% geral de acertos no período. Esse resultado foi sinalizado como CRÍTICO no seu acompanhamento e merece uma análise mais próxima.',
                     ],
                     [
                         'codigo' => 'alerta',
@@ -112,7 +112,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 60.01,
                         'valor_max' => 70,
                         'ordem' => 2,
-                        'texto_email' => '{NOME}, você alcançou {PERCENTUAL_ACERTOS}% de acertos no período. Esse resultado é um PONTO DE ATENÇÃO: já há algum domínio, mas ainda existe uma quantidade relevante de erros que precisa ser compreendida e corrigida.',
+                        'texto_email' => '{NOME}, você alcançou {PERCENTUAL_ACERTOS}% geral de acertos no período. Esse resultado foi sinalizado como um PONTO DE ATENÇÃO no seu acompanhamento. Você já demonstra algum domínio dos conteúdos, mas ainda existe uma quantidade relevante de erros que precisa ser compreendida.',
                     ],
                     [
                         'codigo' => 'mediano',
@@ -120,7 +120,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 70.01,
                         'valor_max' => 79.99,
                         'ordem' => 3,
-                        'texto_email' => '{NOME}, você alcançou {PERCENTUAL_ACERTOS}% de acertos no período. Resultado MEDIANO: você já construiu uma base importante, porém ainda há erros que impedem um desempenho mais seguro. Foque nos assuntos que mais derrubam sua taxa.',
+                        'texto_email' => '{NOME}, você alcançou {PERCENTUAL_ACERTOS}% de acertos no período. Esse resultado foi classificado como MEDIANO no seu acompanhamento. Você já construiu uma base importante, mas ainda existe uma quantidade de erros que impede um desempenho mais seguro.',
                     ],
                     [
                         'codigo' => 'muito_bom',
@@ -128,7 +128,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 80,
                         'valor_max' => 89.99,
                         'ordem' => 4,
-                        'texto_email' => '{NOME}, você alcançou {PERCENTUAL_ACERTOS}% de acertos no período. Resultado MUITO BOM — desempenho consistente. Preserve o que está funcionando e observe os assuntos que ainda concentram erros, sem mudar toda a estratégia de uma vez.',
+                        'texto_email' => '{NOME}, você alcançou {PERCENTUAL_ACERTOS}% de acertos no período. Esse resultado foi classificado como MUITO BOM e mostra que você está construindo um desempenho consistente. Neste momento, sua prioridade não é mudar toda a estratégia, mas preservar o que está funcionando e observar os assuntos que ainda concentram seus erros. Vamos continuar acompanhando esses pontos para que você avance sem perder os resultados já conquistados.',
                     ],
                     [
                         'codigo' => 'excelente',
@@ -136,7 +136,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 90,
                         'valor_max' => 100,
                         'ordem' => 5,
-                        'texto_email' => '{NOME}, você alcançou {PERCENTUAL_ACERTOS}% de acertos no período. Resultado EXCELENTE, com domínio elevado dos conteúdos praticados. O desafio agora é manter esse nível, corrigir erros pontuais e não deixar o bom resultado virar acomodação.',
+                        'texto_email' => '{NOME}, você alcançou {PERCENTUAL_ACERTOS}% de acertos no período. Esse resultado foi classificado como EXCELENTE e demonstra um domínio elevado dos conteúdos praticados. O resultado foi positivo, mas o acompanhamento continua: vamos observar se esse desempenho se mantém. Sua prioridade agora é preservar esse nível, continuar corrigindo os erros pontuais e evitar que os bons resultados tragam acomodação.',
                     ],
                 ],
             ],
@@ -152,7 +152,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                         'valor_min' => 0,
                         'valor_max' => 60,
                         'ordem' => 1,
-                        'texto_email' => "{LISTA_ASSUNTOS}\n\nEsses resultados foram sinalizados como possíveis gargalos e merecem uma análise mais próxima para definir a correção de rota.",
+                        'texto_email' => "{LISTA_ASSUNTOS}\n\nEsses resultados foram sinalizados como possíveis gargalos e merecem uma análise mais próxima.\nIrei entrar em contato para entender a origem dos erros e definir a melhor correção de rota. Caso queira adiantar essa conversa, você pode utilizar o botão abaixo.",
                     ],
                     [
                         'codigo' => 'abaixo_media',

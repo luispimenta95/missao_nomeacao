@@ -11,10 +11,13 @@ class PdfFontesTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_padrao_e_dejavu_quando_nada_foi_salvo(): void
+    public function test_padrao_e_inter_quando_as_fontes_existem(): void
     {
-        $this->assertSame('dejavu', PdfFontes::chaveAtual());
-        $this->assertSame('DejaVu Sans', PdfFontes::familiaDompdf());
+        $this->assertNotNull(PdfFontes::diretorioInter());
+        $this->assertSame('inter', PdfFontes::chaveAtual());
+        $this->assertSame('Inter', PdfFontes::familiaDompdf());
+        $this->assertStringContainsString('@font-face', PdfFontes::fontFaceCss());
+        $this->assertStringContainsString('Inter-Regular.ttf', PdfFontes::fontFaceCss());
     }
 
     public function test_admin_prevalece_sobre_env(): void
@@ -27,7 +30,7 @@ class PdfFontesTest extends TestCase
 
     public function test_chave_invalida_volta_ao_padrao(): void
     {
-        $this->assertSame('dejavu', PdfFontes::normalizar('comic-sans'));
+        $this->assertSame('inter', PdfFontes::normalizar('comic-sans'));
         $this->assertFalse(PdfFontes::ehValida('fredoka'));
     }
 }

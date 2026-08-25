@@ -77,6 +77,33 @@ final class PdfDatas
         return $saida;
     }
 
+    /**
+     * Datas compactas para eixos de gráfico (01/08 em vez de 01/08/2026).
+     *
+     * @param  list<mixed>  $labels
+     * @return list<mixed>
+     */
+    public static function listaParaBrCompacta(array $labels): array
+    {
+        $saida = [];
+        foreach (self::listaParaBr($labels) as $label) {
+            if (! is_scalar($label)) {
+                $saida[] = $label;
+
+                continue;
+            }
+            $texto = (string) $label;
+            if (preg_match('#^(\d{1,2}/\d{1,2})/\d{2,4}$#', $texto, $m)) {
+                $saida[] = $m[1];
+
+                continue;
+            }
+            $saida[] = $texto;
+        }
+
+        return $saida;
+    }
+
     public static function pareceAmericano(string $texto): bool
     {
         if (! preg_match_all('/(?<!\d[\/\-.])\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/', $texto, $matches, PREG_SET_ORDER)) {

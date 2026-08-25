@@ -4,6 +4,7 @@ namespace App\Services\Desempenho;
 
 use App\Models\EixoDesempenho;
 use App\Models\FaixaDesempenho;
+use App\Services\Tutory\RelatorioConsolidadoLayout;
 
 class AvaliadorDesempenho
 {
@@ -106,9 +107,8 @@ class AvaliadorDesempenho
             }
         }
 
-        $blocoAssuntos = $this->avaliarAssuntos($assuntos, $primeiroNome);
-        if ($blocoAssuntos !== null) {
-            $blocos[] = $blocoAssuntos;
+        foreach ($this->avaliarAssuntos($assuntos, $primeiroNome) as $blocoAssunto) {
+            $blocos[] = $blocoAssunto;
         }
 
         $resumo = null;
@@ -127,15 +127,15 @@ class AvaliadorDesempenho
     }
 
     /**
-     * Um único bloco com N bullets para assuntos ≤ 75%.
+     * Blocos separados: críticos (≤ 60%) e abaixo da média (61–75%).
      *
      * @param  list<array{disciplina?: string, assunto: string, percentual: float|int|null}>  $assuntos
-     * @return array{eixo: string, eixo_nome: string, faixa: string, faixa_nome: string, titulo: string, texto: string, itens: list<string>, meta?: array<string, mixed>}|null
+     * @return list<array{eixo: string, eixo_nome: string, faixa: string, faixa_nome: string, titulo: string, texto: string, itens: list<string>, meta?: array<string, mixed>}>
      */
-    private function avaliarAssuntos(array $assuntos, string $primeiroNome): ?array
+    private function avaliarAssuntos(array $assuntos, string $primeiroNome): array
     {
-        $itens = [];
-        $piorPct = null;
+        $criticos = [];
+        $abaixo = [];
 
         foreach ($assuntos as $item) {
             $pct = $this->paraNumero($item['percentual'] ?? null);
@@ -143,18 +143,53 @@ class AvaliadorDesempenho
             if ($pct === null || $assunto === '' || $pct > 75) {
                 continue;
             }
-            $itens[] = [
+            $linha = [
                 'disciplina' => trim((string) ($item['disciplina'] ?? '')),
                 'assunto' => $assunto,
                 'percentual' => $pct,
                 'linha' => 'No assunto '.$assunto.', você alcançou '.$this->fmtPct($pct).'% de acertos.',
             ];
-            if ($piorPct === null || $pct < $piorPct) {
-                $piorPct = $pct;
+            if ($pct <= 60) {
+                $criticos[] = $linha;
+            } else {
+                $abaixo[] = $linha;
             }
         }
 
-        if ($itens === [] || $piorPct === null) {
+        $blocos = [];
+        $critico = $this->blocoAssuntosFaixa($criticos, $primeiroNome);
+        if ($critico !== null) {
+            $critico['cta'] = [
+                'label' => RelatorioConsolidadoLayout::CTA_ANALISE,
+                'url' => RelatorioConsolidadoLayout::WHATSAPP_URL,
+            ];
+            $blocos[] = $critico;
+        }
+        $media = $this->blocoAssuntosFaixa($abaixo, $primeiroNome);
+        if ($media !== null) {
+            $blocos[] = $media;
+        }
+
+        return $blocos;
+    }
+
+    /**
+     * @param  list<array{disciplina: string, assunto: string, percentual: float, linha: string}>  $itens
+     * @return array{eixo: string, eixo_nome: string, faixa: string, faixa_nome: string, titulo: string, texto: string, itens: list<string>, meta?: array<string, mixed>}|null
+     */
+    private function blocoAssuntosFaixa(array $itens, string $primeiroNome): ?array
+    {
+        if ($itens === []) {
+            return null;
+        }
+
+        $piorPct = null;
+        foreach ($itens as $item) {
+            if ($piorPct === null || $item['percentual'] < $piorPct) {
+                $piorPct = $item['percentual'];
+            }
+        }
+        if ($piorPct === null) {
             return null;
         }
 

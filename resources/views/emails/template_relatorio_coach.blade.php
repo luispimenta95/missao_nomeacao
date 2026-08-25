@@ -92,6 +92,14 @@
                 @elseif(!empty($bloco['texto']))
                 <p style="white-space:pre-line;margin:0;">{{ $bloco['texto'] }}</p>
                 @endif
+                @if(!empty($bloco['cta']['url']))
+                <p style="margin:14px 0 0;">
+                    <a href="{{ $bloco['cta']['url'] }}" target="_blank" rel="noopener"
+                       style="display:inline-block;background:#BF8F00;color:#ffffff;text-decoration:none;padding:10px 16px;font-weight:bold;font-size:14px;">
+                        {{ $bloco['cta']['label'] ?? 'Quero adiantar minha análise' }}
+                    </a>
+                </p>
+                @endif
             </div>
             @endforeach
             @elseif(!empty($dados['textoDesempenho']))
