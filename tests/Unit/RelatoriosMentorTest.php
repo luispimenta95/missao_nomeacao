@@ -180,7 +180,7 @@ class RelatoriosMentorTest extends TestCase
         $ref = new ReflectionClass($downloader);
         $css = $ref->getMethod('cssPdfConsolidado')->invoke($downloader, 'DejaVu Sans', '');
 
-        $this->assertStringContainsString('@page{margin:27mm 16mm 16mm 16mm;}', $css);
+        $this->assertStringContainsString('@page{margin:34mm 16mm 18mm 16mm;}', $css);
         $this->assertStringContainsString('background:#ffffff', $css);
         $this->assertStringNotContainsString('#F5F5F5', $css);
         $this->assertStringNotContainsString('border-radius', $css);
@@ -220,7 +220,7 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('Horas estudadas = horas brutas registradas.', $script);
         $this->assertStringNotContainsString('Horas planejadas × horas (brutas) estudadas', $script);
         $this->assertStringContainsString('MISSÃO NOMEAÇÃO •', $script);
-        $this->assertStringContainsString("top: '27mm'", $script);
+        $this->assertStringContainsString("top: '34mm'", $script);
         $this->assertStringContainsString("right: '16mm'", $script);
     }
 

@@ -328,15 +328,16 @@ html, body {
 .mn-unified {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 4px 0 16px;
+  padding: 8px 0 16px;
 }
 .mn-sec {
-  margin: 0 0 28px;
+  margin: 0 0 32px;
   break-inside: auto;
 }
 .mn-sec-head {
   break-after: avoid;
   page-break-after: avoid;
+  margin: 0 0 4px;
 }
 .mn-sec-title {
   font-size: 16.5pt;
@@ -350,10 +351,10 @@ html, body {
 .mn-sec-intro {
   font-size: 10.5pt;
   color: var(--mn-sec);
-  margin: 7px 0 0;
+  margin: 10px 0 12px;
   padding-left: 16px;
 }
-.mn-sec-body { margin-top: 14px; }
+.mn-sec-body { margin-top: 16px; }
 .mn-sec-keep { break-inside: avoid; page-break-inside: avoid; }
 .mn-sec-insights { break-inside: avoid; page-break-inside: avoid; }
 .mn-sec-table .mn-sec-head { break-after: avoid; page-break-after: avoid; }
@@ -365,7 +366,7 @@ html, body {
   font-size: 26pt;
   font-weight: 700;
   color: var(--mn-azul);
-  margin: 0 0 14px;
+  margin: 6px 0 18px;
   text-transform: uppercase;
   letter-spacing: -0.02em;
   line-height: 1.1;
@@ -428,19 +429,20 @@ html, body {
   font-size: 11pt;
   font-weight: 600;
   color: var(--mn-azul);
-  margin: 0 0 6px;
+  margin: 0 0 8px;
 }
 .mn-chart-note {
   font-size: 9.5pt;
   font-weight: 400;
   color: var(--mn-sec);
-  margin: 0 0 12px;
+  margin: 0 0 14px;
 }
-.mn-chart { margin: 0 0 18px; break-inside: avoid; page-break-inside: avoid; }
+.mn-chart { margin: 8px 0 28px; break-inside: avoid; page-break-inside: avoid; }
 .mn-sec-body table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12.5px;
+  margin-top: 6px;
 }
 .mn-sec-body thead { display: table-header-group; }
 .mn-sec-body thead td, .mn-sec-body thead th {
@@ -450,14 +452,15 @@ html, body {
   font-size: 11px;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  padding: 9px 11px;
+  padding: 11px 12px;
   text-align: left;
 }
 .mn-sec-body tbody td {
   border-bottom: 1px solid #EEF0F3;
-  padding: 9px 11px;
+  padding: 11px 12px;
   vertical-align: top;
   word-wrap: break-word;
+  line-height: 1.4;
 }
 .mn-sec-body tbody tr:nth-child(even) td { background: var(--mn-zebra); }
 .mn-sec-body tbody tr { break-inside: avoid; page-break-inside: avoid; }
@@ -901,14 +904,14 @@ try {
     format: 'A4',
     printBackground: true,
     displayHeaderFooter: true,
-    headerTemplate: `<div style="font-family:Inter,'DejaVu Sans',Helvetica,sans-serif;font-size:8px;width:100%;padding:10px 16mm 6px;color:#001D3D;display:flex;justify-content:space-between;border-bottom:0.6px solid #BF8F00;box-sizing:border-box;">
+    headerTemplate: `<div style="font-family:Inter,'DejaVu Sans',Helvetica,sans-serif;font-size:8px;width:100%;padding:8px 16mm 8px;color:#001D3D;display:flex;justify-content:space-between;border-bottom:0.6px solid #BF8F00;box-sizing:border-box;">
       <span style="font-weight:700;">MISSÃO NOMEAÇÃO •</span>
       <span style="color:#4B5563;">${rotuloPeriodo.replace(/</g, '')}</span>
     </div>`,
     footerTemplate: `<div style="font-family:Inter,'DejaVu Sans',Helvetica,sans-serif;font-size:7.5px;width:100%;padding:0 16mm;color:#4B5563;text-align:right;">
       Página <span class="pageNumber"></span> de <span class="totalPages"></span>
     </div>`,
-    margin: { top: '27mm', right: '16mm', bottom: '16mm', left: '16mm' },
+    margin: { top: '34mm', right: '16mm', bottom: '18mm', left: '16mm' },
   });
   try { fs.unlinkSync(tmpHtml); } catch (_) {}
 
