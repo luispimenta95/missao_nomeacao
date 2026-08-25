@@ -328,7 +328,7 @@ html, body {
 .mn-unified {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 4px 8px 16px;
+  padding: 4px 0 16px;
 }
 .mn-sec {
   margin: 0 0 28px;
@@ -339,33 +339,48 @@ html, body {
   page-break-after: avoid;
 }
 .mn-sec-title {
-  font-size: 18px;
+  font-size: 16.5pt;
   font-weight: 700;
   color: var(--mn-azul);
   margin: 0;
-  padding: 0 0 0 10px;
-  border-left: 3px solid var(--mn-ouro);
+  padding: 0 0 0 12px;
+  border-left: 3.5px solid var(--mn-ouro);
   line-height: 1.2;
 }
 .mn-sec-intro {
-  font-size: 13px;
+  font-size: 10.5pt;
   color: var(--mn-sec);
   margin: 7px 0 0;
-  padding-left: 13px;
+  padding-left: 16px;
 }
 .mn-sec-body { margin-top: 14px; }
+.mn-sec-keep { break-inside: avoid; page-break-inside: avoid; }
+.mn-sec-insights { break-inside: avoid; page-break-inside: avoid; }
+.mn-sec-table .mn-sec-head { break-after: avoid; page-break-after: avoid; }
 .mn-sec-body h1,
 .mn-sec-body h2,
 .mn-sec-body h6,
 .mn-kicker { display: none !important; }
-.mn-aluno-nome, .title-section h1, .aluno-details h4 {
-  font-size: 22px;
+.mn-aluno-nome {
+  font-size: 26pt;
+  font-weight: 700;
+  color: var(--mn-azul);
+  margin: 0 0 14px;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+.title-section h1, .aluno-details h4 {
+  font-size: 26pt;
   font-weight: 700;
   color: var(--mn-azul);
   margin: 0 0 4px;
+  text-transform: uppercase;
 }
 .aluno-details p, .title-section p {
-  font-size: 13px;
+  font-size: 10.5pt;
   color: var(--mn-sec);
   margin: 0;
 }
@@ -378,7 +393,7 @@ html, body {
 .metric-card, .main-numbers {
   background: #fff;
   border: 1px solid var(--mn-borda);
-  border-radius: 4px;
+  border-radius: 0;
   padding: 16px 14px 18px;
   box-shadow: none !important;
   text-align: left;
@@ -410,10 +425,16 @@ html, body {
   flex: 1 1 160px;
 }
 .mn-chart-title {
-  font-size: 13px;
+  font-size: 11pt;
   font-weight: 600;
   color: var(--mn-azul);
-  margin: 0 0 10px;
+  margin: 0 0 6px;
+}
+.mn-chart-note {
+  font-size: 9.5pt;
+  font-weight: 400;
+  color: var(--mn-sec);
+  margin: 0 0 12px;
 }
 .mn-chart { margin: 0 0 18px; break-inside: avoid; page-break-inside: avoid; }
 .mn-sec-body table {
@@ -572,6 +593,8 @@ async function extractDesempenho(page) {
       return el ? el.outerHTML : '';
     }
     return {
+      nome: (document.querySelector('.aluno-details h4') || {}).textContent?.trim() || '',
+      curso: (document.querySelector('.aluno-details p') || {}).textContent?.trim() || '',
       header: htmlOf('.main-header-card'),
       metrics: htmlOf('.metrics-grid'),
     };
@@ -655,9 +678,10 @@ async function extractHoras(page) {
       }
       return wrap.innerHTML;
     }
+    const tabelaHist = document.getElementById('tabela_horas_liquidas');
     return {
       tempo: htmlFromHeading('h2.section-2'),
-      historico: htmlFromHeading('h2.section-4'),
+      historico: tabelaHist ? tabelaHist.outerHTML : htmlFromHeading('h2.section-4'),
     };
   });
 }
@@ -765,42 +789,66 @@ async function extractProgresso(page) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+
 function block(title, inner, extraClass = 'mn-legacy', intro = '') {
   if (!inner || !String(inner).trim()) return '';
-  const introHtml = intro ? `<p class="mn-sec-intro">${intro}</p>` : '';
+  const introHtml = intro ? `<p class="mn-sec-intro">${escapeHtml(intro)}</p>` : '';
   return `<section class="mn-sec ${extraClass}">
     <div class="mn-sec-head"><h2 class="mn-sec-title">${title}</h2>${introHtml}</div>
     <div class="mn-sec-body">${inner}</div>
   </section>`;
 }
 
-function chartBlock(subtitle, inner) {
+function chartBlock(subtitle, inner, note = '') {
   if (!inner || !String(inner).trim()) return '';
   const title = subtitle ? `<p class="mn-chart-title">${subtitle}</p>` : '';
-  return `<div class="mn-chart">${title}${inner}</div>`;
+  const noteHtml = note ? `<p class="mn-chart-note">${note}</p>` : '';
+  return `<div class="mn-chart">${title}${noteHtml}${inner}</div>`;
 }
 
 function buildHtml(extracted) {
   const parts = [];
-  parts.push(block(
+  const nome = extracted.desempenho.nome
+    ? `<p class="mn-aluno-nome">${escapeHtml(extracted.desempenho.nome)}</p>`
+    : (extracted.desempenho.header || '');
+  parts.push(nome + block(
     'Seu desempenho',
-    `${extracted.desempenho.header || ''}${extracted.desempenho.metrics || ''}`,
-    'mn-desempenho',
+    extracted.desempenho.metrics || '',
+    'mn-sec-keep',
+    extracted.desempenho.curso || '',
   ));
   const ritmo = chartBlock('Horas brutas × horas líquidas', extracted.horas.tempo)
-    + chartBlock('Horas planejadas × horas (brutas) estudadas', extracted.progresso.motivacao);
+    + chartBlock(
+      'Horas planejadas × horas estudadas',
+      extracted.progresso.motivacao,
+      'Horas estudadas = horas brutas registradas.',
+    );
   parts.push(block('Ritmo de estudos', ritmo));
-  parts.push(block('Painel de Insights', extracted.progresso.insights || ''));
+  parts.push(block('Painel de Insights', extracted.progresso.insights || '', 'mn-sec-insights'));
   parts.push(block('Desempenho em questões', extracted.questoes.panorama || ''));
-  parts.push(block('Performance por assunto', extracted.questoes.assuntos || ''));
+  parts.push(block('Performance por assunto', extracted.questoes.assuntos || '', 'mn-sec-table'));
   if (extracted.aluno.revisoes && extracted.aluno.revisoes.trim()) {
     let revisoesHtml = extracted.aluno.revisoes;
     if (extracted.aluno.revisoesRows === 0 && !/mn-empty/.test(revisoesHtml)) {
       revisoesHtml += '<p class="mn-empty">Nenhuma revisão registrada neste período.</p>';
     }
-    parts.push(block('Revisões no período', revisoesHtml));
+    parts.push(block('Revisões no período', revisoesHtml, 'mn-sec-table'));
   }
-  parts.push(block('Histórico completo', extracted.horas.historico || ''));
+  parts.push(block(
+    'Histórico completo',
+    extracted.horas.historico || '',
+    'mn-sec-table',
+    'Confira o histórico completo de horas cronometradas no período.',
+  ));
 
   return `<!DOCTYPE html>
 <html lang="pt-BR" data-theme="light">
@@ -831,7 +879,9 @@ try {
   };
 
   const missing = [];
-  if (!extracted.desempenho.header || !extracted.desempenho.metrics) missing.push('desempenho');
+  if (!extracted.desempenho.metrics || (!extracted.desempenho.header && !extracted.desempenho.nome)) {
+    missing.push('desempenho');
+  }
   if (!extracted.horas.tempo || !extracted.horas.historico) missing.push('horas-liquidas');
   if (!extracted.questoes.panorama || !extracted.questoes.assuntos) missing.push('questoes');
   if (!extracted.progresso.motivacao || !extracted.progresso.insights) missing.push('progresso');
@@ -851,14 +901,14 @@ try {
     format: 'A4',
     printBackground: true,
     displayHeaderFooter: true,
-    headerTemplate: `<div style="font-family:Inter,Helvetica,sans-serif;font-size:8px;width:100%;padding:0 20mm;color:#001D3D;display:flex;justify-content:space-between;">
-      <span style="font-weight:700;">MISSÃO NOMEAÇÃO</span>
+    headerTemplate: `<div style="font-family:Inter,'DejaVu Sans',Helvetica,sans-serif;font-size:8px;width:100%;padding:10px 16mm 6px;color:#001D3D;display:flex;justify-content:space-between;border-bottom:0.6px solid #BF8F00;box-sizing:border-box;">
+      <span style="font-weight:700;">MISSÃO NOMEAÇÃO •</span>
       <span style="color:#4B5563;">${rotuloPeriodo.replace(/</g, '')}</span>
     </div>`,
-    footerTemplate: `<div style="font-family:Inter,Helvetica,sans-serif;font-size:8px;width:100%;padding:0 20mm;color:#4B5563;text-align:right;">
+    footerTemplate: `<div style="font-family:Inter,'DejaVu Sans',Helvetica,sans-serif;font-size:7.5px;width:100%;padding:0 16mm;color:#4B5563;text-align:right;">
       Página <span class="pageNumber"></span> de <span class="totalPages"></span>
     </div>`,
-    margin: { top: '18mm', right: '20mm', bottom: '16mm', left: '20mm' },
+    margin: { top: '27mm', right: '16mm', bottom: '16mm', left: '16mm' },
   });
   try { fs.unlinkSync(tmpHtml); } catch (_) {}
 
