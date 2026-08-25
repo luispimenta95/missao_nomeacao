@@ -169,8 +169,9 @@ class RelatoriosMentorTest extends TestCase
         $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());
         $this->assertStringNotContainsString('aplicarMarcaDaguaPdf', $php);
         $this->assertStringContainsString('aplicarCabecalhoRodape', $php);
-        $this->assertSame('AGOSTO • PERÍODO 1', RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10')));
-        $this->assertSame('AGOSTO • PERÍODO 2', RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-08-20')));
+        $this->assertSame('AGOSTO/PERÍODO 1', RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10')));
+        $this->assertSame('AGOSTO/PERÍODO 2', RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-08-20')));
+        $this->assertSame('MISSÃO NOMEAÇÃO •', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
     }
 
     public function test_css_do_consolidado_nao_deixa_bloco_cinza_no_rodape(): void
@@ -179,7 +180,7 @@ class RelatoriosMentorTest extends TestCase
         $ref = new ReflectionClass($downloader);
         $css = $ref->getMethod('cssPdfConsolidado')->invoke($downloader, 'DejaVu Sans', '');
 
-        $this->assertStringContainsString('@page{margin:', $css);
+        $this->assertStringContainsString('@page{margin:27mm 16mm 16mm 16mm;}', $css);
         $this->assertStringContainsString('background:#ffffff', $css);
         $this->assertStringNotContainsString('#F5F5F5', $css);
         $this->assertStringNotContainsString('border-radius', $css);
@@ -197,6 +198,10 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('montarHtmlMetricasDesempenho', $php);
         $this->assertStringContainsString('Ritmo de estudos', $php);
         $this->assertStringContainsString('Histórico completo', $php);
+        $this->assertStringContainsString('INTRO_HISTORICO', $php);
+        $this->assertStringContainsString('TITULO_GRAFICO_PLANEJADAS', $php);
+        $this->assertStringNotContainsString('Horas planejadas × horas (brutas) estudadas', $php);
+        $this->assertStringNotContainsString("' (brutas)'", $php);
     }
 
     public function test_grafico_de_horas_diarias_tem_rotulos_nos_vertices(): void
@@ -204,12 +209,19 @@ class RelatoriosMentorTest extends TestCase
         $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());
         $this->assertStringContainsString('__DATALABEL_HOURS__', $php);
         $this->assertStringContainsString("'formatter' => '__DATALABEL_HOURS__'", $php);
+        $this->assertStringContainsString('__DATALABEL_VALUE__', $php);
 
         $script = (string) file_get_contents(base_path('scripts/tutory-compose-pdf.mjs'));
         $this->assertStringContainsString('labelHoursOnChartVertices', $script);
         $this->assertStringContainsString('chart_horas_diarias', $script);
         $this->assertStringContainsString('return `${txt}h`', $script);
         $this->assertStringNotContainsString('stripPercentFromHoursCharts', $script);
+        $this->assertStringContainsString('Horas planejadas × horas estudadas', $script);
+        $this->assertStringContainsString('Horas estudadas = horas brutas registradas.', $script);
+        $this->assertStringNotContainsString('Horas planejadas × horas (brutas) estudadas', $script);
+        $this->assertStringContainsString('MISSÃO NOMEAÇÃO •', $script);
+        $this->assertStringContainsString("top: '27mm'", $script);
+        $this->assertStringContainsString("right: '16mm'", $script);
     }
 
     public function test_fallback_dompdf_gera_pdf_consolidado_a_partir_dos_htmls(): void
@@ -277,7 +289,7 @@ class RelatoriosMentorTest extends TestCase
                 $txt = (string) shell_exec(escapeshellcmd($pdftotext).' '.escapeshellarg($destino).' -');
                 $this->assertStringContainsString('MISSÃO', $txt);
                 $this->assertStringContainsString('NOMEAÇÃO', $txt);
-                $this->assertStringContainsString('Giovanna', $txt);
+                $this->assertStringContainsString('GIOVANNA', $txt);
                 $this->assertStringContainsStringIgnoringCase('Total de Horas', $txt);
                 $this->assertStringContainsString('Seu desempenho', $txt);
                 $this->assertStringContainsString('Painel de Insights', $txt);
@@ -285,17 +297,21 @@ class RelatoriosMentorTest extends TestCase
                 $this->assertStringContainsString('Performance por assunto', $txt);
                 $this->assertStringContainsString('Revisões no período', $txt);
                 $this->assertStringContainsString('Histórico completo', $txt);
+                $this->assertStringContainsString('Confira o histórico completo de horas cronometradas no período.', $txt);
                 $this->assertStringNotContainsString('Histórico de Metas', $txt);
                 $this->assertStringNotContainsString('Performance por Área', $txt);
                 $this->assertStringNotContainsString('Horas de estudo', $txt);
                 $this->assertStringNotContainsString('Breve Panorama', $txt);
+                $posNome = mb_strpos($txt, 'GIOVANNA');
                 $posDes = mb_strpos($txt, 'Seu desempenho');
                 $posInsights = mb_strpos($txt, 'Painel de Insights');
                 $posQuestoes = mb_strpos($txt, 'Desempenho em questões');
                 $posAssuntos = mb_strpos($txt, 'Performance por assunto');
                 $posRevisoes = mb_strpos($txt, 'Revisões no período');
                 $posHist = mb_strpos($txt, 'Histórico completo');
+                $this->assertNotFalse($posNome);
                 $this->assertNotFalse($posDes);
+                $this->assertGreaterThan($posNome, $posDes);
                 $this->assertGreaterThan($posDes, $posInsights);
                 $this->assertGreaterThan($posInsights, $posQuestoes);
                 $this->assertGreaterThan($posQuestoes, $posAssuntos);

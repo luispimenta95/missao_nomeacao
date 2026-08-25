@@ -16,8 +16,11 @@ class PdfFontesTest extends TestCase
         $this->assertNotNull(PdfFontes::diretorioInter());
         $this->assertSame('inter', PdfFontes::chaveAtual());
         $this->assertSame('Inter', PdfFontes::familiaDompdf());
+        $this->assertSame('DejaVu Sans', PdfFontes::defaultFontDompdf());
+        $this->assertSame('DejaVu Sans', PdfFontes::opcoesDompdf()->getDefaultFont());
         $this->assertStringContainsString('@font-face', PdfFontes::fontFaceCss());
-        $this->assertStringContainsString('Inter-Regular.ttf', PdfFontes::fontFaceCss());
+        $this->assertStringContainsString("url('resources/fonts/inter/Inter-Regular.ttf')", PdfFontes::fontFaceCss());
+        $this->assertStringNotContainsString('file://', PdfFontes::fontFaceCss());
     }
 
     public function test_admin_prevalece_sobre_env(): void

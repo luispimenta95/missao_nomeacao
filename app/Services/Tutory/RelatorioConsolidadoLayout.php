@@ -33,6 +33,12 @@ final class RelatorioConsolidadoLayout
 
     public const CTA_ANALISE = 'Quero adiantar minha análise';
 
+    public const INTRO_HISTORICO = 'Confira o histórico completo de horas cronometradas no período.';
+
+    public const TITULO_GRAFICO_PLANEJADAS = 'Horas planejadas × horas estudadas';
+
+    public const LEGENDA_HORAS_ESTUDADAS = 'Horas estudadas = horas brutas registradas.';
+
     /**
      * @var list<string>
      */
@@ -70,7 +76,12 @@ final class RelatorioConsolidadoLayout
         $mes = self::MESES[(int) $ref->format('n')] ?? mb_strtoupper($ref->format('F'));
         $n = $periodo === '2' ? '2' : '1';
 
-        return $mes.' • PERÍODO '.$n;
+        return $mes.'/PERÍODO '.$n;
+    }
+
+    public static function textoCabecalhoEsquerdo(): string
+    {
+        return 'MISSÃO NOMEAÇÃO •';
     }
 
     public static function corPercentual(?float $pct): string
@@ -96,13 +107,14 @@ final class RelatorioConsolidadoLayout
         return [self::AZUL, self::DOURADO, '#64748B', self::VERDE];
     }
 
-    public static function secao(string $titulo, string $intro, string $body): string
+    public static function secao(string $titulo, string $intro, string $body, string $classe = ''): string
     {
         if (trim($body) === '') {
             return '';
         }
 
-        $html = '<section class="mn-sec">';
+        $cls = trim('mn-sec '.$classe);
+        $html = '<section class="'.$cls.'">';
         $html .= '<div class="mn-sec-head">';
         $html .= '<h2 class="mn-sec-title">'.htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</h2>';
         if (trim($intro) !== '') {
@@ -115,7 +127,7 @@ final class RelatorioConsolidadoLayout
         return $html;
     }
 
-    public static function grafico(string $subtitulo, string $imgHtml): string
+    public static function grafico(string $subtitulo, string $imgHtml, string $legenda = ''): string
     {
         if (trim($imgHtml) === '') {
             return '';
@@ -124,6 +136,9 @@ final class RelatorioConsolidadoLayout
         $html = '<div class="mn-chart">';
         if (trim($subtitulo) !== '') {
             $html .= '<p class="mn-chart-title">'.htmlspecialchars($subtitulo, ENT_QUOTES, 'UTF-8').'</p>';
+        }
+        if (trim($legenda) !== '') {
+            $html .= '<p class="mn-chart-note">'.htmlspecialchars($legenda, ENT_QUOTES, 'UTF-8').'</p>';
         }
         $html .= $imgHtml;
         $html .= '</div>';
@@ -152,10 +167,8 @@ final class RelatorioConsolidadoLayout
             $html .= '<tr>';
             $span = $cols - count($linha);
             foreach ($linha as $i => $item) {
-                $destaque = ! empty($item['destaque']);
                 $colspan = ($i === count($linha) - 1 && $span > 0) ? ' colspan="'.($span + 1).'"' : '';
-                $cls = $destaque ? ' class="kpi kpi-hot"' : ' class="kpi"';
-                $html .= '<td'.$cls.$colspan.'>'
+                $html .= '<td class="kpi"'.$colspan.'>'
                     .'<div class="kpi-label">'.htmlspecialchars((string) $item['label'], ENT_QUOTES, 'UTF-8').'</div>'
                     .'<div class="kpi-value">'.htmlspecialchars((string) $item['value'], ENT_QUOTES, 'UTF-8').'</div>'
                     .'</td>';
@@ -238,27 +251,31 @@ final class RelatorioConsolidadoLayout
 
         $html = '';
         if ($cards !== []) {
-            $html .= self::cards($cards);
+            $html .= '<div class="mn-insight-item">'.self::cards($cards).'</div>';
         }
         foreach ($textos as $t) {
-            $html .= '<p class="mn-insight">'.htmlspecialchars($t, ENT_QUOTES, 'UTF-8').'</p>';
+            $html .= self::blocoInsightTextual($t);
         }
 
         return $html;
     }
 
+    public static function alunoNome(string $nome): string
+    {
+        $nome = trim($nome);
+        if ($nome === '') {
+            return '';
+        }
+
+        $maiusculo = mb_strtoupper($nome, 'UTF-8');
+
+        return '<p class="mn-aluno-nome">'.htmlspecialchars($maiusculo, ENT_QUOTES, 'UTF-8').'</p>';
+    }
+
     public static function alunoBloco(string $nome, string $curso): string
     {
-        $html = '<div class="mn-aluno">';
-        if ($nome !== '') {
-            $html .= '<p class="mn-aluno-nome">'.htmlspecialchars($nome, ENT_QUOTES, 'UTF-8').'</p>';
-        }
-        if ($curso !== '') {
-            $html .= '<p class="mn-aluno-curso">'.htmlspecialchars($curso, ENT_QUOTES, 'UTF-8').'</p>';
-        }
-        $html .= '</div>';
-
-        return $nome === '' && $curso === '' ? '' : $html;
+        return self::alunoNome($nome)
+            .($curso !== '' ? '<p class="mn-aluno-curso">'.htmlspecialchars($curso, ENT_QUOTES, 'UTF-8').'</p>' : '');
     }
 
     public static function css(string $fontCss, string $pieCss = '', string $fontFace = ''): string
@@ -272,40 +289,48 @@ final class RelatorioConsolidadoLayout
 
         return <<<CSS
 {$fontFace}
-@page{margin:20mm 20mm 18mm 20mm;}
-html,body{font-family: {$fontCss}; font-size:11pt; color:{$texto}; margin:0; padding:0; background:#ffffff; line-height:1.45;}
+@page{margin:27mm 16mm 16mm 16mm;}
+html,body{font-family: {$fontCss}; font-size:10pt; color:{$texto}; margin:0; padding:0; background:#ffffff; line-height:1.45;}
 h1,h2,h3,h4,h5,h6,p,table,img,section,div{margin:0; padding:0;}
+img{max-width:100%; height:auto;}
+.mn-aluno-nome{font-size:26pt; font-weight:700; color:{$azul}; line-height:1.1; letter-spacing:-0.02em; text-transform:uppercase; margin:0 0 14px; page-break-after:avoid;}
+.mn-aluno-curso{font-size:10.5pt; font-weight:400; color:{$sec}; margin:0 0 8px;}
 .mn-sec{margin:0 0 28px;}
 .mn-sec-head{page-break-after:avoid; page-break-inside:avoid;}
-.mn-sec-title{font-size:13.5pt; font-weight:700; color:{$azul}; letter-spacing:-0.01em; padding:0 0 0 10px; border-left:3px solid {$ouro}; line-height:1.2;}
-.mn-sec-intro{font-size:9pt; color:{$sec}; margin:7px 0 0; padding-left:13px; page-break-after:avoid;}
+.mn-sec-title{font-size:16.5pt; font-weight:700; color:{$azul}; letter-spacing:-0.01em; padding:0 0 0 12px; border-left:3.5px solid {$ouro}; line-height:1.2;}
+.mn-sec-intro{font-size:10.5pt; font-weight:400; color:{$sec}; margin:7px 0 0; padding-left:16px; page-break-after:avoid;}
 .mn-sec-body{margin-top:14px;}
-.mn-aluno{margin:0 0 16px;}
-.mn-aluno-nome{font-size:16pt; font-weight:700; color:{$azul}; line-height:1.15;}
-.mn-aluno-curso{font-size:9.5pt; color:{$sec}; margin-top:4px;}
-.mn-kpis{width:100%; border-collapse:separate; border-spacing:12px 0; table-layout:fixed; margin:0 0 4px;}
-.mn-kpis td.kpi{background:#ffffff; border:1px solid {$borda}; padding:16px 14px 18px; vertical-align:top;}
-.mn-kpis td.kpi-hot{border-left:3px solid {$ouro};}
-.kpi-label{font-size:8pt; font-weight:500; color:{$sec}; letter-spacing:0.04em; text-transform:uppercase; margin:0 0 8px; line-height:1.25;}
-.kpi-value{font-size:16pt; font-weight:700; color:{$azul}; line-height:1.1;}
-.mn-chart{margin:0 0 18px; page-break-inside:avoid;}
-.mn-chart-title{font-size:9.5pt; font-weight:600; color:{$azul}; margin:0 0 10px;}
-.chart{width:100%; max-width:700px; max-height:280px; margin:0 0 4px;}
+.mn-sec-keep{page-break-inside:avoid;}
+.mn-sec-insights{page-break-inside:avoid;}
+.mn-sec-insights .mn-sec-head,.mn-sec-table .mn-sec-head{page-break-after:avoid;}
+.mn-sec-insights .mn-insight-item:first-child,.mn-sec-insights .mn-insight-block:nth-child(-n+2){page-break-before:avoid;}
+.mn-kpis{width:100%; border-collapse:separate; border-spacing:14px 0; table-layout:fixed; margin:0;}
+.mn-kpis td.kpi{background:#ffffff; border:1px solid {$borda}; padding:16px 16px 18px; vertical-align:top;}
+.kpi-label{font-size:8.5pt; font-weight:500; color:{$sec}; letter-spacing:0.04em; text-transform:uppercase; margin:0 0 8px; line-height:1.25;}
+.kpi-value{font-size:19pt; font-weight:700; color:{$azul}; line-height:1.1;}
+.mn-chart{margin:0 0 20px; page-break-inside:avoid;}
+.mn-chart-title{font-size:11pt; font-weight:600; color:{$azul}; margin:0 0 6px;}
+.mn-chart-note{font-size:9.5pt; font-weight:400; color:{$sec}; margin:0 0 12px;}
+.chart{width:100%; max-width:100%; margin:8px 0 0;}
 {$pieCss}
-.mn-table{width:100%; border-collapse:collapse; font-size:9pt;}
+.mn-table{width:100%; border-collapse:collapse; font-size:9pt; table-layout:auto;}
 .mn-table thead{display:table-header-group;}
-.mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:8pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle;}
+.mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:8.5pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle;}
 .mn-table th.num,.mn-table td.num{text-align:right; white-space:nowrap;}
-.mn-table td{border-bottom:1px solid #EEF0F3; padding:9px 11px; vertical-align:top; color:{$texto}; word-wrap:break-word;}
+.mn-table td{border-bottom:1px solid #EEF0F3; padding:9px 11px; vertical-align:top; color:{$texto}; word-wrap:break-word; font-size:9pt; font-weight:400;}
 .mn-table tr.z td{background:{$zebra};}
 .mn-table tr{page-break-inside:avoid;}
+.mn-table thead{page-break-after:avoid;}
+.mn-table tbody tr:first-child,.mn-table tbody tr:nth-child(2){page-break-before:avoid;}
 .pct{font-weight:600; font-size:9.5pt;}
 .bar-track{display:block; height:3px; background:#EEF0F3; margin-top:6px; width:72px; overflow:hidden;}
 .bar-fill{display:block; height:3px;}
-.mn-insight{font-size:9.5pt; color:{$texto}; margin:0 0 8px; padding:8px 0 8px 12px; border-left:2px solid {$ouro};}
-.empty{color:#6B7280; text-align:left; font-size:9.5pt; padding:8px 0;}
+.mn-insight-item,.mn-insight-block{page-break-inside:avoid; margin:0 0 12px;}
+.mn-insight-block{padding:8px 0 8px 12px; border-left:2px solid {$ouro};}
+.mn-insight-label{font-size:8.5pt; font-weight:500; color:{$sec}; letter-spacing:0.03em; text-transform:uppercase; margin:0 0 4px;}
+.mn-insight-value{font-size:10pt; font-weight:600; color:{$azul};}
+.empty{color:#6B7280; text-align:left; font-size:10pt; padding:8px 0;}
 .keep{page-break-inside:avoid;}
-.keep-start{page-break-inside:avoid;}
 CSS;
     }
 
@@ -314,34 +339,64 @@ CSS;
         try {
             $canvas = $dompdf->getCanvas();
             $metrics = $dompdf->getFontMetrics();
-            $bold = $metrics->getFont('Inter', 'bold')
-                ?: $metrics->getFont('DejaVu Sans', 'bold')
-                ?: $metrics->getFont('DejaVu Sans', 'normal');
-            $regular = $metrics->getFont('Inter', 'normal')
-                ?: $metrics->getFont('DejaVu Sans', 'normal');
+            $bold = $metrics->getFont('DejaVu Sans', 'bold')
+                ?: $metrics->getFont('Inter', 'bold')
+                ?: $metrics->getFont('Helvetica', 'bold');
+            $regular = $metrics->getFont('DejaVu Sans', 'normal')
+                ?: $metrics->getFont('Inter', 'normal')
+                ?: $metrics->getFont('Helvetica', 'normal');
             if (! is_string($bold) || $bold === '' || ! is_string($regular) || $regular === '') {
                 return;
             }
 
             $pageW = $canvas->get_width();
             $pageH = $canvas->get_height();
-            $left = 56.7;
-            $right = $pageW - 56.7;
+            $mm = 2.83465;
+            $left = 16 * $mm;
+            $right = $pageW - (16 * $mm);
             $azul = self::hexToRgb(self::AZUL);
             $ouro = self::hexToRgb(self::DOURADO);
             $cinza = self::hexToRgb(self::TEXTO_SEC);
 
-            $canvas->page_text($left, 22, 'MISSÃO NOMEAÇÃO', $bold, 8.0, $azul);
+            $marca = self::textoCabecalhoEsquerdo();
+            $canvas->page_text($left, 28.0, $marca, $bold, 8.0, $azul);
             $rotuloW = $metrics->getTextWidth($rotuloPeriodo, $regular, 8.0);
-            $canvas->page_text($right - $rotuloW, 22, $rotuloPeriodo, $regular, 8.0, $cinza);
-            $canvas->page_line($left, 34.5, $right, 34.5, $ouro, 0.6);
+            $canvas->page_text($right - $rotuloW, 28.0, $rotuloPeriodo, $regular, 8.0, $cinza);
+            $canvas->page_line($left, 54.0, $right, 54.0, $ouro, 0.6);
 
             $pag = 'Página {PAGE_NUM} de {PAGE_COUNT}';
             $pagW = $metrics->getTextWidth('Página 00 de 00', $regular, 7.5);
-            $canvas->page_text($right - $pagW, $pageH - 24, $pag, $regular, 7.5, $cinza);
+            $canvas->page_text($right - $pagW, $pageH - 32.0, $pag, $regular, 7.5, $cinza);
         } catch (Throwable) {
             // Relatório segue válido sem chrome de página.
         }
+    }
+
+    private static function blocoInsightTextual(string $texto): string
+    {
+        $label = '';
+        $valor = $texto;
+        $padroes = [
+            '/^(.*?mat[eé]ria mais estudada)\s+(?:foi|é|:)\s+(.+)$/iu',
+            '/^(.*?mat[eé]ria menos estudada)\s+(?:foi|é|:)\s+(.+)$/iu',
+            '/^(.*?tempo extra)\s+(?:foi|é|:)\s+(.+)$/iu',
+        ];
+        foreach ($padroes as $re) {
+            if (preg_match($re, $texto, $m)) {
+                $label = trim($m[1], " \t:-–—.");
+                $valor = trim($m[2]);
+                break;
+            }
+        }
+
+        $html = '<div class="mn-insight-block">';
+        if ($label !== '') {
+            $html .= '<div class="mn-insight-label">'.htmlspecialchars($label, ENT_QUOTES, 'UTF-8').'</div>';
+        }
+        $html .= '<div class="mn-insight-value">'.htmlspecialchars($valor, ENT_QUOTES, 'UTF-8').'</div>';
+        $html .= '</div>';
+
+        return $html;
     }
 
     /**

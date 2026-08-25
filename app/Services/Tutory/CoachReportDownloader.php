@@ -1071,7 +1071,8 @@ class CoachReportDownloader
         $pdfHtml = $this->montarHtmlConsolidado($xpDes, $xpAluno, $xpHoras, $xpQuestoes, $xpProgresso, $horas, $questoes, $progresso);
 
         try {
-            $dompdf = new Dompdf($this->opcoesDompdf());
+            $dompdf = new Dompdf($this->opcoesDompdfConsolidado());
+            PdfFontes::aplicarNoDompdf($dompdf);
             $dompdf->loadHtml($pdfHtml, 'UTF-8');
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
@@ -1109,19 +1110,20 @@ class CoachReportDownloader
         string $htmlQuestoes,
         string $htmlProgresso,
     ): string {
-        $fontCss = $this->cssFamiliaFontePdf();
+        $fontCss = PdfFontes::diretorioInter() !== null ? PdfFontes::css('inter') : PdfFontes::css('dejavu');
         $pieCss = $this->cssChartPie();
-        $css = $this->cssPdfConsolidado($fontCss, $pieCss);
+        $css = RelatorioConsolidadoLayout::css($fontCss, $pieCss, PdfFontes::fontFaceCss('inter'));
 
-        $desempenho = $this->montarHtmlCabecalhoDesempenho($xpDes)
-            .$this->montarHtmlMetricasDesempenho($xpDes);
+        [$aluno, $curso] = $this->extrairIdentidadeDesempenho($xpDes);
+        $cards = $this->montarHtmlMetricasDesempenho($xpDes);
 
         $ritmo = RelatorioConsolidadoLayout::grafico(
             'Horas brutas × horas líquidas',
             $this->chartImgHtml($htmlHoras, 'chart_line_comparativo', null)
         ).RelatorioConsolidadoLayout::grafico(
-            'Horas planejadas × horas (brutas) estudadas',
-            $this->chartImgHtml($htmlProgresso, 'chart_horas_diarias', null)
+            RelatorioConsolidadoLayout::TITULO_GRAFICO_PLANEJADAS,
+            $this->chartImgHtml($htmlProgresso, 'chart_horas_diarias', null),
+            RelatorioConsolidadoLayout::LEGENDA_HORAS_ESTUDADAS
         );
 
         $insights = $this->montarHtmlInsights($xpProgresso);
@@ -1140,22 +1142,30 @@ class CoachReportDownloader
             $revisoes .= '<p class="empty">Nenhuma revisão registrada neste período.</p>';
         }
 
-        $descHist = $this->xpathText($xpHoras, "//h2[contains(@class,'section-4')]/following-sibling::p[1]");
         $historico = $this->htmlTabelaPorId($xpHoras, 'tabela_horas_liquidas');
 
-        $secoes = RelatorioConsolidadoLayout::secao('Seu desempenho', '', $desempenho)
+        $secoes = RelatorioConsolidadoLayout::alunoNome($aluno)
+            .RelatorioConsolidadoLayout::secao('Seu desempenho', $curso, $cards, 'mn-sec-keep')
             .RelatorioConsolidadoLayout::secao('Ritmo de estudos', '', $ritmo)
-            .RelatorioConsolidadoLayout::secao('Painel de Insights', '', $insights)
+            .RelatorioConsolidadoLayout::secao('Painel de Insights', '', $insights, 'mn-sec-insights')
             .RelatorioConsolidadoLayout::secao('Desempenho em questões', $descQuestoes, $questoes)
-            .RelatorioConsolidadoLayout::secao('Performance por assunto', $descAssuntos, $assuntos)
-            .RelatorioConsolidadoLayout::secao('Revisões no período', $descRevisoes, $revisoes)
-            .RelatorioConsolidadoLayout::secao('Histórico completo', $descHist, $historico);
+            .RelatorioConsolidadoLayout::secao('Performance por assunto', $descAssuntos, $assuntos, 'mn-sec-table')
+            .RelatorioConsolidadoLayout::secao('Revisões no período', $descRevisoes, $revisoes, 'mn-sec-table')
+            .RelatorioConsolidadoLayout::secao(
+                'Histórico completo',
+                RelatorioConsolidadoLayout::INTRO_HISTORICO,
+                $historico,
+                'mn-sec-table'
+            );
 
         return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'.$css
             .'</style></head><body>'.$secoes.'</body></html>';
     }
 
-    private function montarHtmlCabecalhoDesempenho(DOMXPath $xp): string
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function extrairIdentidadeDesempenho(DOMXPath $xp): array
     {
         $aluno = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' aluno-details ')]//h4");
         $curso = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' aluno-details ')]//p");
@@ -1163,7 +1173,15 @@ class CoachReportDownloader
             $aluno = $this->xpathText($xp, '//h4') ?: '';
         }
 
-        return RelatorioConsolidadoLayout::alunoBloco($aluno, $curso);
+        return [$aluno, $curso];
+    }
+
+    private function montarHtmlCabecalhoDesempenho(DOMXPath $xp): string
+    {
+        [$aluno, $curso] = $this->extrairIdentidadeDesempenho($xp);
+
+        return RelatorioConsolidadoLayout::alunoNome($aluno)
+            .($curso !== '' ? '<p class="mn-aluno-curso">'.htmlspecialchars($curso, ENT_QUOTES, 'UTF-8').'</p>' : '');
     }
 
     private function montarHtmlMetricasDesempenho(DOMXPath $xp): string
@@ -2298,6 +2316,14 @@ HTML;
         return PdfFontes::opcoesDompdf();
     }
 
+    private function opcoesDompdfConsolidado(): Options
+    {
+        $options = PdfFontes::opcoesDompdf('inter');
+        $options->set('defaultFont', 'DejaVu Sans');
+
+        return $options;
+    }
+
     private function montarHtmlPanorama(DOMXPath $xp): string
     {
         $nodes = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' main-numbers ')]");
@@ -2544,7 +2570,7 @@ HTML;
         $data = $this->normalizarCoresDataset($data);
         $data = $this->aplicarDatalabelsOficiais($data, $canvasId);
 
-        return $this->aplicarIdentidadeVisualGrafico($data, $canvasId);
+        return $this->aplicarIdentidadeVisualGrafico($data);
     }
 
     /**
@@ -2553,7 +2579,7 @@ HTML;
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function aplicarIdentidadeVisualGrafico(array $data, string $canvasId): array
+    private function aplicarIdentidadeVisualGrafico(array $data): array
     {
         $paleta = RelatorioConsolidadoLayout::paletaSeries();
         $type = (string) ($data['type'] ?? '');
@@ -2569,13 +2595,6 @@ HTML;
                 $data['data']['datasets'][$i]['fill'] = false;
                 $data['data']['datasets'][$i]['pointRadius'] = 2;
                 $data['data']['datasets'][$i]['borderWidth'] = 2;
-                $label = (string) ($ds['label'] ?? '');
-                if ($canvasId === 'chart_horas_diarias'
-                    && preg_match('/estudad/i', $label)
-                    && ! preg_match('/brut/i', $label)
-                ) {
-                    $data['data']['datasets'][$i]['label'] = trim($label).' (brutas)';
-                }
             }
         }
 
@@ -2795,51 +2814,46 @@ HTML;
         }
 
         if ($type === 'line') {
-            if ($isHours) {
-                $data['options'] = is_array($data['options'] ?? null) ? $data['options'] : [];
-                $data['options']['plugins'] = is_array($data['options']['plugins'] ?? null)
-                    ? $data['options']['plugins']
-                    : [];
-                $data['options']['layout'] = is_array($data['options']['layout'] ?? null)
-                    ? $data['options']['layout']
-                    : [];
-                $data['options']['plugins']['datalabels'] = [
-                    'anchor' => 'end',
-                    'align' => 'end',
-                    'offset' => 4,
-                    'clamp' => true,
-                    'clip' => false,
-                    'color' => '#111827',
-                    'backgroundColor' => 'rgba(255,255,255,0.85)',
-                    'borderRadius' => 3,
-                    'padding' => 3,
-                    'font' => ['size' => 9, 'weight' => 'bold'],
-                    'formatter' => '__DATALABEL_HOURS__',
-                ];
-                if (isset($data['data']['datasets']) && is_array($data['data']['datasets'])) {
-                    foreach ($data['data']['datasets'] as $i => $ds) {
-                        if (! is_array($ds)) {
-                            continue;
-                        }
-                        $data['data']['datasets'][$i]['datalabels'] = [
-                            'align' => $i === 0 ? 'end' : 'start',
-                            'anchor' => $i === 0 ? 'end' : 'start',
-                        ];
+            $data['options'] = is_array($data['options'] ?? null) ? $data['options'] : [];
+            $data['options']['plugins'] = is_array($data['options']['plugins'] ?? null)
+                ? $data['options']['plugins']
+                : [];
+            $data['options']['layout'] = is_array($data['options']['layout'] ?? null)
+                ? $data['options']['layout']
+                : [];
+            $data['options']['plugins']['datalabels'] = [
+                'anchor' => 'end',
+                'align' => 'end',
+                'offset' => 3,
+                'clamp' => true,
+                'clip' => false,
+                'color' => RelatorioConsolidadoLayout::AZUL,
+                'backgroundColor' => 'rgba(255,255,255,0.72)',
+                'borderWidth' => 0,
+                'padding' => 2,
+                'font' => ['size' => 8, 'weight' => 'bold'],
+                'formatter' => $isHours ? '__DATALABEL_HOURS__' : '__DATALABEL_VALUE__',
+            ];
+            if (isset($data['data']['datasets']) && is_array($data['data']['datasets'])) {
+                foreach ($data['data']['datasets'] as $i => $ds) {
+                    if (! is_array($ds)) {
+                        continue;
                     }
+                    $data['data']['datasets'][$i]['datalabels'] = [
+                        'align' => $i % 2 === 0 ? 'end' : 'start',
+                        'anchor' => $i % 2 === 0 ? 'end' : 'start',
+                    ];
                 }
-                $padding = is_array($data['options']['layout']['padding'] ?? null)
-                    ? $data['options']['layout']['padding']
-                    : [];
-                $data['options']['layout']['padding'] = array_merge($padding, [
-                    'top' => max((int) ($padding['top'] ?? 0), 22),
-                    'bottom' => max((int) ($padding['bottom'] ?? 0), 18),
-                ]);
-
-                return $data;
             }
+            $padding = is_array($data['options']['layout']['padding'] ?? null)
+                ? $data['options']['layout']['padding']
+                : [];
+            $data['options']['layout']['padding'] = array_merge($padding, [
+                'top' => max((int) ($padding['top'] ?? 0), 22),
+                'bottom' => max((int) ($padding['bottom'] ?? 0), 18),
+            ]);
 
-            // Tendência: sem etiqueta em cada ponto (não transformar o gráfico em tabela).
-            return $this->ocultarDatalabels($data);
+            return $data;
         }
 
         unset($data['options']['plugins']['datalabels']);
@@ -2917,6 +2931,7 @@ HTML;
                 '"__DATALABEL_QUESTOES__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
                 '"__DATALABEL_PERCENT__"' => 'function(value){return Number(value).toFixed(0)+"%";}',
                 '"__DATALABEL_HOURS__"' => 'function(value){var n=Number(value&&typeof value==="object"&&value.y!=null?value.y:value);if(!isFinite(n))return "";var r=Math.round(n*10)/10;if(r===0)return "";return (Math.abs(r%1)<1e-9?String(Math.round(r)):String(r).replace(".",","))+"h";}',
+                '"__DATALABEL_VALUE__"' => 'function(value){var n=Number(value&&typeof value==="object"&&value.y!=null?value.y:value);if(!isFinite(n))return "";var r=Math.round(n*10)/10;if(r===0)return "";return Math.abs(r%1)<1e-9?String(Math.round(r)):String(r).replace(".",",");}',
                 '"__DATALABEL_BUBBLE_PERCENT__"' => 'function(value){return value&&value.r!=null?Number(value.r*10).toFixed(0)+"%":"";}',
                 // legado
                 '"__DATALABEL_FORMATTER__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
