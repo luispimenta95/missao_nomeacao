@@ -208,8 +208,8 @@ class RelatoriosMentorTest extends TestCase
     {
         $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());
         $this->assertStringContainsString('__DATALABEL_HOURS__', $php);
-        $this->assertStringContainsString("'formatter' => '__DATALABEL_HOURS__'", $php);
         $this->assertStringContainsString('__DATALABEL_VALUE__', $php);
+        $this->assertStringContainsString('$isHours ? \'__DATALABEL_HOURS__\' : \'__DATALABEL_VALUE__\'', $php);
 
         $script = (string) file_get_contents(base_path('scripts/tutory-compose-pdf.mjs'));
         $this->assertStringContainsString('labelHoursOnChartVertices', $script);
