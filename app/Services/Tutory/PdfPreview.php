@@ -5,7 +5,7 @@ namespace App\Services\Tutory;
 use Dompdf\Dompdf;
 
 /**
- * Gera um PDF de amostra (mesma casca do relatório) para o preview do admin.
+ * Gera um PDF de amostra (mesma casca do relatório quinzenal) para o preview do admin.
  */
 final class PdfPreview
 {
@@ -13,65 +13,80 @@ final class PdfPreview
     {
         $chave = PdfFontes::normalizar($chaveFonte);
         $fontCss = PdfFontes::css($chave);
-        $logoHtml = '<div class="logo"><div class="l1">MISSÃO</div><div class="l2">NOMEAÇÃO</div></div>';
+        $css = RelatorioConsolidadoLayout::css($fontCss, '', PdfFontes::fontFaceCss($chave));
+        $rotulo = RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-01'));
+
+        $desempenho = RelatorioConsolidadoLayout::alunoBloco(
+            'Giovanna',
+            'Pré-edital · Delegado de Polícia — São Paulo'
+        ).RelatorioConsolidadoLayout::cards([
+            ['label' => 'Total de Horas', 'value' => '32h'],
+            ['label' => '% de acertos', 'value' => '78,1%'],
+            ['label' => 'Questões', 'value' => '248'],
+            ['label' => 'Revisões', 'value' => '12'],
+        ]);
+
+        $ritmo = RelatorioConsolidadoLayout::grafico(
+            'Horas planejadas × horas (brutas) estudadas',
+            '<p class="empty">Gráfico omitido neste preview de fonte.</p>'
+        );
+
+        $insights = RelatorioConsolidadoLayout::insights([
+            'Média diária 03:16',
+            'Exercícios realizados 248',
+            'Acertos 194',
+            'Taxa de acertos 78,1%',
+            'A matéria mais estudada foi Direito Constitucional.',
+        ]);
+
+        $questoes = RelatorioConsolidadoLayout::cards([
+            ['label' => 'Questões realizadas', 'value' => '248'],
+            ['label' => 'Acertos', 'value' => '194'],
+            ['label' => 'Percentual de acertos', 'value' => '78,1%', 'destaque' => true],
+        ]);
+
+        $assuntos = RelatorioConsolidadoLayout::tabela(
+            ['Disciplina', 'Assunto', 'Taxa de Acertos'],
+            [
+                ['Direito Administrativo', 'Improbidade administrativa e o dever de probidade na administração pública', '55%'],
+                ['Direito Constitucional', 'Organização do Estado', '82%'],
+                ['Português', 'Concordância verbal', '71%'],
+            ],
+            ['numeric' => [2], 'percent_col' => 2]
+        );
+
+        $revisoes = RelatorioConsolidadoLayout::tabela(
+            ['Disciplina', 'Assunto', 'Revisões'],
+            [
+                ['Direito Penal', 'Teoria do crime', '3'],
+                ['Direito Constitucional', 'Controle de constitucionalidade', '1'],
+            ],
+            ['numeric' => [2]]
+        );
+
+        $historico = RelatorioConsolidadoLayout::tabela(
+            ['Data', 'Disciplina', 'Horas brutas', 'Horas líquidas'],
+            [
+                ['01/08', 'Direito Constitucional', '02:10', '01:48'],
+                ['02/08', 'Direito Administrativo', '01:40', '01:22'],
+            ],
+            ['numeric' => [2, 3]]
+        );
+
+        $secoes = RelatorioConsolidadoLayout::secao('Seu desempenho', '', $desempenho)
+            .RelatorioConsolidadoLayout::secao('Ritmo de estudos', '', $ritmo)
+            .RelatorioConsolidadoLayout::secao('Painel de Insights', '', $insights)
+            .RelatorioConsolidadoLayout::secao('Desempenho em questões', 'Confira o seu desempenho de questões no período', $questoes)
+            .RelatorioConsolidadoLayout::secao('Performance por assunto', 'Amostra de texto com acentuação: ação, ciência, constituição, órgão.', $assuntos)
+            .RelatorioConsolidadoLayout::secao('Revisões no período', '', $revisoes)
+            .RelatorioConsolidadoLayout::secao('Histórico completo', '', $historico);
 
         $html = <<<HTML
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
-body{font-family: {$fontCss}; font-size:12px; color:#222; margin:24px;}
-.logo{text-align:center; margin:0 0 14px; color:#000; font-family: {$fontCss}; font-weight:bold; line-height:0.95;}
-.logo .l1{font-size:18pt; letter-spacing:2pt;}
-.logo .l2{font-size:16pt; letter-spacing:1pt;}
-h1{font-size:20px; margin:0 0 6px; text-align:center;}
-.periodo{color:#555; margin-bottom:14px; text-align:center;}
-.aluno{margin:10px 0 18px;}
-.aluno h2{margin:0 0 4px; font-size:16px;}
-.section{margin:22px 0 8px; padding-left:10px; border-left:4px solid #00aced; font-size:15px;}
-.section-desc{color:#555; margin:0 0 12px;}
-.panorama{width:100%; border-collapse:separate; border-spacing:10px 0; margin:6px 0 14px; table-layout:fixed;}
-.panorama td{
-  width:33%;
-  border:0.4pt solid #cdcdcd;
-  padding:6pt 8pt 10pt;
-  height:52pt;
-  vertical-align:top;
-  background:#ffffff;
-}
-.panorama .label{color:#888; font-size:8pt; margin:0 0 8pt; line-height:1.1;}
-.panorama .value{font-size:12pt; font-weight:bold; color:#000000; margin:0; line-height:1.1;}
-.assuntos{width:100%; border-collapse:collapse; margin-top:8px; font-size:11px;}
-.assuntos thead td{background:#00aced; color:#fff; font-weight:bold; padding:8px;}
-.assuntos tbody td{border-bottom:1px solid #eee; padding:8px; vertical-align:top;}
-.rule{border:0;border-top:1px solid #eaeaea; margin:12px 0;}
-.nota{color:#555; font-size:10px; margin-top:18px;}
+{$css}
 </style></head><body>
-{$logoHtml}
-<h1>Relatório de Questões</h1>
-<div class="periodo">Período do relatório: de 01/08/2026 a 15/08/2026</div>
-<hr class="rule" />
-<div class="aluno">
-  <h2>Giovanna</h2>
-  <div class="periodo" style="text-align:left;margin:0;">Pré-edital · Delegado de Polícia — São Paulo</div>
-</div>
-
-<h2 class="section">Breve Panorama</h2>
-<p class="section-desc">Confira o seu desempenho de questões no período</p>
-<table class="panorama"><tr>
-  <td><div class="label">Questões realizadas</div><div class="value">248</div></td>
-  <td><div class="label">Percentual de acertos</div><div class="value">78,1%</div></td>
-  <td><div class="label">Horas estudadas</div><div class="value">32h</div></td>
-</tr></table>
-
-<h2 class="section">Performance por assunto</h2>
-<p class="section-desc">Amostra de texto com acentuação: ação, ciência, constituição, órgão.</p>
-<table class="assuntos"><thead><tr>
-  <td>Disciplina</td><td>Assunto</td><td>Taxa de Acertos</td>
-</tr></thead><tbody>
-  <tr><td>Direito Administrativo</td><td>Improbidade administrativa</td><td>55%</td></tr>
-  <tr><td>Direito Constitucional</td><td>Organização do Estado</td><td>82%</td></tr>
-  <tr><td>Português</td><td>Concordância verbal</td><td>71%</td></tr>
-</tbody></table>
-<p class="nota">Preview da fonte do PDF (não é o relatório completo do aluno).</p>
+{$secoes}
 </body></html>
 HTML;
 
@@ -79,6 +94,7 @@ HTML;
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();
+        RelatorioConsolidadoLayout::aplicarCabecalhoRodape($dompdf, $rotulo);
 
         return $dompdf->output() ?? '';
     }

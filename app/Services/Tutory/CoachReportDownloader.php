@@ -20,9 +20,9 @@ use App\Models\Aluno;
 use App\Services\Desempenho\AvaliadorDesempenho;
 use DOMDocument;
 use DOMElement;
-use DOMXPath;
 use Dompdf\Dompdf;
 use Dompdf\Options;
+use DOMXPath;
 use GuzzleHttp\Cookie\FileCookieJar;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
@@ -37,8 +37,6 @@ class CoachReportDownloader
     private const ALUNA_TESTE = 'Giovanna';
 
     private const MAX_TENTATIVAS = 3;
-
-    private const MARCA_DAGUA = 'Missão Nomeação';
 
     /**
      * Pizza no PDF Dompdf — meio-termo entre o original (~700×327, grande demais)
@@ -139,7 +137,7 @@ class CoachReportDownloader
         $this->periodo = $periodo;
         $this->teste = $teste;
         $this->logger = $logger ?? static function (string $message): void {
-            echo $message . PHP_EOL;
+            echo $message.PHP_EOL;
         };
 
         $loginUrl = trim((string) env('LOGIN_URL', ''));
@@ -152,11 +150,11 @@ class CoachReportDownloader
             ? public_path('pdfs')
             : (function_exists('storage_path')
                 ? storage_path('app/tutory-relatorios')
-                : rtrim((string) getenv('HOME'), '/') . '/Relatorios_Tutory');
+                : rtrim((string) getenv('HOME'), '/').'/Relatorios_Tutory');
         $this->pastaDownload = $this->expandHome($pastaEnv !== '' ? $pastaEnv : $defaultPasta);
 
         $this->timeout = (int) (env('TIMEOUT') ?: 120);
-        $this->cookieFile = sys_get_temp_dir() . '/tutory_cookies_' . getmypid() . '.json';
+        $this->cookieFile = sys_get_temp_dir().'/tutory_cookies_'.getmypid().'.json';
         $this->cookieJar = new FileCookieJar($this->cookieFile, true);
 
         if (! is_dir($this->pastaDownload)) {
@@ -201,7 +199,7 @@ class CoachReportDownloader
     private function expandHome(string $path): string
     {
         if (str_starts_with($path, '~/')) {
-            return rtrim((string) getenv('HOME'), '/') . substr($path, 1);
+            return rtrim((string) getenv('HOME'), '/').substr($path, 1);
         }
 
         return $path;
@@ -221,7 +219,7 @@ class CoachReportDownloader
                 'Accept' => 'application/json, text/html, */*;q=0.8',
                 'X-Requested-With' => 'XMLHttpRequest',
                 'Origin' => self::BASE,
-                'Referer' => self::BASE . '/alunos/consulta',
+                'Referer' => self::BASE.'/alunos/consulta',
             ])
             ->baseUrl(self::BASE);
 
@@ -237,7 +235,7 @@ class CoachReportDownloader
         $this->log('Abrindo página de login...');
         $loginPage = $this->client()->get($this->urlLogin);
         if ($loginPage->status() >= 400) {
-            throw new RuntimeException('Não foi possível abrir a página de login (HTTP ' . $loginPage->status() . ').');
+            throw new RuntimeException('Não foi possível abrir a página de login (HTTP '.$loginPage->status().').');
         }
 
         $this->log('Enviando credenciais para /intent/login...');
@@ -252,7 +250,7 @@ class CoachReportDownloader
         $json = $response->json();
         if (! is_array($json) || empty($json['result'])) {
             $erro = is_array($json) ? (string) ($json['error'] ?? 'login falhou') : $response->body();
-            throw new RuntimeException('Falha no login: ' . $erro);
+            throw new RuntimeException('Falha no login: '.$erro);
         }
 
         $index = $this->client()
@@ -299,7 +297,7 @@ class CoachReportDownloader
         }
         $ultimo = (int) $hoje->format('t');
 
-        return [$hoje->format('Y-m-16'), $hoje->format('Y-m-') . str_pad((string) $ultimo, 2, '0', STR_PAD_LEFT)];
+        return [$hoje->format('Y-m-16'), $hoje->format('Y-m-').str_pad((string) $ultimo, 2, '0', STR_PAD_LEFT)];
     }
 
     /**
@@ -318,7 +316,7 @@ class CoachReportDownloader
     private function loadDom(string $html): DOMXPath
     {
         $dom = new DOMDocument;
-        @$dom->loadHTML('<?xml encoding="utf-8"?>' . $html);
+        @$dom->loadHTML('<?xml encoding="utf-8"?>'.$html);
 
         return new DOMXPath($dom);
     }
@@ -341,7 +339,7 @@ class CoachReportDownloader
      */
     private function coletarAlunosAtivos(): array
     {
-        $this->log("Abrindo /alunos/consulta com status=ativos...");
+        $this->log('Abrindo /alunos/consulta com status=ativos...');
         $resp = $this->client()->get('/alunos/consulta', ['status' => 'ativos']);
         $html = $resp->body();
         if (! str_contains($html, 'pesquisa-aluno-container')) {
@@ -355,17 +353,17 @@ class CoachReportDownloader
         // Endpoints reais da página (ex.: /intent/cadastrar-relatorio-coach)
         if (preg_match_all('#/intent/[a-zA-Z0-9_./-]+#', $html, $m)) {
             $this->endpointsGeracao = array_values(array_unique($m[0]));
-            $this->log('Intents na página: ' . implode(', ', $this->endpointsGeracao));
+            $this->log('Intents na página: '.implode(', ', $this->endpointsGeracao));
         }
 
         $alunos = [];
         $vistos = [];
         $pagina = 1;
-        $urlAtual = self::BASE . '/alunos/consulta?status=ativos';
+        $urlAtual = self::BASE.'/alunos/consulta?status=ativos';
 
         while (true) {
             $paginaAlunos = $this->parseAlunosDaPagina($html);
-            $this->log("Coletando página {$pagina}: " . count($paginaAlunos) . ' aluno(s)');
+            $this->log("Coletando página {$pagina}: ".count($paginaAlunos).' aluno(s)');
             foreach ($paginaAlunos as $aluno) {
                 if ($aluno['id'] === '' || isset($vistos[$aluno['id']])) {
                     continue;
@@ -378,7 +376,7 @@ class CoachReportDownloader
             if ($proxima === null) {
                 break;
             }
-            $this->log('Próxima página: ' . $proxima);
+            $this->log('Próxima página: '.$proxima);
             $html = $this->client()->get($proxima)->body();
             $urlAtual = $proxima;
             $pagina++;
@@ -387,7 +385,7 @@ class CoachReportDownloader
             }
         }
 
-        $this->log('Total de alunos ativos: ' . count($alunos));
+        $this->log('Total de alunos ativos: '.count($alunos));
 
         return $alunos;
     }
@@ -485,13 +483,13 @@ class CoachReportDownloader
             return $url;
         }
         if (str_starts_with($url, '//')) {
-            return 'https:' . $url;
+            return 'https:'.$url;
         }
         if (str_starts_with($url, '/')) {
-            return self::BASE . $url;
+            return self::BASE.$url;
         }
 
-        return rtrim($base, '/') . '/' . ltrim($url, '/');
+        return rtrim($base, '/').'/'.ltrim($url, '/');
     }
 
     /**
@@ -535,10 +533,10 @@ class CoachReportDownloader
         $this->log("[{$nome}] [{$rotulo}] Gerando via {$endpoint}...");
         // PDF de referência do painel usa agrupamento diário (gráficos por dia)
         $agrupamento = trim((string) env('TUTORY_REPORT_AGRUPAMENTO', 'dia')) ?: 'dia';
-        $body = 'alunos[]=' . rawurlencode($id)
-            . '&dt_ini=' . rawurlencode($dtIni)
-            . '&dt_fim=' . rawurlencode($dtFim)
-            . '&agrupamento=' . rawurlencode($agrupamento);
+        $body = 'alunos[]='.rawurlencode($id)
+            .'&dt_ini='.rawurlencode($dtIni)
+            .'&dt_fim='.rawurlencode($dtFim)
+            .'&agrupamento='.rawurlencode($agrupamento);
 
         $resp = $this->client()
             ->withHeaders(['Content-Type' => 'application/x-www-form-urlencoded; charset=UTF-8'])
@@ -548,25 +546,25 @@ class CoachReportDownloader
         $json = $resp->json();
         if (! is_array($json) || empty($json['result'])) {
             $erro = is_array($json) ? (string) ($json['error'] ?? $resp->body()) : $resp->body();
-            $this->log("[{$nome}] [{$rotulo}] Falha ao gerar: " . $erro);
+            $this->log("[{$nome}] [{$rotulo}] Falha ao gerar: ".$erro);
 
             return null;
         }
 
         $lista = $json['data'] ?? null;
         if (! is_array($lista) || $lista === [] || empty($lista[0]['token'])) {
-            $this->log("[{$nome}] [{$rotulo}] Resposta sem token de relatório: " . $resp->body());
+            $this->log("[{$nome}] [{$rotulo}] Resposta sem token de relatório: ".$resp->body());
 
             return null;
         }
 
         $key = (string) $lista[0]['token'];
-        $reportUrl = self::BASE . '/documentos/relatorios/' . $model . '?key=' . rawurlencode($key);
+        $reportUrl = self::BASE.'/documentos/relatorios/'.$model.'?key='.rawurlencode($key);
         $this->log("[{$nome}] [{$rotulo}] Abrindo relatório (/documentos/relatorios/{$model})...");
 
         $pagina = $this->client()
             ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
-            ->get('/documentos/relatorios/' . $model, ['key' => $key]);
+            ->get('/documentos/relatorios/'.$model, ['key' => $key]);
 
         if ($pagina->status() >= 400 || (! str_contains($pagina->body(), 'btn_save') && ! str_contains($pagina->body(), 'btn_download'))) {
             $this->log("[{$nome}] [{$rotulo}] Página do relatório inválida (HTTP {$pagina->status()})");
@@ -668,7 +666,7 @@ class CoachReportDownloader
 
         $parts = [];
         foreach ($this->cookieJar as $cookie) {
-            $parts[] = $cookie->getName() . '=' . $cookie->getValue();
+            $parts[] = $cookie->getName().'='.$cookie->getValue();
         }
 
         return implode('; ', $parts);
@@ -686,7 +684,7 @@ class CoachReportDownloader
     ): bool {
         $script = function_exists('base_path')
             ? base_path('scripts/tutory-render-pdf.mjs')
-            : dirname(__DIR__, 3) . '/scripts/tutory-render-pdf.mjs';
+            : dirname(__DIR__, 3).'/scripts/tutory-render-pdf.mjs';
 
         if (! is_file($script)) {
             $this->log("[{$nome}] [{$rotulo}] Script Puppeteer ausente: {$script}");
@@ -730,7 +728,7 @@ class CoachReportDownloader
 
         if ($code !== 0 || ! is_file($destino) || filesize($destino) < 500) {
             $detail = trim($stderr !== '' ? $stderr : $stdout);
-            $this->log("[{$nome}] [{$rotulo}] Puppeteer falhou (exit {$code}): " . $detail);
+            $this->log("[{$nome}] [{$rotulo}] Puppeteer falhou (exit {$code}): ".$detail);
 
             return false;
         }
@@ -752,7 +750,7 @@ class CoachReportDownloader
     ): bool {
         $script = function_exists('base_path')
             ? base_path('scripts/tutory-compose-pdf.mjs')
-            : dirname(__DIR__, 3) . '/scripts/tutory-compose-pdf.mjs';
+            : dirname(__DIR__, 3).'/scripts/tutory-compose-pdf.mjs';
 
         if (! is_file($script)) {
             $this->log("[{$nome}] Script de consolidação ausente: {$script}");
@@ -783,6 +781,7 @@ class CoachReportDownloader
             '--url-horas-liquidas', $urlsPorModelo['horas-liquidas'],
             '--url-questoes', $urlsPorModelo['questoes'],
             '--url-progresso', $urlsPorModelo['progresso'],
+            '--rotulo-periodo', RelatorioConsolidadoLayout::rotuloPeriodo($this->periodo),
         ];
         $cookie = $this->cookieHeader();
         if ($cookie !== '') {
@@ -1069,98 +1068,17 @@ class CoachReportDownloader
         $xpQuestoes = $this->loadDom($questoes);
         $xpProgresso = $this->loadDom($progresso);
 
-        $header = $this->montarHtmlCabecalhoDesempenho($xpDes);
-        $metrics = $this->montarHtmlMetricasDesempenho($xpDes);
-        $revisoes = $this->htmlTabelaPorId($xpAluno, 'tabela_revisoes');
-        $revisoesLinhas = $this->contarLinhasTabela($xpAluno, 'tabela_revisoes');
-        $chartTempo = $this->chartImgHtml($horas, 'chart_line_comparativo', null);
-        $historicoHoras = $this->htmlTabelaPorId($xpHoras, 'tabela_horas_liquidas');
-        $panoramaQuestoes = $this->montarHtmlPanorama($xpQuestoes);
-        $chartQuestoes = $this->chartImgHtml($questoes, 'chart_questoes_dia', null);
-        $assuntos = $this->montarHtmlAssuntos($xpQuestoes);
-        $chartMotivacao = $this->chartImgHtml($progresso, 'chart_horas_diarias', null);
-        $insights = $this->montarHtmlMotivacaoProgresso($xpProgresso);
-
-        $descRevisoes = htmlspecialchars($this->xpathText($xpAluno, "//h2[contains(@class,'section-4')]/following-sibling::p[1]")
-            ?: 'Revisões registradas no período', ENT_QUOTES, 'UTF-8');
-        $descTempo = htmlspecialchars($this->xpathText($xpHoras, "//h2[contains(@class,'section-2')]/following-sibling::p[1]")
-            ?: 'Comparativo entre horas brutas e horas líquidas', ENT_QUOTES, 'UTF-8');
-        $descHistHoras = htmlspecialchars($this->xpathText($xpHoras, "//h2[contains(@class,'section-4')]/following-sibling::p[1]")
-            ?: 'Histórico de horas cronometradas', ENT_QUOTES, 'UTF-8');
-        $descQuestoes = htmlspecialchars($this->xpathText($xpQuestoes, "//h2[contains(@class,'section-1')]/following-sibling::p[1]")
-            ?: 'Desempenho de questões no período', ENT_QUOTES, 'UTF-8');
-        $descAssuntos = htmlspecialchars($this->xpathText($xpQuestoes, "//h2[contains(@class,'section-4')]/following-sibling::p[1]")
-            ?: 'Desempenho de questões por assunto', ENT_QUOTES, 'UTF-8');
-        $descMotivacao = htmlspecialchars($this->xpathText($xpProgresso, "//*[contains(@class,'section-3-1')]")
-            ?: 'Comparativo das horas por dia com o horário atual', ENT_QUOTES, 'UTF-8');
-
-        $revisoesBloco = $revisoesLinhas > 0
-            ? $revisoes
-            : $revisoes.'<p class="empty">Nenhuma revisão registrada neste período.</p>';
-
-        $logoHtml = $this->montarHtmlLogoPdf();
-        $fontCss = $this->cssFamiliaFontePdf();
-        $pieCss = $this->cssChartPie();
-        $css = $this->cssPdfConsolidado($fontCss, $pieCss);
-        $seguroNome = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
-
-        $pdfHtml = <<<HTML
-<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-{$css}
-</style></head><body>
-{$logoHtml}
-<div class="card keep">{$header}{$metrics}</div>
-<div class="kicker">Revisões no período</div>
-<div class="card">
-  <h2>Revisões no Período</h2>
-  <p class="muted">{$descRevisoes}</p>
-  {$revisoesBloco}
-</div>
-<div class="kicker">Horas líquidas · desempenho ao longo do tempo</div>
-<div class="card">
-  <h2>Desempenho ao longo do Tempo</h2>
-  <p class="muted">{$descTempo}</p>
-  {$chartTempo}
-</div>
-<div class="kicker">Horas líquidas · histórico</div>
-<div class="card">
-  <h2>Histórico</h2>
-  <p class="muted">{$descHistHoras}</p>
-  {$historicoHoras}
-</div>
-<div class="kicker">Questões</div>
-<div class="card">
-  <h2>Breve Panorama</h2>
-  <p class="muted">{$descQuestoes}</p>
-  {$panoramaQuestoes}
-  {$chartQuestoes}
-</div>
-<div class="card">
-  <h2>Performance por assunto</h2>
-  <p class="muted">{$descAssuntos}</p>
-  {$assuntos}
-</div>
-<div class="kicker">Progresso no plano · motivação</div>
-<div class="card">
-  <h2>Motivação</h2>
-  <p class="muted">{$descMotivacao}</p>
-  {$chartMotivacao}
-</div>
-<div class="insights keep">
-  <h3>Painel de Insights</h3>
-  {$insights}
-</div>
-<p class="empty">Relatório consolidado de {$seguroNome}</p>
-</body></html>
-HTML;
+        $pdfHtml = $this->montarHtmlConsolidado($xpDes, $xpAluno, $xpHoras, $xpQuestoes, $xpProgresso, $horas, $questoes, $progresso);
 
         try {
             $dompdf = new Dompdf($this->opcoesDompdf());
             $dompdf->loadHtml($pdfHtml, 'UTF-8');
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
-            $this->aplicarMarcaDaguaPdf($dompdf);
+            RelatorioConsolidadoLayout::aplicarCabecalhoRodape(
+                $dompdf,
+                RelatorioConsolidadoLayout::rotuloPeriodo($this->periodo)
+            );
             $bytes = $dompdf->output() ?? '';
             if ($bytes === '' || strlen($bytes) < 500) {
                 $this->log("[{$nome}] Fallback Dompdf gerou PDF vazio");
@@ -1178,26 +1096,74 @@ HTML;
         }
     }
 
+    /**
+     * HTML modular do consolidado (ordem fixa; seções vazias são omitidas).
+     */
+    private function montarHtmlConsolidado(
+        DOMXPath $xpDes,
+        DOMXPath $xpAluno,
+        DOMXPath $xpHoras,
+        DOMXPath $xpQuestoes,
+        DOMXPath $xpProgresso,
+        string $htmlHoras,
+        string $htmlQuestoes,
+        string $htmlProgresso,
+    ): string {
+        $fontCss = $this->cssFamiliaFontePdf();
+        $pieCss = $this->cssChartPie();
+        $css = $this->cssPdfConsolidado($fontCss, $pieCss);
+
+        $desempenho = $this->montarHtmlCabecalhoDesempenho($xpDes)
+            .$this->montarHtmlMetricasDesempenho($xpDes);
+
+        $ritmo = RelatorioConsolidadoLayout::grafico(
+            'Horas brutas × horas líquidas',
+            $this->chartImgHtml($htmlHoras, 'chart_line_comparativo', null)
+        ).RelatorioConsolidadoLayout::grafico(
+            'Horas planejadas × horas (brutas) estudadas',
+            $this->chartImgHtml($htmlProgresso, 'chart_horas_diarias', null)
+        );
+
+        $insights = $this->montarHtmlInsights($xpProgresso);
+
+        $descQuestoes = $this->xpathText($xpQuestoes, "//h2[contains(@class,'section-1')]/following-sibling::p[1]");
+        $questoes = $this->montarHtmlPanorama($xpQuestoes)
+            .RelatorioConsolidadoLayout::grafico('', $this->chartImgHtml($htmlQuestoes, 'chart_questoes_dia', null));
+
+        $descAssuntos = $this->xpathText($xpQuestoes, "//h2[contains(@class,'section-4')]/following-sibling::p[1]");
+        $assuntos = $this->montarHtmlAssuntos($xpQuestoes);
+
+        $descRevisoes = $this->xpathText($xpAluno, "//h2[contains(@class,'section-4')]/following-sibling::p[1]");
+        $revisoesLinhas = $this->contarLinhasTabela($xpAluno, 'tabela_revisoes');
+        $revisoes = $this->htmlTabelaPorId($xpAluno, 'tabela_revisoes');
+        if ($revisoes !== '' && $revisoesLinhas === 0) {
+            $revisoes .= '<p class="empty">Nenhuma revisão registrada neste período.</p>';
+        }
+
+        $descHist = $this->xpathText($xpHoras, "//h2[contains(@class,'section-4')]/following-sibling::p[1]");
+        $historico = $this->htmlTabelaPorId($xpHoras, 'tabela_horas_liquidas');
+
+        $secoes = RelatorioConsolidadoLayout::secao('Seu desempenho', '', $desempenho)
+            .RelatorioConsolidadoLayout::secao('Ritmo de estudos', '', $ritmo)
+            .RelatorioConsolidadoLayout::secao('Painel de Insights', '', $insights)
+            .RelatorioConsolidadoLayout::secao('Desempenho em questões', $descQuestoes, $questoes)
+            .RelatorioConsolidadoLayout::secao('Performance por assunto', $descAssuntos, $assuntos)
+            .RelatorioConsolidadoLayout::secao('Revisões no período', $descRevisoes, $revisoes)
+            .RelatorioConsolidadoLayout::secao('Histórico completo', $descHist, $historico);
+
+        return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'.$css
+            .'</style></head><body>'.$secoes.'</body></html>';
+    }
+
     private function montarHtmlCabecalhoDesempenho(DOMXPath $xp): string
     {
-        $titulo = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' title-section ')]//h1")
-            ?: 'Seu desempenho';
-        $subtitulo = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' title-section ')]//p");
         $aluno = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' aluno-details ')]//h4");
         $curso = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' aluno-details ')]//p");
-
-        $out = '<h1>'.htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</h1>';
-        if ($subtitulo !== '') {
-            $out .= '<p class="muted">'.htmlspecialchars($subtitulo, ENT_QUOTES, 'UTF-8').'</p>';
-        }
-        if ($aluno !== '') {
-            $out .= '<p><b>'.htmlspecialchars($aluno, ENT_QUOTES, 'UTF-8').'</b></p>';
-        }
-        if ($curso !== '') {
-            $out .= '<p class="muted">'.htmlspecialchars($curso, ENT_QUOTES, 'UTF-8').'</p>';
+        if ($aluno === '') {
+            $aluno = $this->xpathText($xp, '//h4') ?: '';
         }
 
-        return $out;
+        return RelatorioConsolidadoLayout::alunoBloco($aluno, $curso);
     }
 
     private function montarHtmlMetricasDesempenho(DOMXPath $xp): string
@@ -1206,7 +1172,7 @@ HTML;
         if ($cards === false || $cards->length === 0) {
             return '';
         }
-        $cells = '';
+        $items = [];
         foreach ($cards as $card) {
             if (! $card instanceof DOMElement) {
                 continue;
@@ -1226,29 +1192,132 @@ HTML;
             if ($label === '' && $value === '') {
                 continue;
             }
-            $cells .= '<td><div class="label">'.htmlspecialchars($label, ENT_QUOTES, 'UTF-8').'</div>'
-                .'<div class="value">'.htmlspecialchars($value, ENT_QUOTES, 'UTF-8').'</div></td>';
+            $items[] = ['label' => $label, 'value' => $value];
         }
 
-        return $cells !== '' ? '<table class="metrics"><tr>'.$cells.'</tr></table>' : '';
+        return RelatorioConsolidadoLayout::cards($items);
     }
 
     private function htmlTabelaPorId(DOMXPath $xp, string $id): string
     {
-        $nodes = $xp->query('//*[@id="'.$id.'"]');
-        if ($nodes === false || $nodes->length === 0) {
-            return '<p class="empty">(Tabela indisponível)</p>';
-        }
-        $table = $nodes->item(0);
-        if (! $table instanceof DOMElement || $table->ownerDocument === null) {
-            return '<p class="empty">(Tabela indisponível)</p>';
-        }
-        $html = $table->ownerDocument->saveHTML($table) ?: '';
-        if ($html === '') {
-            return '<p class="empty">(Tabela vazia)</p>';
+        $parsed = $this->extrairTabelaPorId($xp, $id);
+        if ($parsed === null) {
+            return '';
         }
 
-        return str_replace('<table', '<table class="data"', $html);
+        return RelatorioConsolidadoLayout::tabela(
+            $parsed['headers'],
+            $parsed['rows'],
+            ['numeric' => $parsed['numeric']]
+        );
+    }
+
+    /**
+     * @return array{headers: list<string>, rows: list<list<string>>, numeric: list<int>}|null
+     */
+    private function extrairTabelaPorId(DOMXPath $xp, string $id): ?array
+    {
+        $nodes = $xp->query('//*[@id="'.$id.'"]');
+        if ($nodes === false || $nodes->length === 0) {
+            return null;
+        }
+        $table = $nodes->item(0);
+        if (! $table instanceof DOMElement) {
+            return null;
+        }
+
+        $headers = [];
+        foreach ($table->getElementsByTagName('th') as $th) {
+            $headers[] = trim(preg_replace('/\s+/u', ' ', (string) $th->textContent) ?? '');
+        }
+        if ($headers === []) {
+            $thead = $xp->query('.//thead/tr[1]/*', $table);
+            if ($thead !== false) {
+                foreach ($thead as $cell) {
+                    $headers[] = trim(preg_replace('/\s+/u', ' ', (string) $cell->textContent) ?? '');
+                }
+            }
+        }
+
+        $rows = [];
+        $bodyRows = $xp->query('.//tbody/tr', $table);
+        if ($bodyRows === false || $bodyRows->length === 0) {
+            $bodyRows = $xp->query('.//tr', $table);
+        }
+        if ($bodyRows !== false) {
+            foreach ($bodyRows as $tr) {
+                if (! $tr instanceof DOMElement) {
+                    continue;
+                }
+                $parent = $tr->parentNode;
+                if ($parent instanceof DOMElement && strtolower($parent->tagName) === 'thead') {
+                    continue;
+                }
+                $cols = [];
+                foreach ($tr->childNodes as $td) {
+                    if (! $td instanceof DOMElement) {
+                        continue;
+                    }
+                    $tag = strtolower($td->tagName);
+                    if ($tag !== 'td' && $tag !== 'th') {
+                        continue;
+                    }
+                    $cols[] = trim(preg_replace('/\s+/u', ' ', (string) $td->textContent) ?? '');
+                }
+                if ($cols === []) {
+                    continue;
+                }
+                if ($headers !== [] && $cols === $headers) {
+                    continue;
+                }
+                $rows[] = $cols;
+            }
+        }
+
+        $numeric = $this->indicesColunasNumericas($headers, $rows);
+
+        return [
+            'headers' => $headers,
+            'rows' => $rows,
+            'numeric' => $numeric,
+        ];
+    }
+
+    /**
+     * @param  list<string>  $headers
+     * @param  list<list<string>>  $rows
+     * @return list<int>
+     */
+    private function indicesColunasNumericas(array $headers, array $rows): array
+    {
+        $cols = 0;
+        foreach ($rows as $r) {
+            $cols = max($cols, count($r));
+        }
+        $cols = max($cols, count($headers));
+        $out = [];
+        for ($i = 0; $i < $cols; $i++) {
+            $valores = [];
+            foreach ($rows as $r) {
+                if (isset($r[$i]) && $r[$i] !== '') {
+                    $valores[] = $r[$i];
+                }
+            }
+            if ($valores === []) {
+                continue;
+            }
+            $ok = 0;
+            foreach ($valores as $v) {
+                if (preg_match('/^[\d.,:%hH\s:]+$/u', $v) && preg_match('/\d/', $v)) {
+                    $ok++;
+                }
+            }
+            if ($ok >= max(1, (int) ceil(count($valores) * 0.6))) {
+                $out[] = $i;
+            }
+        }
+
+        return $out;
     }
 
     private function contarLinhasTabela(DOMXPath $xp, string $id): int
@@ -2002,30 +2071,34 @@ HTML;
         return $avaliador->avaliarRelatorio($dados);
     }
 
-    private function montarHtmlMotivacaoProgresso(DOMXPath $xp): string
+    /**
+     * Painel de Insights: textos originais, layout escaneável, sem título duplicado.
+     */
+    private function montarHtmlInsights(DOMXPath $xp): string
     {
         $nodes = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' insights-panel ')]//p");
         if ($nodes === false || $nodes->length === 0) {
-            // fallback: parágrafo após h2 Motivação
-            $nodes = $xp->query("//h2[contains(.,'Motiv')]/following-sibling::p[position()<=6]");
+            $nodes = $xp->query("//h2[contains(.,'Motiv')]/following-sibling::p[position()<=8]");
         }
         if ($nodes === false || $nodes->length === 0) {
-            return '<p style="color:#888;">(Seção Motivação indisponível na página)</p>';
+            return '';
         }
 
-        $titulo = $this->xpathText($xp, "//*[contains(concat(' ', normalize-space(@class), ' '), ' insights-panel ')]//h6");
-        $out = $titulo !== ''
-            ? '<p><b>'.htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</b></p>'
-            : '<p><b>Painel de Insights</b></p>';
+        $paragrafos = [];
         foreach ($nodes as $node) {
-            $txt = trim(preg_replace('/\s+/', ' ', (string) $node->textContent) ?? '');
+            $txt = trim(preg_replace('/\s+/u', ' ', (string) $node->textContent) ?? '');
             if ($txt === '') {
                 continue;
             }
-            $out .= '<p>'.htmlspecialchars($txt, ENT_QUOTES, 'UTF-8').'</p>';
+            $paragrafos[] = $txt;
         }
 
-        return $out !== '' ? $out : '<p style="color:#888;">(Seção Motivação vazia)</p>';
+        return RelatorioConsolidadoLayout::insights($paragrafos);
+    }
+
+    private function montarHtmlMotivacaoProgresso(DOMXPath $xp): string
+    {
+        return $this->montarHtmlInsights($xp);
     }
 
     /**
@@ -2176,7 +2249,7 @@ HTML;
 
             return $this->salvarBytesPdf($nome, $dompdf->output() ?? '', $model, $id);
         } catch (Throwable $exc) {
-            $this->log("[{$nome}] Erro Dompdf: " . $exc->getMessage());
+            $this->log("[{$nome}] Erro Dompdf: ".$exc->getMessage());
 
             return null;
         }
@@ -2192,11 +2265,11 @@ HTML;
         }
 
         return $page
-            . '<div class="keep">'
-            . '<h2 class="section">Progresso por Modalidade</h2>'
-            . '<p class="section-desc">' . $desc . '</p>'
-            . $chart
-            . '</div>';
+            .'<div class="keep">'
+            .'<h2 class="section">Progresso por Modalidade</h2>'
+            .'<p class="section-desc">'.$desc.'</p>'
+            .$chart
+            .'</div>';
     }
 
     /**
@@ -2204,7 +2277,7 @@ HTML;
      */
     private function htmlQuebraPaginaComLogo(string $logoHtml): string
     {
-        return '<div style="page-break-before: always;"></div>' . $logoHtml;
+        return '<div style="page-break-before: always;"></div>'.$logoHtml;
     }
 
     /**
@@ -2229,10 +2302,10 @@ HTML;
     {
         $nodes = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' main-numbers ')]");
         if ($nodes === false || $nodes->length === 0) {
-            return '<p style="color:#888;">(Breve Panorama indisponível na página)</p>';
+            return '';
         }
 
-        $cells = '';
+        $items = [];
         foreach ($nodes as $node) {
             if (! $node instanceof DOMElement) {
                 continue;
@@ -2254,85 +2327,30 @@ HTML;
             if ($label === '' && $value === '') {
                 continue;
             }
-            $cells .= '<td><div class="label">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</div>'
-                . '<div class="value">' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '</div></td>';
+            $key = $this->normalizarParaComparacao($label);
+            $destaque = str_contains($key, 'percent') || str_contains($key, '%') || (str_contains($key, 'acerto') && str_contains($value, '%'));
+            $items[] = ['label' => $label, 'value' => $value, 'destaque' => $destaque];
         }
 
-        if ($cells === '') {
-            return '<p style="color:#888;">(Breve Panorama vazio)</p>';
-        }
-
-        return '<table class="panorama"><tr>' . $cells . '</tr></table>';
+        return RelatorioConsolidadoLayout::cards($items);
     }
 
     private function montarHtmlAssuntos(DOMXPath $xp): string
     {
-        $rows = $xp->query("//*[@id='tabela_questoes']//tbody/tr");
-        if ($rows === false || $rows->length === 0) {
-            return '<p style="color:#888;">(Performance por assunto indisponível na página)</p>';
+        $parsed = $this->extrairTabelaPorId($xp, 'tabela_questoes');
+        if ($parsed === null || $parsed['rows'] === []) {
+            return '';
         }
+        $headers = $parsed['headers'] !== []
+            ? $parsed['headers']
+            : ['Disciplina', 'Assunto', 'Taxa de Acertos'];
+        $percentCol = count($headers) - 1;
+        $numeric = array_values(array_unique(array_merge($parsed['numeric'], [$percentCol])));
 
-        $body = '';
-        foreach ($rows as $tr) {
-            if (! $tr instanceof DOMElement) {
-                continue;
-            }
-            $tds = [];
-            foreach ($tr->getElementsByTagName('td') as $td) {
-                $tds[] = $td;
-            }
-            if (count($tds) < 3) {
-                continue;
-            }
-            $disciplina = htmlspecialchars(trim((string) $tds[0]->textContent), ENT_QUOTES, 'UTF-8');
-            $assunto = htmlspecialchars(trim((string) $tds[1]->textContent), ENT_QUOTES, 'UTF-8');
-            $taxa = htmlspecialchars(trim((string) $tds[2]->textContent), ENT_QUOTES, 'UTF-8');
-            $style = trim($tds[2]->getAttribute('style'));
-            $color = '#d09611';
-            if (preg_match('/color\s*:\s*([^;]+)/i', $style, $m)) {
-                $color = trim($m[1]);
-            }
-            $body .= '<tr>'
-                . '<td>' . $disciplina . '</td>'
-                . '<td>' . $assunto . '</td>'
-                . '<td class="taxa" style="color:' . htmlspecialchars($color, ENT_QUOTES, 'UTF-8') . ';">' . $taxa . '</td>'
-                . '</tr>';
-        }
-
-        return '<table class="assuntos"><thead><tr>'
-            . '<td>Disciplina</td><td>Assunto</td><td>Taxa de Acertos</td>'
-            . '</tr></thead><tbody>' . $body . '</tbody></table>';
-    }
-
-    /**
-     * Marca d'água diagonal, clara, em todas as páginas — não cobre a leitura.
-     */
-    private function aplicarMarcaDaguaPdf(Dompdf $dompdf): void
-    {
-        try {
-            $canvas = $dompdf->getCanvas();
-            $metrics = $dompdf->getFontMetrics();
-            $font = $metrics->getFont('DejaVu Sans', 'bold')
-                ?: $metrics->getFont('DejaVu Sans', 'normal');
-            if (! is_string($font) || $font === '') {
-                return;
-            }
-
-            $texto = self::MARCA_DAGUA;
-            $tamanho = 48.0;
-            $angulo = -32.0;
-            $largura = $metrics->getTextWidth($texto, $font, $tamanho);
-            $paginaW = $canvas->get_width();
-            $paginaH = $canvas->get_height();
-            $rad = deg2rad($angulo);
-            $x = ($paginaW / 2.0) - ($largura / 2.0) * cos($rad);
-            $y = ($paginaH / 2.0) - ($largura / 2.0) * sin($rad);
-            $cor = [0.52, 0.52, 0.52, 'alpha' => 0.12];
-
-            $canvas->page_text($x, $y, $texto, $font, $tamanho, $cor, 0.0, 1.2, $angulo);
-        } catch (Throwable) {
-            // Relatório segue válido sem a marca.
-        }
+        return RelatorioConsolidadoLayout::tabela($headers, $parsed['rows'], [
+            'numeric' => $numeric,
+            'percent_col' => $percentCol,
+        ]);
     }
 
     /**
@@ -2342,32 +2360,7 @@ HTML;
      */
     private function cssPdfConsolidado(string $fontCss, string $pieCss): string
     {
-        return <<<CSS
-@page{margin:12mm 12mm 14mm;}
-html,body{font-family: {$fontCss}; font-size:12px; color:#1F2937; margin:0; padding:0; background:#ffffff;}
-.logo{text-align:center; margin:0 0 14px; color:#000; font-weight:bold; line-height:0.95;}
-.logo .l1{font-size:18pt; letter-spacing:2pt;}
-.logo .l2{font-size:16pt; letter-spacing:1pt;}
-.card{background:#fff; padding:12px 14px; margin:0 0 12px; border:1px solid #E5E7EB;}
-.kicker{font-size:10px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; color:#6B7280; margin:14px 0 6px;}
-h1{font-size:20px; margin:0 0 6px; padding-left:10px; border-left:4px solid #F4B942;}
-h2{font-size:15px; margin:0 0 6px; padding-left:10px; border-left:4px solid #F4B942;}
-.muted{color:#6B7280; margin:0 0 10px;}
-.metrics{width:100%; border-collapse:collapse; table-layout:fixed;}
-.metrics td{background:#fff; border:1px solid #E5E7EB; padding:10px; vertical-align:top;}
-.metrics .label{color:#6B7280; font-size:10px; margin:0 0 6px;}
-.metrics .value{font-size:16px; font-weight:bold; margin:0;}
-.chart{width:100%; max-width:700px; max-height:280px; margin:8px 0 12px;}
-{$pieCss}
-table.data{width:100%; border-collapse:collapse; font-size:10px;}
-table.data thead td{background:#3264ff; color:#fff; font-weight:bold; padding:6px;}
-table.data tbody td{border-bottom:1px solid #eee; padding:6px; vertical-align:top;}
-.insights{border:3px solid #3264ff; padding:16px 18px; background:#fff; margin:8px 0 12px;}
-.insights h3{margin:0 0 10px; color:#3264ff; font-size:16px;}
-.insights p{margin:0 0 8px; font-size:13px; line-height:1.45;}
-.empty{color:#9CA3AF; text-align:center; font-size:12px; padding:8px;}
-.keep{page-break-inside:avoid;}
-CSS;
+        return RelatorioConsolidadoLayout::css($fontCss, $pieCss, PdfFontes::fontFaceCss());
     }
 
     private function cssChartPie(): string
@@ -2383,7 +2376,7 @@ CSS;
     {
         if (! extension_loaded('gd')) {
             return $titulo
-                ? '<p style="color:#888;">(' . $titulo . ' omitido: instale php-gd)</p>'
+                ? '<p style="color:#888;">('.$titulo.' omitido: instale php-gd)</p>'
                 : '';
         }
         $cfg = $this->extrairChartConfig($html, $chartId);
@@ -2397,7 +2390,7 @@ CSS;
         $out = '';
         if ($titulo !== null && $titulo !== '') {
             $out .= '<p style="text-align:center;font-weight:bold;margin:8px 0;">'
-                . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</p>';
+                .htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</p>';
         }
         $type = (string) ($cfg['type'] ?? '');
         $isPie = in_array($type, ['pie', 'doughnut'], true);
@@ -2409,13 +2402,13 @@ CSS;
                 : (in_array($chartId, ['chart_progresso_principal'], true) ? 'chart-sm' : 'chart'));
         // Dimensões explícitas: Dompdf ignora max-height e parte a página
         if ($isPie) {
-            $out .= '<img class="' . $class . '" src="' . $img . '" width="' . self::PIE_PDF_WIDTH
-                . '" height="' . self::PIE_PDF_HEIGHT . '" />';
+            $out .= '<img class="'.$class.'" src="'.$img.'" width="'.self::PIE_PDF_WIDTH
+                .'" height="'.self::PIE_PDF_HEIGHT.'" />';
         } elseif ($isModalidade) {
-            $out .= '<img class="' . $class . '" src="' . $img . '" width="' . self::MODALIDADE_PDF_WIDTH
-                . '" height="' . self::MODALIDADE_PDF_HEIGHT . '" />';
+            $out .= '<img class="'.$class.'" src="'.$img.'" width="'.self::MODALIDADE_PDF_WIDTH
+                .'" height="'.self::MODALIDADE_PDF_HEIGHT.'" />';
         } else {
-            $out .= '<img class="' . $class . '" src="' . $img . '" />';
+            $out .= '<img class="'.$class.'" src="'.$img.'" />';
         }
 
         return $out;
@@ -2442,7 +2435,7 @@ CSS;
         // new Chart(elFoo, { ... });
         $elVar = null;
         if (preg_match(
-            '/var\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*document\.getElementById\(\s*[\'"]' . preg_quote($canvasId, '/') . '[\'"]\s*\)/',
+            '/var\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*document\.getElementById\(\s*[\'"]'.preg_quote($canvasId, '/').'[\'"]\s*\)/',
             $html,
             $vm
         )) {
@@ -2451,14 +2444,14 @@ CSS;
 
         $jsonish = null;
         if ($elVar !== null) {
-            $needle = 'new Chart(' . $elVar;
+            $needle = 'new Chart('.$elVar;
             $pos = strpos($html, $needle);
             if ($pos === false) {
-                $pos = strpos($html, 'new Chart( ' . $elVar);
+                $pos = strpos($html, 'new Chart( '.$elVar);
             }
             if ($pos !== false) {
                 $slice = substr($html, $pos, 20000);
-                if (preg_match('/new\s+Chart\s*\(\s*' . preg_quote($elVar, '/') . '\s*,\s*(\{)/', $slice, $m, PREG_OFFSET_CAPTURE)) {
+                if (preg_match('/new\s+Chart\s*\(\s*'.preg_quote($elVar, '/').'\s*,\s*(\{)/', $slice, $m, PREG_OFFSET_CAPTURE)) {
                     $jsonish = $this->extrairObjetoJsBalanceado($slice, (int) $m[1][1]);
                 }
             }
@@ -2467,7 +2460,7 @@ CSS;
         // Fallback: new Chart(document.getElementById('id'), { ... })
         if ($jsonish === null) {
             if (preg_match(
-                '/new\s+Chart\s*\(\s*document\.getElementById\(\s*[\'"]' . preg_quote($canvasId, '/') . '[\'"]\s*\)\s*,\s*(\{)/',
+                '/new\s+Chart\s*\(\s*document\.getElementById\(\s*[\'"]'.preg_quote($canvasId, '/').'[\'"]\s*\)\s*,\s*(\{)/',
                 $html,
                 $m,
                 PREG_OFFSET_CAPTURE
@@ -2495,7 +2488,7 @@ CSS;
                 $c = $colors[$colorIdx % count($colors)];
                 $colorIdx++;
 
-                return "'" . $c . "'";
+                return "'".$c."'";
             },
             $json
         ) ?? $json;
@@ -2519,7 +2512,7 @@ CSS;
                     $colorIdx++;
                 }
 
-                return "'" . $c . "'";
+                return "'".$c."'";
             },
             $json
         ) ?? $json;
@@ -2549,8 +2542,79 @@ CSS;
         }
 
         $data = $this->normalizarCoresDataset($data);
+        $data = $this->aplicarDatalabelsOficiais($data, $canvasId);
 
-        return $this->aplicarDatalabelsOficiais($data, $canvasId);
+        return $this->aplicarIdentidadeVisualGrafico($data, $canvasId);
+    }
+
+    /**
+     * Paleta institucional, grade discreta e legendas secundárias.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function aplicarIdentidadeVisualGrafico(array $data, string $canvasId): array
+    {
+        $paleta = RelatorioConsolidadoLayout::paletaSeries();
+        $type = (string) ($data['type'] ?? '');
+
+        if ($type === 'line' && isset($data['data']['datasets']) && is_array($data['data']['datasets'])) {
+            foreach ($data['data']['datasets'] as $i => $ds) {
+                if (! is_array($ds)) {
+                    continue;
+                }
+                $cor = $paleta[$i % count($paleta)];
+                $data['data']['datasets'][$i]['borderColor'] = $cor;
+                $data['data']['datasets'][$i]['backgroundColor'] = $cor;
+                $data['data']['datasets'][$i]['fill'] = false;
+                $data['data']['datasets'][$i]['pointRadius'] = 2;
+                $data['data']['datasets'][$i]['borderWidth'] = 2;
+                $label = (string) ($ds['label'] ?? '');
+                if ($canvasId === 'chart_horas_diarias'
+                    && preg_match('/estudad/i', $label)
+                    && ! preg_match('/brut/i', $label)
+                ) {
+                    $data['data']['datasets'][$i]['label'] = trim($label).' (brutas)';
+                }
+            }
+        }
+
+        $data['options'] = is_array($data['options'] ?? null) ? $data['options'] : [];
+        $data['options']['scales'] = is_array($data['options']['scales'] ?? null) ? $data['options']['scales'] : [];
+        foreach (['xAxes', 'yAxes'] as $axis) {
+            $existing = $data['options']['scales'][$axis] ?? [[]];
+            if (! is_array($existing) || $existing === []) {
+                $existing = [[]];
+            }
+            foreach ($existing as $j => $ax) {
+                if (! is_array($ax)) {
+                    $ax = [];
+                }
+                $grid = is_array($ax['gridLines'] ?? null) ? $ax['gridLines'] : [];
+                $ax['gridLines'] = array_merge($grid, [
+                    'color' => 'rgba(15, 23, 42, 0.06)',
+                    'drawBorder' => false,
+                    'lineWidth' => 0.5,
+                ]);
+                $ticks = is_array($ax['ticks'] ?? null) ? $ax['ticks'] : [];
+                $ax['ticks'] = array_merge($ticks, [
+                    'fontSize' => 9,
+                    'fontColor' => RelatorioConsolidadoLayout::TEXTO_SEC,
+                ]);
+                $existing[$j] = $ax;
+            }
+            $data['options']['scales'][$axis] = $existing;
+        }
+
+        $data['options']['legend'] = is_array($data['options']['legend'] ?? null) ? $data['options']['legend'] : [];
+        $labels = is_array($data['options']['legend']['labels'] ?? null) ? $data['options']['legend']['labels'] : [];
+        $data['options']['legend']['labels'] = array_merge($labels, [
+            'boxWidth' => 10,
+            'fontSize' => 10,
+            'fontColor' => RelatorioConsolidadoLayout::TEXTO_SEC,
+        ]);
+
+        return $data;
     }
 
     /**
@@ -2615,6 +2679,7 @@ CSS;
     {
         return in_array($canvasId, [
             'chart_horas_diarias',
+            'chart_line_comparativo',
             'chart_top_disciplinas',
             'chart_pizza_modalidades',
             'chart_horas_estudo',
@@ -2648,7 +2713,7 @@ CSS;
 
                 return $label;
             }, $data['data']['labels']);
-            $data['data']['labels'] = PdfDatas::listaParaBr($data['data']['labels']);
+            $data['data']['labels'] = PdfDatas::listaParaBrCompacta($data['data']['labels']);
         }
 
         // Barras: nomes das disciplinas no eixo X
@@ -2772,30 +2837,9 @@ CSS;
 
                 return $data;
             }
-            $isQuestoesDia = $canvasId === 'chart_questoes_dia';
-            $data['options']['plugins']['datalabels'] = [
-                'anchor' => 'end',
-                'align' => 'end',
-                'offset' => 8,
-                'color' => '#fff',
-                'backgroundColor' => '#000',
-                'borderRadius' => 0,
-                'padding' => 4,
-                'font' => ['size' => 10],
-                'formatter' => $isQuestoesDia ? '__DATALABEL_QUESTOES__' : '__DATALABEL_PERCENT__',
-            ];
-            $padding = is_array($data['options']['layout']['padding'] ?? null)
-                ? $data['options']['layout']['padding']
-                : [];
-            $data['options']['layout']['padding'] = array_merge($padding, [
-                'top' => 28,
-                'right' => 16,
-            ]);
-            if ($canvasId === 'chart_evolucao_materia') {
-                $data['options']['legend']['display'] = true;
-            }
 
-            return $data;
+            // Tendência: sem etiqueta em cada ponto (não transformar o gráfico em tabela).
+            return $this->ocultarDatalabels($data);
         }
 
         unset($data['options']['plugins']['datalabels']);
@@ -2914,22 +2958,22 @@ CSS;
                 $body = $resp->body();
                 $ctype = (string) ($resp->header('Content-Type') ?? '');
                 if (str_starts_with($body, "\x89PNG") || str_contains($ctype, 'image')) {
-                    return 'data:image/png;base64,' . base64_encode($body);
+                    return 'data:image/png;base64,'.base64_encode($body);
                 }
-                $this->log('QuickChart resposta inesperada: ' . substr($body, 0, 180));
+                $this->log('QuickChart resposta inesperada: '.substr($body, 0, 180));
             }
 
             // GET fallback (sem function — só útil se não houver formatter)
             if (! str_contains($chartJs, 'function(value)')) {
-                $url = 'https://quickchart.io/chart?c=' . rawurlencode($chartJs)
-                    . '&w=' . $width . '&h=' . $height . '&bkg=white&f=png&v=2.9.4';
+                $url = 'https://quickchart.io/chart?c='.rawurlencode($chartJs)
+                    .'&w='.$width.'&h='.$height.'&bkg=white&f=png&v=2.9.4';
                 $get = Http::timeout(45)->get($url);
                 if ($get->successful() && strlen($get->body()) > 100) {
-                    return 'data:image/png;base64,' . base64_encode($get->body());
+                    return 'data:image/png;base64,'.base64_encode($get->body());
                 }
             }
         } catch (Throwable $exc) {
-            $this->log('QuickChart erro: ' . $exc->getMessage());
+            $this->log('QuickChart erro: '.$exc->getMessage());
         }
 
         return null;
@@ -2976,25 +3020,25 @@ CSS;
         array $falhas,
         array $resultados,
     ): string {
-        $caminho = $this->pastaDownload . '/log_download_' . $inicio->format('Ymd_His') . '.txt';
+        $caminho = $this->pastaDownload.'/log_download_'.$inicio->format('Ymd_His').'.txt';
         $linhas = [
             'Relatórios Tutory - CLI/HTTP',
-            'Início: ' . $inicio->format('d/m/Y H:i:s'),
-            'Fim:    ' . $fim->format('d/m/Y H:i:s'),
-            'Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()),
-            'Alunos: ' . $total,
-            'Modelos-fonte: ' . implode(', ', array_column($this->relatorios(), 'model')) . ' → PDF consolidado',
-            'PDFs: ' . count($pdfs),
-            'Falhas: ' . count($falhas),
+            'Início: '.$inicio->format('d/m/Y H:i:s'),
+            'Fim:    '.$fim->format('d/m/Y H:i:s'),
+            'Duração: '.$this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()),
+            'Alunos: '.$total,
+            'Modelos-fonte: '.implode(', ', array_column($this->relatorios(), 'model')).' → PDF consolidado',
+            'PDFs: '.count($pdfs),
+            'Falhas: '.count($falhas),
             "Pasta: {$this->pastaDownload}",
             '',
             'Arquivos:',
         ];
-        $linhas = array_merge($linhas, $pdfs !== [] ? array_map(static fn($p) => '- ' . basename($p), $pdfs) : ['- (nenhum)']);
+        $linhas = array_merge($linhas, $pdfs !== [] ? array_map(static fn ($p) => '- '.basename($p), $pdfs) : ['- (nenhum)']);
         $linhas[] = '';
         $linhas[] = 'Status:';
         foreach ($resultados as $r) {
-            $linhas[] = '- [' . ($r['sucesso'] ? 'OK' : 'FALHA') . "] {$r['nome']} (tentativas: {$r['tentativas']})";
+            $linhas[] = '- ['.($r['sucesso'] ? 'OK' : 'FALHA')."] {$r['nome']} (tentativas: {$r['tentativas']})";
         }
         if ($falhas !== []) {
             $linhas[] = '';
@@ -3003,7 +3047,7 @@ CSS;
                 $linhas[] = "- {$f}";
             }
         }
-        file_put_contents($caminho, implode("\n", $linhas) . "\n");
+        file_put_contents($caminho, implode("\n", $linhas)."\n");
 
         return $caminho;
     }
@@ -3012,14 +3056,14 @@ CSS;
     {
         $inicio = new \DateTimeImmutable('now');
         $relatorios = $this->relatorios();
-        $this->log('Processo iniciado em: ' . $inicio->format('d/m/Y H:i:s'));
+        $this->log('Processo iniciado em: '.$inicio->format('d/m/Y H:i:s'));
         $motivo = $this->motivoSemPuppeteer();
         $motor = $motivo === null
             ? 'Puppeteer (Node)'
             : 'PHP/Dompdf ('.$motivo.')';
         $this->log('Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via '.$motor);
-        $this->log('Fontes: ' . implode(', ', array_map(
-            static fn (array $r): string => $r['nome'] . ' (' . $r['model'] . ')',
+        $this->log('Fontes: '.implode(', ', array_map(
+            static fn (array $r): string => $r['nome'].' ('.$r['model'].')',
             $relatorios
         )));
 
@@ -3028,12 +3072,12 @@ CSS;
             $alvo = mb_strtolower(self::ALUNA_TESTE);
             $alunos = array_values(array_filter(
                 $alunos,
-                static fn(array $a) => str_contains(mb_strtolower($a['nome']), $alvo)
+                static fn (array $a) => str_contains(mb_strtolower($a['nome']), $alvo)
             ));
             if ($alunos !== []) {
-                $this->log('Modo --teste: ' . $alunos[0]['nome'] . ' (id ' . $alunos[0]['id'] . ')');
+                $this->log('Modo --teste: '.$alunos[0]['nome'].' (id '.$alunos[0]['id'].')');
             } else {
-                $this->log("Modo --teste: '" . self::ALUNA_TESTE . "' não encontrada.");
+                $this->log("Modo --teste: '".self::ALUNA_TESTE."' não encontrada.");
             }
         }
 
@@ -3066,11 +3110,11 @@ CSS;
                 $aluno = $resultados[$chave]['meta'];
                 $rotulo = $aluno['nome'];
                 $this->log(str_repeat('=', 50));
-                $this->log("[rodada {$rodada}] Aluno " . ($i + 1) . "/{$total}: {$rotulo} (tentativa {$t}/" . self::MAX_TENTATIVAS . ')');
+                $this->log("[rodada {$rodada}] Aluno ".($i + 1)."/{$total}: {$rotulo} (tentativa {$t}/".self::MAX_TENTATIVAS.')');
                 try {
                     $arquivo = $this->processarAlunoConsolidado($aluno, $relatorios);
                 } catch (Throwable $exc) {
-                    $this->log("[{$rotulo}] ERRO: " . $exc->getMessage());
+                    $this->log("[{$rotulo}] ERRO: ".$exc->getMessage());
                     $arquivo = null;
                 }
                 if ($arquivo !== null) {
@@ -3087,14 +3131,14 @@ CSS;
 
         $processarLote($chaves, 1);
         for ($rodada = 2; $rodada <= self::MAX_TENTATIVAS; $rodada++) {
-            $pendentes = array_values(array_filter($chaves, static fn($k) => ! $resultados[$k]['sucesso']));
+            $pendentes = array_values(array_filter($chaves, static fn ($k) => ! $resultados[$k]['sucesso']));
             if ($pendentes === []) {
                 $this->log(str_repeat('=', 50));
                 $this->log('Nenhuma falha restante.');
                 break;
             }
             $this->log(str_repeat('=', 50));
-            $this->log('Reprocessando ' . count($pendentes) . " falha(s) (rodada {$rodada}/" . self::MAX_TENTATIVAS . ')...');
+            $this->log('Reprocessando '.count($pendentes)." falha(s) (rodada {$rodada}/".self::MAX_TENTATIVAS.')...');
             $processarLote($pendentes, $rodada);
         }
 
@@ -3108,16 +3152,16 @@ CSS;
                 $falhas[] = $r['nome'];
             }
         }
-        $lista = array_map(static fn($k) => $resultados[$k], $chaves);
+        $lista = array_map(static fn ($k) => $resultados[$k], $chaves);
         $fim = new \DateTimeImmutable('now');
         $log = $this->gravarLogResumo($inicio, $fim, count($alunos), $pdfs, $falhas, $lista);
 
         $this->log(str_repeat('=', 50));
-        $this->log('Início: ' . $inicio->format('d/m/Y H:i:s'));
-        $this->log('Fim:    ' . $fim->format('d/m/Y H:i:s'));
-        $this->log('Duração: ' . $this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()));
-        $this->log('PDFs consolidados: ' . count($pdfs));
-        $this->log('Falhas finais: ' . count($falhas));
+        $this->log('Início: '.$inicio->format('d/m/Y H:i:s'));
+        $this->log('Fim:    '.$fim->format('d/m/Y H:i:s'));
+        $this->log('Duração: '.$this->formatarDuracao($fim->getTimestamp() - $inicio->getTimestamp()));
+        $this->log('PDFs consolidados: '.count($pdfs));
+        $this->log('Falhas finais: '.count($falhas));
         foreach ($chaves as $chave) {
             if ($resultados[$chave]['sucesso']) {
                 continue;
