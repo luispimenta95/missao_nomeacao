@@ -473,7 +473,7 @@ html, body {
 .mn-sec-body td.num, .mn-sec-body th.num {
   text-align: right;
   white-space: nowrap;
-  width: auto;
+  width: 1%;
 }
 .mn-sec-body tbody tr:nth-child(even) td { background: var(--mn-zebra); }
 .mn-sec-body tbody tr { break-inside: avoid; page-break-inside: avoid; }

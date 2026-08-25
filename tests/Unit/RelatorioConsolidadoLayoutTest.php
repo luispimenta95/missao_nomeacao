@@ -90,6 +90,7 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('.mn-table tr{page-break-inside:avoid;', $css);
         $this->assertStringContainsString('.mn-table tbody tr:first-child,.mn-table tbody tr:nth-child(2){page-break-before:avoid;}', $css);
         $this->assertStringContainsString('white-space:nowrap', $css);
+        $this->assertStringContainsString('width:1%', $css);
         $this->assertStringNotContainsString('width:18%', $css);
         $this->assertStringNotContainsString('.mn-table{width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed;', $css);
         $this->assertStringNotContainsString('mn-table-band', $css);
@@ -187,19 +188,27 @@ class RelatorioConsolidadoLayoutTest extends TestCase
             $this->assertGreaterThan(90.0, $yNome);
             $this->assertGreaterThan($yCab + 50.0, $yNome);
 
+            $pares = [];
             preg_match_all(
-                '/<page[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>Confira<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DISCIPLINA<\/word>/u',
+                '/<word[^>]*yMin="([0-9.]+)"[^>]*>Amostra<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DISCIPLINA<\/word>/u',
                 $bbox,
-                $pares,
+                $assunto,
                 PREG_SET_ORDER
             );
+            preg_match_all(
+                '/<word[^>]*yMin="([0-9.]+)"[^>]*>cronometradas<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DATA<\/word>/u',
+                $bbox,
+                $historico,
+                PREG_SET_ORDER
+            );
+            $pares = array_merge($assunto, $historico);
             $this->assertNotEmpty($pares);
             foreach ($pares as $par) {
                 $delta = (float) $par[2] - (float) $par[1];
                 $this->assertGreaterThan(
                     18.0,
                     $delta,
-                    'Título secundário não pode grudar no cabeçalho da tabela'
+                    'Texto secundário não pode grudar no cabeçalho da tabela'
                 );
                 $this->assertLessThan(
                     55.0,

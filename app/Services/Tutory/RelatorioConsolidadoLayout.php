@@ -318,7 +318,7 @@ img{max-width:100%; height:auto;}
 .mn-table thead{display:table-header-group;}
 .mn-table th,.mn-table td{height:auto;}
 .mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:nowrap;}
-.mn-table th.num,.mn-table td.num{text-align:right; white-space:nowrap; width:auto;}
+.mn-table th.num,.mn-table td.num{text-align:right; white-space:nowrap; width:1%;}
 .mn-table td{border-bottom:1px solid #EEF0F3; padding:9px 11px; vertical-align:top; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; font-size:9pt; font-weight:400; line-height:1.45; white-space:normal;}
 .mn-table tr.z td{background:{$zebra};}
 .mn-table tr{page-break-inside:avoid; break-inside:avoid; height:auto;}
