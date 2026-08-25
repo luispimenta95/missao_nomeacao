@@ -331,13 +331,13 @@ html, body {
   padding: 8px 0 16px;
 }
 .mn-sec {
-  margin: 0 0 32px;
+  margin: 0 0 28px;
   break-inside: auto;
 }
 .mn-sec-head {
   break-after: avoid;
   page-break-after: avoid;
-  margin: 0 0 4px;
+  margin: 0;
 }
 .mn-sec-title {
   font-size: 16.5pt;
@@ -351,10 +351,10 @@ html, body {
 .mn-sec-intro {
   font-size: 10.5pt;
   color: var(--mn-sec);
-  margin: 10px 0 12px;
+  margin: 7px 0 0;
   padding-left: 16px;
 }
-.mn-sec-body { margin-top: 16px; }
+.mn-sec-body { margin-top: 14px; }
 .mn-sec-keep { break-inside: avoid; page-break-inside: avoid; }
 .mn-sec-insights { break-inside: avoid; page-break-inside: avoid; }
 .mn-sec-table .mn-sec-head { break-after: avoid; page-break-after: avoid; }
@@ -388,14 +388,14 @@ html, body {
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
-  margin-top: 16px;
+  gap: 14px;
+  margin-top: 14px;
 }
 .metric-card, .main-numbers {
   background: #fff;
   border: 1px solid var(--mn-borda);
   border-radius: 0;
-  padding: 16px 14px 18px;
+  padding: 18px;
   box-shadow: none !important;
   text-align: left;
   margin: 0;
@@ -417,7 +417,7 @@ html, body {
 .mn-legacy .row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 14px;
   margin: 0;
 }
 .mn-legacy .col-4, .mn-legacy .col-6, .mn-legacy .col-2 {
@@ -435,32 +435,45 @@ html, body {
   font-size: 9.5pt;
   font-weight: 400;
   color: var(--mn-sec);
-  margin: 0 0 14px;
+  margin: 0 0 12px;
 }
-.mn-chart { margin: 8px 0 28px; break-inside: avoid; page-break-inside: avoid; }
+.mn-chart { margin: 8px 0 16px; break-inside: avoid; page-break-inside: avoid; }
 .mn-sec-body table {
   width: 100%;
+  max-width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
-  margin-top: 6px;
+  table-layout: auto;
+  font-size: 9pt;
+  margin-top: 0;
 }
 .mn-sec-body thead { display: table-header-group; }
 .mn-sec-body thead td, .mn-sec-body thead th {
   background: var(--mn-azul) !important;
   color: #fff !important;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 9pt;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  padding: 11px 12px;
+  padding: 9px 11px;
   text-align: left;
+  height: auto;
+  white-space: nowrap;
 }
 .mn-sec-body tbody td {
   border-bottom: 1px solid #EEF0F3;
-  padding: 11px 12px;
+  padding: 9px 11px;
   vertical-align: top;
   word-wrap: break-word;
-  line-height: 1.4;
+  overflow-wrap: break-word;
+  line-height: 1.45;
+  height: auto;
+  white-space: normal;
+  font-size: 9pt;
+}
+.mn-sec-body td.num, .mn-sec-body th.num {
+  text-align: right;
+  white-space: nowrap;
+  width: auto;
 }
 .mn-sec-body tbody tr:nth-child(even) td { background: var(--mn-zebra); }
 .mn-sec-body tbody tr { break-inside: avoid; page-break-inside: avoid; }
