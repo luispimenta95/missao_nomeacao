@@ -72,6 +72,57 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringNotContainsString('mn-table-band', $html);
         $this->assertStringContainsString('class="z"', $html);
         $this->assertMatchesRegularExpression('/<td class="num">/', $html);
+        $this->assertStringContainsString('class="mn-c-assunto"', $html);
+        $this->assertStringContainsString('class="mn-assunto"', $html);
+        $this->assertStringNotContainsString('…', $html);
+        $this->assertStringNotContainsString('ellipsis', $html);
+    }
+
+    public function test_tabela_destina_espaco_restante_ao_assunto(): void
+    {
+        $performance = RelatorioConsolidadoLayout::tabela(
+            ['Disciplina', 'Assunto', 'Taxa de Acertos'],
+            [
+                ['SEDES - ADMINISTRAÇÃO DE RECURSOS DE MATERIAIS', 'Improbidade administrativa e o dever de probidade na administração pública', '55%'],
+            ],
+            ['numeric' => [2], 'percent_col' => 2]
+        );
+        $larguras = $this->largurasColgroup($performance);
+        $this->assertSame(['disciplina', 'assunto', 'pct'], array_keys($larguras));
+        $this->assertGreaterThan($larguras['disciplina'], $larguras['assunto']);
+        $this->assertGreaterThan($larguras['pct'], $larguras['assunto']);
+        $this->assertLessThan($larguras['disciplina'], $larguras['pct']);
+        $this->assertSame(100, array_sum($larguras));
+
+        $revisoes = RelatorioConsolidadoLayout::tabela(
+            ['Disciplina revisada', 'Assunto revisado', 'Revisões no período'],
+            [['Direito Penal', 'Teoria do crime', '3']],
+            ['numeric' => [2]]
+        );
+        $largurasRev = $this->largurasColgroup($revisoes);
+        $this->assertGreaterThan($largurasRev['disciplina'], $largurasRev['assunto']);
+        $this->assertGreaterThan($largurasRev['num'], $largurasRev['assunto']);
+        $this->assertStringContainsString('Teoria do crime', $revisoes);
+
+        $historico = RelatorioConsolidadoLayout::tabela(
+            ['Disciplina', 'Assunto', 'Modalidade', 'Horas'],
+            [[
+                'SEDES - ADMINISTRAÇÃO DE RECURSOS DE MATERIAIS',
+                'Inventário e controle de estoque de materiais permanentes e de consumo',
+                'Cadernos de Exercícios (Múltipla Escolha)',
+                '01:12:40',
+            ]],
+            ['numeric' => [3]]
+        );
+        $largurasHist = $this->largurasColgroup($historico);
+        $this->assertGreaterThan($largurasHist['disciplina'], $largurasHist['assunto']);
+        $this->assertGreaterThan($largurasHist['modalidade'], $largurasHist['assunto']);
+        $this->assertGreaterThan($largurasHist['horas'], $largurasHist['assunto']);
+        $this->assertLessThanOrEqual($largurasHist['modalidade'], $largurasHist['horas']);
+        $this->assertStringContainsString('class="num mn-horas"', $historico);
+        $this->assertStringContainsString('01:12:40', $historico);
+        $this->assertStringContainsString('Cadernos de Exercícios (Múltipla Escolha)', $historico);
+        $this->assertStringContainsString('class="mn-mod"', $historico);
     }
 
     public function test_css_tabelas_e_espacamentos_seguem_o_comando(): void
@@ -84,15 +135,16 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('border-spacing:14px 0', $css);
         $this->assertStringContainsString('.mn-kpis td.kpi{background:#ffffff; border:1px solid #E6E8EC; padding:18px 18px;', $css);
         $this->assertStringContainsString('.mn-chart{margin:8px 0 16px;', $css);
-        $this->assertStringContainsString('.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:auto; margin:0;}', $css);
+        $this->assertStringContainsString('.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed; margin:0;}', $css);
         $this->assertStringContainsString('padding:9px 11px', $css);
         $this->assertStringContainsString('height:auto', $css);
         $this->assertStringContainsString('.mn-table tr{page-break-inside:avoid;', $css);
         $this->assertStringContainsString('.mn-table tbody tr:first-child,.mn-table tbody tr:nth-child(2){page-break-before:avoid;}', $css);
         $this->assertStringContainsString('white-space:nowrap', $css);
-        $this->assertStringContainsString('width:1%', $css);
+        $this->assertStringContainsString('.mn-table td.mn-horas{white-space:nowrap;}', $css);
         $this->assertStringNotContainsString('width:18%', $css);
-        $this->assertStringNotContainsString('.mn-table{width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed;', $css);
+        $this->assertStringNotContainsString('width:1%', $css);
+        $this->assertStringNotContainsString('text-overflow:ellipsis', $css);
         $this->assertStringNotContainsString('mn-table-band', $css);
         $this->assertStringNotContainsString('padding-top:56px', $css);
         $this->assertStringNotContainsString('#F5F5F5', $css);
@@ -196,7 +248,7 @@ class RelatorioConsolidadoLayoutTest extends TestCase
                 PREG_SET_ORDER
             );
             preg_match_all(
-                '/<word[^>]*yMin="([0-9.]+)"[^>]*>cronometradas<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DATA<\/word>/u',
+                '/<word[^>]*yMin="([0-9.]+)"[^>]*>cronometradas<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DISCIPLINA<\/word>/u',
                 $bbox,
                 $historico,
                 PREG_SET_ORDER
@@ -219,5 +271,19 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         } finally {
             @unlink($tmp);
         }
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function largurasColgroup(string $html): array
+    {
+        preg_match_all('/<col class="mn-c-([a-z]+)"[^>]*width:(\d+)%/', $html, $m, PREG_SET_ORDER);
+        $out = [];
+        foreach ($m as $col) {
+            $out[$col[1]] = (int) $col[2];
+        }
+
+        return $out;
     }
 }

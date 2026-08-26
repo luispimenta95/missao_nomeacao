@@ -442,7 +442,7 @@ html, body {
   width: 100%;
   max-width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
   font-size: 9pt;
   margin-top: 0;
 }
@@ -457,7 +457,7 @@ html, body {
   padding: 9px 11px;
   text-align: left;
   height: auto;
-  white-space: nowrap;
+  white-space: normal;
 }
 .mn-sec-body tbody td {
   border-bottom: 1px solid #EEF0F3;
@@ -470,10 +470,15 @@ html, body {
   white-space: normal;
   font-size: 9pt;
 }
-.mn-sec-body td.num, .mn-sec-body th.num {
+.mn-sec-body td.num {
   text-align: right;
   white-space: nowrap;
-  width: 1%;
+}
+.mn-sec-body td.mn-horas {
+  white-space: nowrap;
+}
+.mn-sec-body th.num {
+  text-align: right;
 }
 .mn-sec-body tbody tr:nth-child(even) td { background: var(--mn-zebra); }
 .mn-sec-body tbody tr { break-inside: avoid; page-break-inside: avoid; }
@@ -815,6 +820,94 @@ function escapeHtml(value) {
   }[ch]));
 }
 
+function normalizeHeader(text) {
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function columnRole(header) {
+  const h = normalizeHeader(header);
+  if (h.includes('taxa') || (h.includes('acerto') && h.includes('percent'))) return 'pct';
+  if (h.includes('assunto')) return 'assunto';
+  if (h.includes('modalidade')) return 'modalidade';
+  if (h.includes('disciplina')) return 'disciplina';
+  if (h.includes('hora')) return 'horas';
+  if (h === 'data' || h === 'dia' || h.startsWith('data')) return 'data';
+  if (h.includes('revis') || /^[\d.,:%h\s:]+$/i.test(String(header || ''))) return 'num';
+  return 'texto';
+}
+
+function columnWidths(roles) {
+    const min = {
+      horas: 13, num: 13, pct: 16, data: 9, modalidade: 16, disciplina: 20, texto: 12, assunto: 0,
+    };
+  const w = roles.map((role) => (role === 'assunto' ? 0 : (min[role] || min.texto)));
+  let used = w.reduce((a, b) => a + b, 0);
+  const assuntoIdx = roles.map((role, i) => (role === 'assunto' ? i : -1)).filter((i) => i >= 0);
+  if (assuntoIdx.length && used > 62) {
+    const fator = 62 / used;
+    used = 0;
+    roles.forEach((role, i) => {
+      if (role === 'assunto') return;
+      w[i] = Math.max(8, Math.round(w[i] * fator));
+      used += w[i];
+    });
+  }
+  let rest = 100 - used;
+  if (assuntoIdx.length) {
+    const base = Math.floor(rest / assuntoIdx.length);
+    assuntoIdx.forEach((i, k) => {
+      w[i] = base + (k === 0 ? rest - base * assuntoIdx.length : 0);
+    });
+    const maxOther = Math.max(0, ...w.filter((_, i) => roles[i] !== 'assunto'));
+    const piso = { num: 11, pct: 14, data: 8, modalidade: 13, disciplina: 16, texto: 10 };
+    assuntoIdx.forEach((idx) => {
+      let need = Math.max(0, maxOther + 6 - w[idx]);
+      ['texto', 'modalidade', 'disciplina', 'data', 'num', 'pct'].forEach((role) => {
+        roles.forEach((r, i) => {
+          if (r !== role || need <= 0) return;
+          const disp = w[i] - (piso[role] || 8);
+          if (disp <= 0) return;
+          const take = Math.min(disp, need);
+          w[i] -= take;
+          w[idx] += take;
+          need -= take;
+        });
+      });
+    });
+  } else {
+    const dest = ['disciplina', 'texto', 'modalidade'].map((role) => roles.indexOf(role)).find((i) => i >= 0);
+    if (dest >= 0) w[dest] += rest;
+    else if (w.length) w[0] += rest;
+  }
+  const sum = w.reduce((a, b) => a + b, 0);
+  if (sum !== 100 && w.length) w[w.length - 1] += 100 - sum;
+  return w;
+}
+
+function injectTableColgroups(html) {
+  if (!html) return html;
+  return String(html).replace(/<table\b[^>]*>[\s\S]*?<\/table>/gi, (table) => {
+    if (/<colgroup/i.test(table)) return table;
+    const row = table.match(/<tr\b[^>]*>([\s\S]*?)<\/tr>/i);
+    if (!row) return table;
+    const headers = [];
+    const cellRe = /<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let cell;
+    while ((cell = cellRe.exec(row[1]))) {
+      headers.push(cell[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+    }
+    if (!headers.length) return table;
+    const roles = headers.map(columnRole);
+    const widths = columnWidths(roles);
+    const cols = roles.map((role, i) => `<col class="mn-c-${role}" style="width:${widths[i]}%">`).join('');
+    return table.replace(/<table\b[^>]*>/i, (open) => `${open}<colgroup>${cols}</colgroup>`);
+  });
+}
+
 function block(title, inner, extraClass = 'mn-legacy', intro = '') {
   if (!inner || !String(inner).trim()) return '';
   const introHtml = intro ? `<p class="mn-sec-intro">${escapeHtml(intro)}</p>` : '';
@@ -851,17 +944,17 @@ function buildHtml(extracted) {
   parts.push(block('Ritmo de estudos', ritmo));
   parts.push(block('Painel de Insights', extracted.progresso.insights || '', 'mn-sec-insights'));
   parts.push(block('Desempenho em questões', extracted.questoes.panorama || ''));
-  parts.push(block('Performance por assunto', extracted.questoes.assuntos || '', 'mn-sec-table'));
+  parts.push(block('Performance por assunto', injectTableColgroups(extracted.questoes.assuntos || ''), 'mn-sec-table'));
   if (extracted.aluno.revisoes && extracted.aluno.revisoes.trim()) {
     let revisoesHtml = extracted.aluno.revisoes;
     if (extracted.aluno.revisoesRows === 0 && !/mn-empty/.test(revisoesHtml)) {
       revisoesHtml += '<p class="mn-empty">Nenhuma revisão registrada neste período.</p>';
     }
-    parts.push(block('Revisões no período', revisoesHtml, 'mn-sec-table'));
+    parts.push(block('Revisões no período', injectTableColgroups(revisoesHtml), 'mn-sec-table'));
   }
   parts.push(block(
     'Histórico completo',
-    extracted.horas.historico || '',
+    injectTableColgroups(extracted.horas.historico || ''),
     'mn-sec-table',
     'Confira o histórico completo de horas cronometradas no período.',
   ));
