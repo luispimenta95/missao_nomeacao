@@ -194,11 +194,26 @@ final class RelatorioConsolidadoLayout
         $numeric = array_fill_keys($opts['numeric'] ?? [], true);
         $percentCol = $opts['percent_col'] ?? null;
         $class = $opts['class'] ?? 'mn-table';
+        $colCount = max(count($headers), 1);
+        foreach ($rows as $r) {
+            $colCount = max($colCount, count($r));
+        }
 
-        $html = '<table class="'.$class.'"><thead><tr>';
+        $papeis = [];
+        for ($i = 0; $i < $colCount; $i++) {
+            $papeis[] = self::papelColuna((string) ($headers[$i] ?? ''), isset($numeric[$i]), $i === $percentCol);
+        }
+        $larguras = self::largurasColunas($papeis);
+
+        $html = '<table class="'.$class.'"><colgroup>';
+        foreach ($papeis as $i => $papel) {
+            $html .= '<col class="mn-c-'.$papel.'" width="'.$larguras[$i].'%" style="width:'.$larguras[$i].'%">';
+        }
+        $html .= '</colgroup><thead><tr>';
         foreach ($headers as $i => $h) {
-            $align = isset($numeric[$i]) || $i === $percentCol ? ' class="num"' : '';
-            $html .= '<th'.$align.'>'.htmlspecialchars($h, ENT_QUOTES, 'UTF-8').'</th>';
+            $cls = self::classeColuna($papeis[$i] ?? 'texto');
+            $attr = $cls !== '' ? ' class="'.$cls.'"' : '';
+            $html .= '<th'.$attr.' style="width:'.$larguras[$i].'%">'.htmlspecialchars($h, ENT_QUOTES, 'UTF-8').'</th>';
         }
         $html .= '</tr></thead><tbody>';
 
@@ -211,8 +226,9 @@ final class RelatorioConsolidadoLayout
 
                     continue;
                 }
-                $align = isset($numeric[$i]) ? ' class="num"' : '';
-                $html .= '<td'.$align.'>'.htmlspecialchars($cell, ENT_QUOTES, 'UTF-8').'</td>';
+                $cls = self::classeColuna($papeis[$i] ?? 'texto');
+                $attr = $cls !== '' ? ' class="'.$cls.'"' : '';
+                $html .= '<td'.$attr.'>'.htmlspecialchars($cell, ENT_QUOTES, 'UTF-8').'</td>';
             }
             $html .= '</tr>';
         }
@@ -314,12 +330,15 @@ img{max-width:100%; height:auto;}
 .mn-chart-note{font-size:9.5pt; font-weight:400; color:{$sec}; margin:0 0 12px;}
 .chart{width:100%; max-width:100%; margin:8px 0 0;}
 {$pieCss}
-.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:auto; margin:0;}
+.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed; margin:0;}
 .mn-table thead{display:table-header-group;}
 .mn-table th,.mn-table td{height:auto;}
-.mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:nowrap;}
-.mn-table th.num,.mn-table td.num{text-align:right; white-space:nowrap; width:1%;}
-.mn-table td{border-bottom:1px solid #EEF0F3; padding:9px 11px; vertical-align:top; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; font-size:9pt; font-weight:400; line-height:1.45; white-space:normal;}
+.mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}
+.mn-table th.num,.mn-table td.num{text-align:right;}
+.mn-table td.num{white-space:nowrap;}
+.mn-table td.mn-horas{white-space:nowrap;}
+.mn-table td{border-bottom:1px solid #EEF0F3; padding:9px 11px; vertical-align:top; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; font-size:9pt; font-weight:400; line-height:1.45; white-space:normal;}
+.mn-table td.mn-assunto,.mn-table td.mn-disc,.mn-table td.mn-mod{white-space:normal; word-wrap:break-word; overflow-wrap:break-word;}
 .mn-table tr.z td{background:{$zebra};}
 .mn-table tr{page-break-inside:avoid; break-inside:avoid; height:auto;}
 .mn-table thead{page-break-after:avoid;}
@@ -443,5 +462,204 @@ CSS;
         }
 
         return (float) $t;
+    }
+
+    /**
+     * @return 'assunto'|'disciplina'|'modalidade'|'horas'|'pct'|'num'|'data'|'texto'
+     */
+    private static function papelColuna(string $header, bool $numeric, bool $percent): string
+    {
+        $h = self::normalizarRotulo($header);
+        if ($percent || str_contains($h, 'taxa') || (str_contains($h, 'acerto') && (str_contains($h, 'percent') || str_contains($h, '%')))) {
+            return 'pct';
+        }
+        if (str_contains($h, 'assunto')) {
+            return 'assunto';
+        }
+        if (str_contains($h, 'modalidade')) {
+            return 'modalidade';
+        }
+        if (str_contains($h, 'disciplina')) {
+            return 'disciplina';
+        }
+        if (str_contains($h, 'hora')) {
+            return 'horas';
+        }
+        if ($h === 'data' || $h === 'dia' || str_starts_with($h, 'data')) {
+            return 'data';
+        }
+        if ($numeric || str_contains($h, 'revis')) {
+            return 'num';
+        }
+
+        return 'texto';
+    }
+
+    private static function classeColuna(string $papel): string
+    {
+        return match ($papel) {
+            'horas' => 'num mn-horas',
+            'num', 'pct', 'data' => 'num',
+            'assunto' => 'mn-assunto',
+            'disciplina' => 'mn-disc',
+            'modalidade' => 'mn-mod',
+            default => '',
+        };
+    }
+
+    /**
+     * Larguras em % da tabela: primeiro as colunas curtas, o resto para Assunto.
+     *
+     * @param  list<string>  $papeis
+     * @return list<int>
+     */
+    private static function largurasColunas(array $papeis): array
+    {
+        $n = count($papeis);
+        if ($n === 0) {
+            return [];
+        }
+
+        $min = [
+            'horas' => 13,
+            'num' => 13,
+            'pct' => 16,
+            'data' => 9,
+            'modalidade' => 16,
+            'disciplina' => 20,
+            'texto' => 12,
+            'assunto' => 0,
+        ];
+        $w = array_fill(0, $n, 0);
+        $assunto = [];
+        $usadas = 0;
+        foreach ($papeis as $i => $papel) {
+            if ($papel === 'assunto') {
+                $assunto[] = $i;
+
+                continue;
+            }
+            $w[$i] = $min[$papel] ?? $min['texto'];
+            $usadas += $w[$i];
+        }
+
+        $reservaAssunto = $assunto !== [] ? max(38, 100 - $usadas) : 0;
+        if ($assunto !== [] && $usadas > 100 - $reservaAssunto) {
+            $alvo = 100 - $reservaAssunto;
+            $fator = $alvo / max(1, $usadas);
+            $usadas = 0;
+            foreach ($papeis as $i => $papel) {
+                if ($papel === 'assunto') {
+                    continue;
+                }
+                $w[$i] = max(8, (int) round($w[$i] * $fator));
+                $usadas += $w[$i];
+            }
+        }
+
+        $resto = 100 - $usadas;
+        if ($assunto !== []) {
+            $base = intdiv($resto, count($assunto));
+            $sobra = $resto - ($base * count($assunto));
+            foreach ($assunto as $k => $i) {
+                $w[$i] = $base + ($k === 0 ? $sobra : 0);
+            }
+            $w = self::garantirAssuntoMaisLarga($w, $papeis);
+        } else {
+            $destino = self::indiceColunaTextoPrincipal($papeis);
+            if ($destino !== null) {
+                $w[$destino] += $resto;
+            } elseif ($n > 0) {
+                $w[0] += $resto;
+            }
+        }
+
+        $soma = array_sum($w);
+        if ($soma !== 100 && $n > 0) {
+            $w[$n - 1] += 100 - $soma;
+        }
+
+        return $w;
+    }
+
+    /**
+     * @param  list<int>  $w
+     * @param  list<string>  $papeis
+     * @return list<int>
+     */
+    private static function garantirAssuntoMaisLarga(array $w, array $papeis): array
+    {
+        $assunto = [];
+        $maxOutra = 0;
+        foreach ($papeis as $i => $papel) {
+            if ($papel === 'assunto') {
+                $assunto[] = $i;
+            } else {
+                $maxOutra = max($maxOutra, $w[$i]);
+            }
+        }
+        if ($assunto === []) {
+            return $w;
+        }
+
+        $piso = [
+            'horas' => 12,
+            'num' => 11,
+            'pct' => 14,
+            'data' => 8,
+            'modalidade' => 13,
+            'disciplina' => 16,
+            'texto' => 10,
+            'assunto' => 0,
+        ];
+        $alvo = $maxOutra + 6;
+        foreach ($assunto as $idx) {
+            if ($w[$idx] >= $alvo) {
+                continue;
+            }
+            $need = $alvo - $w[$idx];
+            foreach (['texto', 'modalidade', 'disciplina', 'data', 'num', 'pct'] as $role) {
+                foreach ($papeis as $i => $papel) {
+                    if ($papel !== $role || $need <= 0) {
+                        continue;
+                    }
+                    $disp = $w[$i] - ($piso[$papel] ?? 8);
+                    if ($disp <= 0) {
+                        continue;
+                    }
+                    $take = min($disp, $need);
+                    $w[$i] -= $take;
+                    $w[$idx] += $take;
+                    $need -= $take;
+                }
+            }
+        }
+
+        return $w;
+    }
+
+    /**
+     * @param  list<string>  $papeis
+     */
+    private static function indiceColunaTextoPrincipal(array $papeis): ?int
+    {
+        foreach (['disciplina', 'texto', 'modalidade'] as $role) {
+            foreach ($papeis as $i => $papel) {
+                if ($papel === $role) {
+                    return $i;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function normalizarRotulo(string $texto): string
+    {
+        $texto = mb_strtolower(trim($texto), 'UTF-8');
+        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $texto);
+        $texto = is_string($ascii) && $ascii !== '' ? $ascii : $texto;
+
+        return preg_replace('/[^a-z0-9]+/', '', $texto) ?? '';
     }
 }

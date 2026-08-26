@@ -57,7 +57,7 @@ final class PdfPreview
         );
 
         $revisoes = RelatorioConsolidadoLayout::tabela(
-            ['Disciplina', 'Assunto', 'Revisões'],
+            ['Disciplina revisada', 'Assunto revisado', 'Revisões no período'],
             [
                 ['Direito Penal', 'Teoria do crime', '3'],
                 ['Direito Constitucional', 'Controle de constitucionalidade', '1'],
@@ -66,12 +66,12 @@ final class PdfPreview
         );
 
         $historico = RelatorioConsolidadoLayout::tabela(
-            ['Data', 'Disciplina', 'Horas brutas', 'Horas líquidas'],
+            ['Disciplina', 'Assunto', 'Modalidade', 'Horas'],
             [
-                ['01/08', 'Direito Constitucional', '02:10', '01:48'],
-                ['02/08', 'Direito Administrativo', '01:40', '01:22'],
+                ['SEDES - ADMINISTRAÇÃO DE RECURSOS DE MATERIAIS', 'Inventário e controle de estoque de materiais permanentes e de consumo', 'Cadernos de Exercícios (Múltipla Escolha)', '01:12:40'],
+                ['Direito Constitucional', 'Organização do Estado', 'Videoaula', '00:45:00'],
             ],
-            ['numeric' => [2, 3]]
+            ['numeric' => [3]]
         );
 
         $secoes = RelatorioConsolidadoLayout::alunoNome('Giovanna')
