@@ -46,13 +46,29 @@ class RelatorioConsolidadoLayoutTest extends TestCase
             'Painel de Insights',
             'Média de 02:00',
             'A matéria mais estudada foi Direito Constitucional.',
+            'SEDES - PORTUGUÊS foi a matéria que você menos estudou',
+            '908 exercícios | 765 acertos | 84%',
         ]);
         $this->assertStringNotContainsString('Painel de Insights', $html);
-        $this->assertStringContainsString('Média de', $html);
+        $this->assertStringNotContainsString('foi a matéria', $html);
+        $this->assertStringNotContainsString('A matéria mais estudada foi', $html);
+        $this->assertStringNotContainsString('mn-kpis', $html);
+        $this->assertStringNotContainsString('kpi-value', $html);
+        $this->assertStringContainsString('MÉDIA DIÁRIA', $html);
         $this->assertStringContainsString('02:00', $html);
+        $this->assertStringContainsString('MATÉRIA MAIS ESTUDADA', $html);
+        $this->assertStringContainsString('Direito Constitucional', $html);
+        $this->assertStringContainsString('MATÉRIA MENOS ESTUDADA', $html);
+        $this->assertStringContainsString('SEDES - PORTUGUÊS', $html);
+        $this->assertStringContainsString('EXERCÍCIOS REALIZADOS', $html);
+        $this->assertStringContainsString('908', $html);
+        $this->assertStringContainsString('ACERTOS', $html);
+        $this->assertStringContainsString('765', $html);
+        $this->assertStringContainsString('TAXA DE ACERTOS', $html);
+        $this->assertStringContainsString('84%', $html);
+        $this->assertSame(6, substr_count($html, 'mn-insight-block'));
         $this->assertStringContainsString('mn-insight-label', $html);
         $this->assertStringContainsString('mn-insight-value', $html);
-        $this->assertStringContainsString('Direito Constitucional', $html);
     }
 
     public function test_tabela_aplica_cor_so_no_percentual(): void
@@ -71,7 +87,7 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringNotContainsString('background:'.RelatorioConsolidadoLayout::VERMELHO.'">Improbidade', $html);
         $this->assertStringNotContainsString('mn-table-band', $html);
         $this->assertStringContainsString('class="z"', $html);
-        $this->assertMatchesRegularExpression('/<td class="num">/', $html);
+        $this->assertMatchesRegularExpression('/<td class="num mn-pct">/', $html);
         $this->assertStringContainsString('class="mn-c-assunto"', $html);
         $this->assertStringContainsString('class="mn-assunto"', $html);
         $this->assertStringNotContainsString('…', $html);
@@ -125,6 +141,25 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('class="mn-mod"', $historico);
     }
 
+    public function test_corpo_das_tabelas_alinha_sem_alterar_cabecalho(): void
+    {
+        $historico = RelatorioConsolidadoLayout::tabela(
+            ['Disciplina', 'Assunto', 'Modalidade', 'Horas'],
+            [['Direito Penal', 'Teoria do crime', 'Videoaula', '01:12:40']],
+            ['numeric' => [3]]
+        );
+        $this->assertMatchesRegularExpression('/<th class="mn-disc" style="width:\d+%">Disciplina<\/th>/', $historico);
+        $this->assertStringContainsString('<td class="mn-disc">Direito Penal</td>', $historico);
+        $this->assertStringContainsString('<td class="mn-assunto">Teoria do crime</td>', $historico);
+        $this->assertStringContainsString('<td class="mn-mod">Videoaula</td>', $historico);
+        $this->assertStringContainsString('<td class="num mn-horas">01:12:40</td>', $historico);
+
+        $css = RelatorioConsolidadoLayout::css("'Inter'", '');
+        $this->assertStringContainsString('.mn-table th{background:#001D3D; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}', $css);
+        $this->assertDoesNotMatchRegularExpression('/\.mn-table th\{[^}]*text-align:center/', $css);
+        $this->assertDoesNotMatchRegularExpression('/\.mn-table tbody td\{[^}]*padding-top:\d{2}/', $css);
+    }
+
     public function test_css_tabelas_e_espacamentos_seguem_o_comando(): void
     {
         $css = RelatorioConsolidadoLayout::css("'Inter'", '');
@@ -142,6 +177,10 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('.mn-table tbody tr:first-child,.mn-table tbody tr:nth-child(2){page-break-before:avoid;}', $css);
         $this->assertStringContainsString('white-space:nowrap', $css);
         $this->assertStringContainsString('.mn-table td.mn-horas{white-space:nowrap;}', $css);
+        $this->assertStringContainsString('.mn-table td{border-bottom:1px solid #EEF0F3; padding:9px 11px; vertical-align:middle;', $css);
+        $this->assertStringContainsString('.mn-table td.mn-assunto{text-align:justify;}', $css);
+        $this->assertStringContainsString('.mn-table td.mn-pct{text-align:right;}', $css);
+        $this->assertStringContainsString('.mn-table th{background:#001D3D; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}', $css);
         $this->assertStringNotContainsString('width:18%', $css);
         $this->assertStringNotContainsString('width:1%', $css);
         $this->assertStringNotContainsString('text-overflow:ellipsis', $css);

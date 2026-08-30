@@ -462,7 +462,7 @@ html, body {
 .mn-sec-body tbody td {
   border-bottom: 1px solid #EEF0F3;
   padding: 9px 11px;
-  vertical-align: top;
+  vertical-align: middle;
   word-wrap: break-word;
   overflow-wrap: break-word;
   line-height: 1.45;
@@ -480,6 +480,13 @@ html, body {
 .mn-sec-body th.num {
   text-align: right;
 }
+.mn-sec-body tbody td { vertical-align: middle; }
+.mn-sec-body tbody td.mn-disc,
+.mn-sec-body tbody td.mn-mod,
+.mn-sec-body tbody td.mn-horas,
+.mn-sec-body tbody td.num { text-align: center; }
+.mn-sec-body tbody td.mn-assunto { text-align: justify; }
+.mn-sec-body tbody td.mn-pct { text-align: right; }
 .mn-sec-body tbody tr:nth-child(even) td { background: var(--mn-zebra); }
 .mn-sec-body tbody tr { break-inside: avoid; page-break-inside: avoid; }
 .mn-sec-body img {
@@ -501,12 +508,32 @@ html, body {
   padding: 0 !important;
 }
 .insights-panel p {
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--mn-texto);
-  margin: 0 0 8px;
-  padding: 8px 0 8px 12px;
+  font-size: 8.5pt;
+  line-height: 1.45;
+  color: var(--mn-sec);
+  margin: 0 0 16px;
+  padding: 10px 0 10px 12px;
   border-left: 2px solid var(--mn-ouro);
+}
+.mn-insight-block {
+  page-break-inside: avoid;
+  margin: 0 0 16px;
+  padding: 10px 0 10px 12px;
+  border-left: 2px solid var(--mn-ouro);
+}
+.mn-insight-label {
+  font-size: 8.5pt;
+  font-weight: 500;
+  color: var(--mn-sec);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+}
+.mn-insight-value {
+  font-size: 10pt;
+  font-weight: 600;
+  color: var(--mn-azul);
+  line-height: 1.35;
 }
 @media print {
   .mn-sec-head, .mn-chart, .metric-card, .main-header-card {
@@ -908,6 +935,75 @@ function injectTableColgroups(html) {
   });
 }
 
+function insightValue(value) {
+  return String(value || '').trim().replace(/[ \t.]+$/, '');
+}
+
+function parseInsightPart(text) {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  const narrativas = [
+    [/^(?:a\s+)?mat[eé]ria mais estudada\s+(?:foi|é|:)\s+(.+)$/i, 'MATÉRIA MAIS ESTUDADA'],
+    [/^(?:a\s+)?mat[eé]ria menos estudada\s+(?:foi|é|:)\s+(.+)$/i, 'MATÉRIA MENOS ESTUDADA'],
+    [/^(?:a\s+)?mat[eé]ria com maior solicita[cç][aã]o de tempo extra\s+(?:foi|é|:)\s+(.+)$/i, 'MATÉRIA COM MAIOR SOLICITAÇÃO DE TEMPO EXTRA'],
+    [/^(?:.*?maior solicita[cç][aã]o de\s+)?tempo extra\s+(?:foi|é|:)\s+(.+)$/i, 'MATÉRIA COM MAIOR SOLICITAÇÃO DE TEMPO EXTRA'],
+    [/^(.+?)\s+foi\s+a\s+mat[eé]ria\s+(?:que\s+voc[eê]\s+)?mais\s+estudou/i, 'MATÉRIA MAIS ESTUDADA'],
+    [/^(.+?)\s+foi\s+a\s+mat[eé]ria\s+(?:que\s+voc[eê]\s+)?menos\s+estudou/i, 'MATÉRIA MENOS ESTUDADA'],
+  ];
+  for (const [re, label] of narrativas) {
+    const m = t.match(re);
+    if (m) return [label, insightValue(m[1])];
+  }
+  const metricas = [
+    [/^m[eé]dia(?:\s+di[aá]ria|\s+de)?\s+(\d{1,2}:\d{2}(?::\d{2})?)\s*$/i, 'MÉDIA DIÁRIA'],
+    [/^exerc[ií]cios(?:\s+realizados)?\s+(\d{1,6})\s*$/i, 'EXERCÍCIOS REALIZADOS'],
+    [/^(\d{1,6})\s+exerc[ií]cios(?:\s+realizados)?\s*$/i, 'EXERCÍCIOS REALIZADOS'],
+    [/^acertos\s+(\d{1,6})\s*$/i, 'ACERTOS'],
+    [/^(\d{1,6})\s+acertos\s*$/i, 'ACERTOS'],
+    [/^taxa(?:\s+de)?\s+acertos\s+(\d+(?:[.,]\d+)?%?)\s*$/i, 'TAXA DE ACERTOS'],
+    [/^(\d+(?:[.,]\d+)?%)\s*$/, 'TAXA DE ACERTOS'],
+  ];
+  for (const [re, label] of metricas) {
+    const m = t.match(re);
+    if (m) return [label, insightValue(m[1])];
+  }
+  const generic = t.match(/^(.+?)\s+(\d{1,2}:\d{2}(?::\d{2})?|\d{1,3}(?:[.,]\d+)?%|\d{1,6})\s*$/);
+  if (generic && generic[1].trim()) {
+    return [generic[1].trim().replace(/^[:\-–—.\s]+|[:\-–—.\s]+$/g, '').toUpperCase(), insightValue(generic[2])];
+  }
+  return null;
+}
+
+function formatInsightsHtml(html) {
+  if (!html) return '';
+  if (/mn-insight-block/.test(html)) return html;
+  const texts = [];
+  const re = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    const t = m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (t && !/painel de insights/i.test(t)) texts.push(t);
+  }
+  if (!texts.length) {
+    const plain = String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (plain && !/painel de insights/i.test(plain)) texts.push(plain);
+  }
+  const blocks = [];
+  texts.forEach((text) => {
+    const parts = /[|•]/.test(text)
+      ? text.split(/\s*[|•]\s*/).map((p) => p.trim()).filter(Boolean)
+      : [text];
+    parts.forEach((part) => {
+      const par = parseInsightPart(part);
+      if (!par) return;
+      blocks.push(
+        `<div class="mn-insight-block"><div class="mn-insight-label">${escapeHtml(par[0])}</div><div class="mn-insight-value">${escapeHtml(par[1])}</div></div>`
+      );
+    });
+  });
+  return blocks.join('') || html;
+}
+
 function block(title, inner, extraClass = 'mn-legacy', intro = '') {
   if (!inner || !String(inner).trim()) return '';
   const introHtml = intro ? `<p class="mn-sec-intro">${escapeHtml(intro)}</p>` : '';
@@ -942,7 +1038,7 @@ function buildHtml(extracted) {
       'Horas estudadas = horas brutas registradas.',
     );
   parts.push(block('Ritmo de estudos', ritmo));
-  parts.push(block('Painel de Insights', extracted.progresso.insights || '', 'mn-sec-insights'));
+  parts.push(block('Painel de Insights', formatInsightsHtml(extracted.progresso.insights || ''), 'mn-sec-insights'));
   parts.push(block('Desempenho em questões', extracted.questoes.panorama || ''));
   parts.push(block('Performance por assunto', injectTableColgroups(extracted.questoes.assuntos || ''), 'mn-sec-table'));
   if (extracted.aluno.revisoes && extracted.aluno.revisoes.trim()) {

@@ -238,39 +238,22 @@ final class RelatorioConsolidadoLayout
     }
 
     /**
-     * Transforma os parágrafos originais do Painel de Insights em cards + linhas,
-     * sem reescrever os textos da Tutory.
+     * Painel de Insights: cada métrica vira um bloco RÓTULO + VALOR.
+     * Os valores da Tutory entram intocados; só a forma visual muda.
      *
      * @param  list<string>  $paragrafos
      */
     public static function insights(array $paragrafos): string
     {
-        $cards = [];
-        $textos = [];
-
+        $html = '';
         foreach ($paragrafos as $p) {
             $p = trim(preg_replace('/\s+/u', ' ', (string) $p) ?? '');
             if ($p === '' || preg_match('/painel de insights/iu', $p)) {
                 continue;
             }
-
-            if (mb_strlen($p) <= 96 && preg_match('/^(.*?)(\d{1,2}:\d{2}|\d{1,3}(?:[.,]\d+)?%|\d{1,5})\s*$/u', $p, $m)) {
-                $label = trim($m[1], " \t:-–—.");
-                if ($label !== '') {
-                    $cards[] = ['label' => $label, 'value' => $m[2]];
-
-                    continue;
-                }
+            foreach (self::extrairParesInsight($p) as $par) {
+                $html .= self::blocoInsight($par[0], $par[1]);
             }
-            $textos[] = $p;
-        }
-
-        $html = '';
-        if ($cards !== []) {
-            $html .= '<div class="mn-insight-item">'.self::cards($cards).'</div>';
-        }
-        foreach ($textos as $t) {
-            $html .= self::blocoInsightTextual($t);
         }
 
         return $html;
@@ -334,11 +317,14 @@ img{max-width:100%; height:auto;}
 .mn-table thead{display:table-header-group;}
 .mn-table th,.mn-table td{height:auto;}
 .mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}
-.mn-table th.num,.mn-table td.num{text-align:right;}
+.mn-table th.num{text-align:right;}
 .mn-table td.num{white-space:nowrap;}
 .mn-table td.mn-horas{white-space:nowrap;}
-.mn-table td{border-bottom:1px solid #EEF0F3; padding:9px 11px; vertical-align:top; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; font-size:9pt; font-weight:400; line-height:1.45; white-space:normal;}
+.mn-table td{border-bottom:1px solid #EEF0F3; padding:9px 11px; vertical-align:middle; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; font-size:9pt; font-weight:400; line-height:1.45; white-space:normal;}
 .mn-table td.mn-assunto,.mn-table td.mn-disc,.mn-table td.mn-mod{white-space:normal; word-wrap:break-word; overflow-wrap:break-word;}
+.mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num{text-align:center;}
+.mn-table td.mn-assunto{text-align:justify;}
+.mn-table td.mn-pct{text-align:right;}
 .mn-table tr.z td{background:{$zebra};}
 .mn-table tr{page-break-inside:avoid; break-inside:avoid; height:auto;}
 .mn-table thead{page-break-after:avoid;}
@@ -393,23 +379,105 @@ CSS;
         }
     }
 
-    private static function blocoInsightTextual(string $texto): string
+    /**
+     * @return list<array{0: string, 1: string}>
+     */
+    private static function extrairParesInsight(string $texto): array
     {
-        $label = '';
-        $valor = $texto;
-        $padroes = [
-            '/^(.*?mat[eé]ria mais estudada)\s+(?:foi|é|:)\s+(.+)$/iu',
-            '/^(.*?mat[eé]ria menos estudada)\s+(?:foi|é|:)\s+(.+)$/iu',
-            '/^(.*?tempo extra)\s+(?:foi|é|:)\s+(.+)$/iu',
-        ];
-        foreach ($padroes as $re) {
-            if (preg_match($re, $texto, $m)) {
-                $label = trim($m[1], " \t:-–—.");
-                $valor = trim($m[2]);
-                break;
+        $pares = [];
+        foreach (self::partirMetricasInsight($texto) as $parte) {
+            $par = self::parInsight($parte);
+            if ($par !== null) {
+                $pares[] = $par;
             }
         }
 
+        return $pares;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function partirMetricasInsight(string $texto): array
+    {
+        $texto = trim($texto);
+        if ($texto === '') {
+            return [];
+        }
+        if (preg_match('/[|•]/u', $texto)) {
+            $partes = preg_split('/\s*[|•]\s*/u', $texto) ?: [];
+
+            return array_values(array_filter(array_map('trim', $partes), static fn (string $p): bool => $p !== ''));
+        }
+        if (preg_match_all(
+            '/(?:m[eé]dia(?:\s+di[aá]ria|\s+de)?|exerc[ií]cios(?:\s+realizados)?|acertos|taxa(?:\s+de)?\s+acertos)\s*[:\s]\s*(?:\d{1,2}:\d{2}(?::\d{2})?|\d+(?:[.,]\d+)?%?)/iu',
+            $texto,
+            $m
+        ) && count($m[0]) > 1) {
+            return array_map('trim', $m[0]);
+        }
+
+        return [$texto];
+    }
+
+    /**
+     * @return array{0: string, 1: string}|null
+     */
+    private static function parInsight(string $texto): ?array
+    {
+        $texto = trim($texto);
+        if ($texto === '') {
+            return null;
+        }
+
+        $narrativas = [
+            ['/^(?:a\s+)?mat[eé]ria mais estudada\s+(?:foi|é|:)\s+(.+)$/iu', 'MATÉRIA MAIS ESTUDADA'],
+            ['/^(?:a\s+)?mat[eé]ria menos estudada\s+(?:foi|é|:)\s+(.+)$/iu', 'MATÉRIA MENOS ESTUDADA'],
+            ['/^(?:a\s+)?mat[eé]ria com maior solicita[cç][aã]o de tempo extra\s+(?:foi|é|:)\s+(.+)$/iu', 'MATÉRIA COM MAIOR SOLICITAÇÃO DE TEMPO EXTRA'],
+            ['/^(?:.*?maior solicita[cç][aã]o de\s+)?tempo extra\s+(?:foi|é|:)\s+(.+)$/iu', 'MATÉRIA COM MAIOR SOLICITAÇÃO DE TEMPO EXTRA'],
+            ['/^(.+?)\s+foi\s+a\s+mat[eé]ria\s+(?:que\s+voc[eê]\s+)?mais\s+estudou/iu', 'MATÉRIA MAIS ESTUDADA'],
+            ['/^(.+?)\s+foi\s+a\s+mat[eé]ria\s+(?:que\s+voc[eê]\s+)?menos\s+estudou/iu', 'MATÉRIA MENOS ESTUDADA'],
+        ];
+        foreach ($narrativas as [$re, $rotulo]) {
+            if (preg_match($re, $texto, $m)) {
+                return [$rotulo, self::valorInsight($m[1])];
+            }
+        }
+
+        $metricas = [
+            ['/^m[eé]dia(?:\s+di[aá]ria|\s+de)?\s+(\d{1,2}:\d{2}(?::\d{2})?)\s*$/iu', 'MÉDIA DIÁRIA'],
+            ['/^exerc[ií]cios(?:\s+realizados)?\s+(\d{1,6})\s*$/iu', 'EXERCÍCIOS REALIZADOS'],
+            ['/^(\d{1,6})\s+exerc[ií]cios(?:\s+realizados)?\s*$/iu', 'EXERCÍCIOS REALIZADOS'],
+            ['/^acertos\s+(\d{1,6})\s*$/iu', 'ACERTOS'],
+            ['/^(\d{1,6})\s+acertos\s*$/iu', 'ACERTOS'],
+            ['/^taxa(?:\s+de)?\s+acertos\s+(\d+(?:[.,]\d+)?%?)\s*$/iu', 'TAXA DE ACERTOS'],
+            ['/^(\d+(?:[.,]\d+)?%)\s*$/u', 'TAXA DE ACERTOS'],
+        ];
+        foreach ($metricas as [$re, $rotulo]) {
+            if (preg_match($re, $texto, $m)) {
+                return [$rotulo, self::valorInsight($m[1])];
+            }
+        }
+
+        if (preg_match('/^(.+?)\s+(\d{1,2}:\d{2}(?::\d{2})?|\d{1,3}(?:[.,]\d+)?%|\d{1,6})\s*$/u', $texto, $m)) {
+            $rotulo = trim($m[1], " \t:-–—.");
+            if ($rotulo !== '') {
+                return [mb_strtoupper($rotulo, 'UTF-8'), self::valorInsight($m[2])];
+            }
+        }
+
+        return null;
+    }
+
+    private static function valorInsight(string $valor): string
+    {
+        $valor = trim($valor);
+
+        return rtrim($valor, " \t.");
+    }
+
+    private static function blocoInsight(string $label, string $valor): string
+    {
         $html = '<div class="mn-insight-block">';
         if ($label !== '') {
             $html .= '<div class="mn-insight-label">'.htmlspecialchars($label, ENT_QUOTES, 'UTF-8').'</div>';
@@ -441,7 +509,7 @@ CSS;
     {
         $n = self::parsePct($taxa);
         $cor = self::corPercentual($n);
-        $html = '<td class="num"><span class="pct" style="color:'.htmlspecialchars($cor, ENT_QUOTES, 'UTF-8').';">'
+        $html = '<td class="num mn-pct"><span class="pct" style="color:'.htmlspecialchars($cor, ENT_QUOTES, 'UTF-8').';">'
             .htmlspecialchars($taxa, ENT_QUOTES, 'UTF-8').'</span>';
         if ($n !== null) {
             $w = max(0, min(100, $n));
@@ -499,7 +567,8 @@ CSS;
     {
         return match ($papel) {
             'horas' => 'num mn-horas',
-            'num', 'pct', 'data' => 'num',
+            'pct' => 'num mn-pct',
+            'num', 'data' => 'num',
             'assunto' => 'mn-assunto',
             'disciplina' => 'mn-disc',
             'modalidade' => 'mn-mod',
