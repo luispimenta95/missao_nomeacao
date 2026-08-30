@@ -34,10 +34,12 @@ final class PdfPreview
 
         $insights = RelatorioConsolidadoLayout::insights([
             'Média diária 03:16',
+            'A matéria mais estudada foi Direito Constitucional.',
+            'A matéria menos estudada foi SEDES - PORTUGUÊS.',
+            'A matéria com maior solicitação de tempo extra foi SEDES - CONHECIMENTOS BÁSICOS.',
             'Exercícios realizados 248',
             'Acertos 194',
             'Taxa de acertos 78,1%',
-            'A matéria mais estudada foi Direito Constitucional.',
         ]);
 
         $questoes = RelatorioConsolidadoLayout::cards([
