@@ -228,15 +228,15 @@ function aplicarDatasBrasileiras() {
 
 /** Rótulos de horas nos vértices do gráfico de motivação (Chart.js v2). */
 function labelHoursOnChartVertices() {
-  const hoursIds = new Set(['chart_horas_diarias']);
+  const hoursIds = new Set(['chart_horas_diarias', 'chart_line_comparativo']);
   if (!window.Chart || !Chart.instances) return 0;
 
   function formatHourLabel(value) {
+    if (value == null || value === '') return '';
     const raw = (value && typeof value === 'object' && 'y' in value) ? value.y : value;
     const num = Number(raw);
     if (!Number.isFinite(num)) return '';
     const rounded = Math.round(num * 10) / 10;
-    if (rounded === 0) return '';
     const txt = Number.isInteger(rounded)
       ? String(rounded)
       : String(rounded).replace('.', ',');
@@ -251,23 +251,58 @@ function labelHoursOnChartVertices() {
     const id = canvas && canvas.id ? canvas.id : '';
     if (!hoursIds.has(id) || !chart || !chart.options) continue;
 
+    const paleta = ['#001D3D', '#3D6B99'];
+    const n = (chart.data && chart.data.labels) ? chart.data.labels.length : 1;
+    const cat = n >= 16 ? 0.70 : (n >= 14 ? 0.76 : 0.82);
+    const barPct = n >= 16 ? 0.80 : (n >= 14 ? 0.82 : 0.85);
+    if (chart.config) chart.config.type = 'bar';
+    chart.type = 'bar';
+    if (chart.data && Array.isArray(chart.data.datasets)) {
+      chart.data.datasets.forEach((ds, i) => {
+        const cor = paleta[i % paleta.length];
+        ds.type = 'bar';
+        ds.fill = false;
+        ds.backgroundColor = cor;
+        ds.borderColor = cor;
+        ds.borderWidth = 0;
+        ds.categoryPercentage = cat;
+        ds.barPercentage = barPct;
+        ds.datalabels = { align: 'end', anchor: 'end', offset: i === 0 ? 2 : 10 };
+      });
+    }
+    chart.options.scales = chart.options.scales || {};
+    chart.options.scales.xAxes = [{
+      stacked: false,
+      gridLines: { display: false, drawBorder: false },
+      ticks: {
+        autoSkip: false,
+        maxTicksLimit: Math.max(n, 1),
+        maxRotation: n >= 16 ? 15 : 0,
+        minRotation: 0,
+        fontSize: n >= 16 ? 7 : 8,
+        fontColor: '#4B5563',
+      },
+    }];
+    chart.options.scales.yAxes = [{
+      stacked: false,
+      gridLines: { color: 'rgba(15, 23, 42, 0.06)', drawBorder: false, lineWidth: 0.5 },
+      ticks: { beginAtZero: true, fontSize: 9, fontColor: '#4B5563' },
+    }];
+    chart.options.legend = Object.assign({}, chart.options.legend || {}, { display: true });
+
     const labels = {
       display: true,
       clamp: true,
       clip: false,
-      color: '#111827',
-      backgroundColor: 'rgba(255,255,255,0.85)',
-      borderRadius: 3,
-      padding: { top: 1, right: 3, bottom: 1, left: 3 },
-      font: { size: 9, weight: 'bold' },
-      offset: 4,
+      color: '#001D3D',
+      backgroundColor: 'rgba(255,255,255,0.82)',
+      borderRadius: 0,
+      padding: { top: 1, right: 2, bottom: 1, left: 2 },
+      font: { size: 7, weight: 'bold' },
+      offset: 2,
       formatter: formatHourLabel,
-      align(ctx) {
-        return ctx.datasetIndex === 0 ? 'end' : 'start';
-      },
-      anchor(ctx) {
-        return ctx.datasetIndex === 0 ? 'end' : 'start';
-      },
+      align: 'end',
+      anchor: 'end',
     };
 
     chart.options.plugins = chart.options.plugins || {};
@@ -393,8 +428,8 @@ html, body {
 }
 .metric-card, .main-numbers {
   background: #fff;
-  border: 1px solid var(--mn-borda);
-  border-radius: 0;
+  border: 1.5pt solid var(--mn-ouro);
+  border-radius: 9px;
   padding: 18px;
   box-shadow: none !important;
   text-align: left;
@@ -413,6 +448,7 @@ html, body {
   font-weight: 700;
   color: var(--mn-azul);
   margin: 0;
+  text-align: center;
 }
 .mn-legacy .row {
   display: flex;
@@ -445,6 +481,7 @@ html, body {
   table-layout: fixed;
   font-size: 9pt;
   margin-top: 0;
+  border: 1.25pt solid var(--mn-azul);
 }
 .mn-sec-body thead { display: table-header-group; }
 .mn-sec-body thead td, .mn-sec-body thead th {
@@ -458,9 +495,10 @@ html, body {
   text-align: left;
   height: auto;
   white-space: normal;
+  border: 1.25pt solid var(--mn-azul);
 }
 .mn-sec-body tbody td {
-  border-bottom: 1px solid #EEF0F3;
+  border: 1.25pt solid var(--mn-azul);
   padding: 9px 11px;
   vertical-align: middle;
   word-wrap: break-word;
@@ -485,7 +523,7 @@ html, body {
 .mn-sec-body tbody td.mn-mod,
 .mn-sec-body tbody td.mn-horas,
 .mn-sec-body tbody td.num { text-align: center; }
-.mn-sec-body tbody td.mn-assunto { text-align: justify; }
+.mn-sec-body tbody td.mn-assunto { text-align: center; }
 .mn-sec-body tbody td.mn-pct { text-align: right; }
 .mn-sec-body tbody tr:nth-child(even) td { background: var(--mn-zebra); }
 .mn-sec-body tbody tr { break-inside: avoid; page-break-inside: avoid; }
@@ -507,33 +545,37 @@ html, body {
   box-shadow: none !important;
   padding: 0 !important;
 }
-.insights-panel p {
-  font-size: 8.5pt;
-  line-height: 1.45;
-  color: var(--mn-sec);
-  margin: 0 0 16px;
-  padding: 10px 0 10px 12px;
-  border-left: 2px solid var(--mn-ouro);
+.mn-kpis {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 14px 14px;
+  table-layout: fixed;
+  margin: 0 0 8px;
+  border: 0 !important;
 }
-.mn-insight-block {
-  page-break-inside: avoid;
-  margin: 0 0 16px;
-  padding: 10px 0 10px 12px;
-  border-left: 2px solid var(--mn-ouro);
+.mn-sec-body .mn-kpis td.kpi {
+  background: #fff;
+  border: 1.5pt solid var(--mn-ouro) !important;
+  border-radius: 9px;
+  padding: 18px;
+  vertical-align: top;
 }
-.mn-insight-label {
+.kpi-label {
   font-size: 8.5pt;
   font-weight: 500;
   color: var(--mn-sec);
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
+  line-height: 1.25;
 }
-.mn-insight-value {
-  font-size: 10pt;
-  font-weight: 600;
+.kpi-value {
+  font-size: 19pt;
+  font-weight: 700;
   color: var(--mn-azul);
-  line-height: 1.35;
+  line-height: 1.1;
+  text-align: center;
+  word-wrap: break-word;
 }
 @media print {
   .mn-sec-head, .mn-chart, .metric-card, .main-header-card {
@@ -976,7 +1018,7 @@ function parseInsightPart(text) {
 
 function formatInsightsHtml(html) {
   if (!html) return '';
-  if (/mn-insight-block/.test(html)) return html;
+  if (/mn-kpis/.test(html) && /kpi-value/.test(html)) return html;
   const texts = [];
   const re = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
   let m;
@@ -988,7 +1030,7 @@ function formatInsightsHtml(html) {
     const plain = String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     if (plain && !/painel de insights/i.test(plain)) texts.push(plain);
   }
-  const blocks = [];
+  const items = [];
   texts.forEach((text) => {
     const parts = /[|•]/.test(text)
       ? text.split(/\s*[|•]\s*/).map((p) => p.trim()).filter(Boolean)
@@ -996,12 +1038,23 @@ function formatInsightsHtml(html) {
     parts.forEach((part) => {
       const par = parseInsightPart(part);
       if (!par) return;
-      blocks.push(
-        `<div class="mn-insight-block"><div class="mn-insight-label">${escapeHtml(par[0])}</div><div class="mn-insight-value">${escapeHtml(par[1])}</div></div>`
-      );
+      items.push(par);
     });
   });
-  return blocks.join('') || html;
+  if (!items.length) return html;
+  const cols = items.length <= 3 ? Math.max(items.length, 1) : 3;
+  let out = '<table class="mn-kpis"><tbody>';
+  for (let i = 0; i < items.length; i += cols) {
+    const row = items.slice(i, i + cols);
+    out += '<tr>';
+    row.forEach((item, idx) => {
+      const span = (idx === row.length - 1 && row.length < cols) ? ` colspan="${cols - row.length + 1}"` : '';
+      out += `<td class="kpi"${span}><div class="kpi-label">${escapeHtml(item[0])}</div><div class="kpi-value">${escapeHtml(item[1])}</div></td>`;
+    });
+    out += '</tr>';
+  }
+  out += '</tbody></table>';
+  return out;
 }
 
 function block(title, inner, extraClass = 'mn-legacy', intro = '') {

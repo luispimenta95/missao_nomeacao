@@ -236,7 +236,8 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('@page{margin:34mm 16mm 18mm 16mm;}', $css);
         $this->assertStringContainsString('background:#ffffff', $css);
         $this->assertStringNotContainsString('#F5F5F5', $css);
-        $this->assertStringNotContainsString('border-radius', $css);
+        $this->assertStringContainsString('border-radius:9px', $css);
+        $this->assertDoesNotMatchRegularExpression('/body\{[^}]*border-radius/', $css);
     }
 
     public function test_consolidado_nao_inclui_desempenho_nem_historico_de_metas(): void
@@ -257,16 +258,67 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringNotContainsString("' (brutas)'", $php);
     }
 
+    public function test_ritmo_de_estudos_vira_barras_agrupadas_com_todas_as_datas(): void
+    {
+        $downloader = new CoachReportDownloader('2', false, static function (): void {});
+        $ref = new ReflectionClass($downloader);
+        $alinhar = $ref->getMethod('alinharSeriesAsDatas');
+        $barras = $ref->getMethod('aplicarBarrasRitmoEstudos');
+        $datas = $ref->getMethod('datasCompactasDoPeriodo');
+
+        $fevereiro = $datas->invoke($downloader, new \DateTimeImmutable('2026-03-01'));
+        $this->assertSame('16/02', $fevereiro[0]);
+        $this->assertSame('28/02', $fevereiro[count($fevereiro) - 1]);
+        $this->assertCount(13, $fevereiro);
+
+        $agosto = $datas->invoke($downloader, new \DateTimeImmutable('2026-09-01'));
+        $this->assertSame('16/08', $agosto[0]);
+        $this->assertSame('31/08', $agosto[count($agosto) - 1]);
+        $this->assertCount(16, $agosto);
+
+        $fonte = [
+            'type' => 'line',
+            'data' => [
+                'labels' => ['16/08', '18/08', '31/08'],
+                'datasets' => [
+                    ['label' => 'Horas brutas', 'data' => [0, 3.5, 2]],
+                    ['label' => 'Horas líquidas', 'data' => [0, 2, 1]],
+                ],
+            ],
+        ];
+        $alinhado = $alinhar->invoke($downloader, $fonte, $agosto);
+        $this->assertCount(16, $alinhado['data']['labels']);
+        $this->assertSame(0, $alinhado['data']['datasets'][0]['data'][0]);
+        $this->assertNull($alinhado['data']['datasets'][0]['data'][1]);
+        $this->assertSame(3.5, $alinhado['data']['datasets'][0]['data'][2]);
+        $this->assertSame(2, $alinhado['data']['datasets'][0]['data'][15]);
+
+        $cfg = $barras->invoke($downloader, $fonte);
+        $this->assertSame('bar', $cfg['type']);
+        $this->assertFalse($cfg['options']['scales']['xAxes'][0]['stacked']);
+        $this->assertFalse($cfg['options']['scales']['xAxes'][0]['ticks']['autoSkip']);
+        $this->assertSame(RelatorioConsolidadoLayout::AZUL, $cfg['data']['datasets'][0]['backgroundColor']);
+        $this->assertSame(RelatorioConsolidadoLayout::AZUL_CLARO, $cfg['data']['datasets'][1]['backgroundColor']);
+        $this->assertSame('__DATALABEL_HOURS_BAR__', $cfg['options']['plugins']['datalabels']['formatter']);
+        $this->assertNotContains(RelatorioConsolidadoLayout::DOURADO, [
+            $cfg['data']['datasets'][0]['backgroundColor'],
+            $cfg['data']['datasets'][1]['backgroundColor'],
+        ]);
+    }
+
     public function test_grafico_de_horas_diarias_tem_rotulos_nos_vertices(): void
     {
         $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());
         $this->assertStringContainsString('__DATALABEL_HOURS__', $php);
+        $this->assertStringContainsString('__DATALABEL_HOURS_BAR__', $php);
         $this->assertStringContainsString('__DATALABEL_VALUE__', $php);
         $this->assertStringContainsString('$isHours ? \'__DATALABEL_HOURS__\' : \'__DATALABEL_VALUE__\'', $php);
 
         $script = (string) file_get_contents(base_path('scripts/tutory-compose-pdf.mjs'));
         $this->assertStringContainsString('labelHoursOnChartVertices', $script);
         $this->assertStringContainsString('chart_horas_diarias', $script);
+        $this->assertStringContainsString('chart_line_comparativo', $script);
+        $this->assertStringContainsString("chart.config.type = 'bar'", $script);
         $this->assertStringContainsString('return `${txt}h`', $script);
         $this->assertStringNotContainsString('stripPercentFromHoursCharts', $script);
         $this->assertStringContainsString('Horas planejadas × horas estudadas', $script);

@@ -52,8 +52,8 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringNotContainsString('Painel de Insights', $html);
         $this->assertStringNotContainsString('foi a matéria', $html);
         $this->assertStringNotContainsString('A matéria mais estudada foi', $html);
-        $this->assertStringNotContainsString('mn-kpis', $html);
-        $this->assertStringNotContainsString('kpi-value', $html);
+        $this->assertStringContainsString('mn-kpis', $html);
+        $this->assertStringContainsString('kpi-value', $html);
         $this->assertStringContainsString('MÉDIA DIÁRIA', $html);
         $this->assertStringContainsString('02:00', $html);
         $this->assertStringContainsString('MATÉRIA MAIS ESTUDADA', $html);
@@ -66,9 +66,11 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('765', $html);
         $this->assertStringContainsString('TAXA DE ACERTOS', $html);
         $this->assertStringContainsString('84%', $html);
-        $this->assertSame(6, substr_count($html, 'mn-insight-block'));
-        $this->assertStringContainsString('mn-insight-label', $html);
-        $this->assertStringContainsString('mn-insight-value', $html);
+        $this->assertSame(6, substr_count($html, 'class="kpi"') + substr_count($html, 'class="kpi '));
+        $this->assertSame(2, substr_count($html, '<tr>'));
+        $this->assertStringContainsString('kpi-label', $html);
+        $this->assertStringContainsString('kpi-long', $html);
+        $this->assertStringNotContainsString('mn-insight-block', $html);
     }
 
     public function test_tabela_aplica_cor_so_no_percentual(): void
@@ -168,17 +170,17 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('.mn-sec-intro{font-size:10.5pt; font-weight:400; color:#4B5563; margin:7px 0 0;', $css);
         $this->assertStringContainsString('.mn-sec-body{margin-top:14px;}', $css);
         $this->assertStringContainsString('border-spacing:14px 0', $css);
-        $this->assertStringContainsString('.mn-kpis td.kpi{background:#ffffff; border:1px solid #E6E8EC; padding:18px 18px;', $css);
+        $this->assertStringContainsString('.mn-kpis td.kpi{background:#ffffff; border:1.5pt solid #BF8F00; border-radius:9px; padding:18px 18px;', $css);
         $this->assertStringContainsString('.mn-chart{margin:8px 0 16px;', $css);
-        $this->assertStringContainsString('.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed; margin:0;}', $css);
+        $this->assertStringContainsString('.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed; margin:0; border:1.25pt solid #001D3D;}', $css);
         $this->assertStringContainsString('padding:9px 11px', $css);
         $this->assertStringContainsString('height:auto', $css);
         $this->assertStringContainsString('.mn-table tr{page-break-inside:avoid;', $css);
         $this->assertStringContainsString('.mn-table tbody tr:first-child,.mn-table tbody tr:nth-child(2){page-break-before:avoid;}', $css);
         $this->assertStringContainsString('white-space:nowrap', $css);
         $this->assertStringContainsString('.mn-table td.mn-horas{white-space:nowrap;}', $css);
-        $this->assertStringContainsString('.mn-table td{border-bottom:1px solid #EEF0F3; padding:9px 11px; vertical-align:middle;', $css);
-        $this->assertStringContainsString('.mn-table td.mn-assunto{text-align:justify;}', $css);
+        $this->assertStringContainsString('.mn-table th,.mn-table td{height:auto; border:1.25pt solid #001D3D;}', $css);
+        $this->assertStringContainsString('.mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num,.mn-table td.mn-assunto{text-align:center;}', $css);
         $this->assertStringContainsString('.mn-table td.mn-pct{text-align:right;}', $css);
         $this->assertStringContainsString('.mn-table th{background:#001D3D; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}', $css);
         $this->assertStringNotContainsString('width:18%', $css);
@@ -187,7 +189,7 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringNotContainsString('mn-table-band', $css);
         $this->assertStringNotContainsString('padding-top:56px', $css);
         $this->assertStringNotContainsString('#F5F5F5', $css);
-        $this->assertStringNotContainsString('border-radius', $css);
+        $this->assertStringNotContainsString('text-align:justify', $css);
         $this->assertDoesNotMatchRegularExpression('/html,body\{[^}]*margin:0/', $css);
     }
 
@@ -197,7 +199,7 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('@page{margin:34mm 16mm 18mm 16mm;}', $css);
         $this->assertStringContainsString('background:#ffffff', $css);
         $this->assertStringNotContainsString('#F5F5F5', $css);
-        $this->assertStringNotContainsString('border-radius', $css);
+        $this->assertStringContainsString('border-radius:9px', $css);
         $this->assertStringNotContainsString('Montserrat', $css);
         $this->assertStringNotContainsString('kpi-hot', $css);
         $this->assertDoesNotMatchRegularExpression('/html,body\{[^}]*margin:0/', $css);
