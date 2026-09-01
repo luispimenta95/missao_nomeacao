@@ -164,6 +164,59 @@ class RelatoriosMentorTest extends TestCase
         }
     }
 
+    public function test_periodo_2_no_dia_1_usa_a_quinzena_do_mes_anterior(): void
+    {
+        $downloader = new CoachReportDownloader('2', false, static function (): void {});
+        $ref = new ReflectionClass($downloader);
+        $iso = $ref->getMethod('datasPeriodoIso');
+        $br = $ref->getMethod('datasPeriodoBr');
+        $mes = $ref->getMethod('mesDoPeriodo');
+
+        $primeiro = new \DateTimeImmutable('2026-09-01');
+        $this->assertSame(['2026-08-16', '2026-08-31'], $iso->invoke($downloader, $primeiro));
+        $this->assertSame(['16/08/2026', '31/08/2026'], $br->invoke($downloader, $primeiro));
+        $this->assertSame(
+            '2026-08-01',
+            $mes->invoke($downloader, $primeiro)->format('Y-m-d')
+        );
+        $this->assertSame(
+            'AGOSTO/PERÍODO 2',
+            RelatorioConsolidadoLayout::rotuloPeriodo('2', $mes->invoke($downloader, $primeiro))
+        );
+    }
+
+    public function test_periodo_2_a_partir_do_dia_16_usa_o_mes_corrente(): void
+    {
+        $downloader = new CoachReportDownloader('2', false, static function (): void {});
+        $ref = new ReflectionClass($downloader);
+        $iso = $ref->getMethod('datasPeriodoIso');
+
+        $this->assertSame(
+            ['2026-08-16', '2026-08-31'],
+            $iso->invoke($downloader, new \DateTimeImmutable('2026-08-31'))
+        );
+        $this->assertSame(
+            ['2026-09-16', '2026-09-30'],
+            $iso->invoke($downloader, new \DateTimeImmutable('2026-09-16'))
+        );
+    }
+
+    public function test_periodo_1_nao_recua_o_mes_antes_do_dia_16(): void
+    {
+        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $ref = new ReflectionClass($downloader);
+        $iso = $ref->getMethod('datasPeriodoIso');
+
+        $this->assertSame(
+            ['2026-09-01', '2026-09-15'],
+            $iso->invoke($downloader, new \DateTimeImmutable('2026-09-01'))
+        );
+        $this->assertSame(
+            ['2026-08-01', '2026-08-15'],
+            $iso->invoke($downloader, new \DateTimeImmutable('2026-08-16'))
+        );
+    }
+
     public function test_nao_aplica_marca_dagua_diagonal(): void
     {
         $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());

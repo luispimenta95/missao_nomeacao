@@ -287,25 +287,47 @@ class CoachReportDownloader
     }
 
     /**
+     * Mês civil da quinzena pedida.
+     *
+     * Período 2 agenda no dia 1 do mês seguinte (routes/console.php). Sem
+     * recuar o mês, `Y-m-16`…`Y-m-t` cairia no mês corrente — datas futuras
+     * e relatório oficial vazio, embora 16–fim do mês anterior tenha dados.
+     */
+    private function mesDoPeriodo(?\DateTimeInterface $ref = null): \DateTimeImmutable
+    {
+        $hoje = $ref instanceof \DateTimeImmutable
+            ? $ref
+            : ($ref instanceof \DateTimeInterface
+                ? \DateTimeImmutable::createFromInterface($ref)
+                : new \DateTimeImmutable('now'));
+
+        if ($this->periodo === '2' && (int) $hoje->format('j') < 16) {
+            return $hoje->modify('first day of last month');
+        }
+
+        return $hoje;
+    }
+
+    /**
      * @return array{0: string, 1: string} Y-m-d
      */
-    private function datasPeriodoIso(): array
+    private function datasPeriodoIso(?\DateTimeInterface $ref = null): array
     {
-        $hoje = new \DateTimeImmutable('now');
+        $mes = $this->mesDoPeriodo($ref);
         if ($this->periodo === '1') {
-            return [$hoje->format('Y-m-01'), $hoje->format('Y-m-15')];
+            return [$mes->format('Y-m-01'), $mes->format('Y-m-15')];
         }
-        $ultimo = (int) $hoje->format('t');
+        $ultimo = (int) $mes->format('t');
 
-        return [$hoje->format('Y-m-16'), $hoje->format('Y-m-').str_pad((string) $ultimo, 2, '0', STR_PAD_LEFT)];
+        return [$mes->format('Y-m-16'), $mes->format('Y-m-').str_pad((string) $ultimo, 2, '0', STR_PAD_LEFT)];
     }
 
     /**
      * @return array{0: string, 1: string} d/m/Y (API Tutory)
      */
-    private function datasPeriodoBr(): array
+    private function datasPeriodoBr(?\DateTimeInterface $ref = null): array
     {
-        [$ini, $fim] = $this->datasPeriodoIso();
+        [$ini, $fim] = $this->datasPeriodoIso($ref);
 
         return [
             \DateTimeImmutable::createFromFormat('Y-m-d', $ini)->format('d/m/Y'),
@@ -781,7 +803,7 @@ class CoachReportDownloader
             '--url-horas-liquidas', $urlsPorModelo['horas-liquidas'],
             '--url-questoes', $urlsPorModelo['questoes'],
             '--url-progresso', $urlsPorModelo['progresso'],
-            '--rotulo-periodo', RelatorioConsolidadoLayout::rotuloPeriodo($this->periodo),
+            '--rotulo-periodo', RelatorioConsolidadoLayout::rotuloPeriodo($this->periodo, $this->mesDoPeriodo()),
         ];
         $cookie = $this->cookieHeader();
         if ($cookie !== '') {
@@ -1078,7 +1100,7 @@ class CoachReportDownloader
             $dompdf->render();
             RelatorioConsolidadoLayout::aplicarCabecalhoRodape(
                 $dompdf,
-                RelatorioConsolidadoLayout::rotuloPeriodo($this->periodo)
+                RelatorioConsolidadoLayout::rotuloPeriodo($this->periodo, $this->mesDoPeriodo())
             );
             $bytes = $dompdf->output() ?? '';
             if ($bytes === '' || strlen($bytes) < 500) {

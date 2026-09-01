@@ -102,8 +102,9 @@ Se `PASTA_DOWNLOAD` estiver vazio, usa `public/pdfs`.
 ## Uso
 
 ```bash
-# Regenerar só a Giovanna (quinzena atual):
-# período 1 = dias 01–15; período 2 = dia 16 até o último dia do mês
+# Regenerar só a Giovanna:
+# período 1 = dias 01–15 do mês corrente
+# período 2 = dia 16 até o último dia do mês (no dia 1–15, usa o mês anterior)
 php artisan tutory:baixar-relatorios --periodo=1 --teste
 php artisan tutory:baixar-relatorios --periodo=2 --teste
 ```
@@ -125,8 +126,8 @@ Em `routes/console.php`:
 
 | Job | Comando | Quando |
 |-----|---------|--------|
-| Periodo 1 | `tutory:baixar-relatorios --periodo=1` | Dia **16** de cada mês, **00:00** |
-| Periodo 2 | `tutory:baixar-relatorios --periodo=2` | **Último dia** do mês, **00:00** |
+| Periodo 1 | `tutory:baixar-relatorios --periodo=1` | Dia **16** de cada mês, **10:30** |
+| Periodo 2 | `tutory:baixar-relatorios --periodo=2` | Dia **1** do mês seguinte, **10:30** (usa 16–fim do mês que acabou) |
 
 No servidor (cron):
 
