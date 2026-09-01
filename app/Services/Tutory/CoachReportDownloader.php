@@ -2402,9 +2402,8 @@ HTML;
     }
 
     /**
-     * CSS do consolidado Dompdf. Sem fundo no body e sem border-radius:
-     * o Dompdf pinta esses boxes de novo em cada página e deixa um bloco
-     * cinza vazio no rodapé.
+     * CSS do consolidado Dompdf. Sem fundo cinza no body.
+     * border-radius fica só nos cards (kpi), não no casco da página.
      */
     private function cssPdfConsolidado(string $fontCss, string $pieCss): string
     {
@@ -2591,8 +2590,229 @@ HTML;
 
         $data = $this->normalizarCoresDataset($data);
         $data = $this->aplicarDatalabelsOficiais($data, $canvasId);
+        $data = $this->aplicarIdentidadeVisualGrafico($data);
+        if ($this->eGraficoRitmo($canvasId)) {
+            $data = $this->aplicarBarrasRitmoEstudos($data);
+        }
 
-        return $this->aplicarIdentidadeVisualGrafico($data);
+        return $data;
+    }
+
+    private function eGraficoRitmo(string $canvasId): bool
+    {
+        return in_array($canvasId, ['chart_line_comparativo', 'chart_horas_diarias'], true);
+    }
+
+    /**
+     * @return list<string> datas compactas d/m do período real
+     */
+    private function datasCompactasDoPeriodo(?\DateTimeInterface $ref = null): array
+    {
+        [$ini, $fim] = $this->datasPeriodoIso($ref);
+        $d1 = new \DateTimeImmutable($ini);
+        $d2 = new \DateTimeImmutable($fim);
+        $out = [];
+        for ($d = $d1; $d <= $d2; $d = $d->modify('+1 day')) {
+            $out[] = $d->format('d/m');
+        }
+
+        return $out;
+    }
+
+    private function chaveDataRotulo(mixed $label): ?string
+    {
+        if (is_array($label)) {
+            $label = implode(' ', array_map(static fn ($p): string => (string) $p, $label));
+        }
+        if (! is_scalar($label)) {
+            return null;
+        }
+        $texto = PdfDatas::textoParaBr((string) $label);
+        if (! preg_match('#(\d{1,2})/(\d{1,2})(?:/\d{2,4})?#', $texto, $m)) {
+            return null;
+        }
+
+        return str_pad((string) ((int) $m[1]), 2, '0', STR_PAD_LEFT)
+            .'/'.str_pad((string) ((int) $m[2]), 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Alinha séries às datas reais do período: não inventa zero, não descarta zero.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  list<string>  $datas
+     * @return array<string, mixed>
+     */
+    private function alinharSeriesAsDatas(array $data, array $datas): array
+    {
+        if ($datas === [] || ! isset($data['data']['labels']) || ! is_array($data['data']['labels'])) {
+            return $data;
+        }
+
+        $indicePorData = [];
+        foreach ($data['data']['labels'] as $i => $label) {
+            $chave = $this->chaveDataRotulo($label);
+            if ($chave !== null) {
+                $indicePorData[$chave] = $i;
+            }
+        }
+        if ($indicePorData === []) {
+            return $data;
+        }
+
+        $datasets = $data['data']['datasets'] ?? [];
+        if (! is_array($datasets)) {
+            return $data;
+        }
+
+        $novos = [];
+        foreach ($datasets as $ds) {
+            if (! is_array($ds)) {
+                continue;
+            }
+            $serie = is_array($ds['data'] ?? null) ? $ds['data'] : [];
+            $alinhada = [];
+            foreach ($datas as $dia) {
+                if (! isset($indicePorData[$dia])) {
+                    $alinhada[] = null;
+
+                    continue;
+                }
+                $valor = $serie[$indicePorData[$dia]] ?? null;
+                $alinhada[] = $valor;
+            }
+            $ds['data'] = $alinhada;
+            $novos[] = $ds;
+        }
+
+        $data['data']['labels'] = $datas;
+        $data['data']['datasets'] = $novos;
+
+        return $data;
+    }
+
+    /**
+     * Ritmo de estudos: linhas → barras verticais agrupadas, uma data real por grupo.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function aplicarBarrasRitmoEstudos(array $data): array
+    {
+        $data = $this->alinharSeriesAsDatas($data, $this->datasCompactasDoPeriodo());
+        $labels = is_array($data['data']['labels'] ?? null) ? $data['data']['labels'] : [];
+        $n = max(1, count($labels));
+        $paleta = RelatorioConsolidadoLayout::paletaRitmo();
+
+        $data['type'] = 'bar';
+        $data['options'] = is_array($data['options'] ?? null) ? $data['options'] : [];
+        $data['options']['plugins'] = is_array($data['options']['plugins'] ?? null)
+            ? $data['options']['plugins']
+            : [];
+        $data['options']['layout'] = is_array($data['options']['layout'] ?? null)
+            ? $data['options']['layout']
+            : [];
+
+        $cat = $n >= 16 ? 0.70 : ($n >= 14 ? 0.76 : 0.82);
+        $bar = $n >= 16 ? 0.80 : ($n >= 14 ? 0.82 : 0.85);
+        $tickSize = $n >= 16 ? 7 : 8;
+        $rotacao = $n >= 16 ? 15 : 0;
+
+        $max = 0.0;
+        if (isset($data['data']['datasets']) && is_array($data['data']['datasets'])) {
+            foreach ($data['data']['datasets'] as $i => $ds) {
+                if (! is_array($ds)) {
+                    continue;
+                }
+                $cor = $paleta[$i % count($paleta)];
+                $data['data']['datasets'][$i]['type'] = 'bar';
+                $data['data']['datasets'][$i]['fill'] = false;
+                $data['data']['datasets'][$i]['backgroundColor'] = $cor;
+                $data['data']['datasets'][$i]['borderColor'] = $cor;
+                $data['data']['datasets'][$i]['borderWidth'] = 0;
+                $data['data']['datasets'][$i]['categoryPercentage'] = $cat;
+                $data['data']['datasets'][$i]['barPercentage'] = $bar;
+                unset(
+                    $data['data']['datasets'][$i]['pointRadius'],
+                    $data['data']['datasets'][$i]['lineTension'],
+                    $data['data']['datasets'][$i]['spanGaps']
+                );
+                $data['data']['datasets'][$i]['datalabels'] = [
+                    'align' => 'end',
+                    'anchor' => 'end',
+                    'offset' => $i === 0 ? 2 : 10,
+                ];
+                foreach (is_array($ds['data'] ?? null) ? $ds['data'] : [] as $valor) {
+                    if (is_numeric($valor) && (float) $valor > $max) {
+                        $max = (float) $valor;
+                    }
+                }
+            }
+        }
+
+        $yMax = $max > 0 ? $max * 1.28 : 1;
+        $data['options']['scales'] = [
+            'xAxes' => [[
+                'stacked' => false,
+                'gridLines' => [
+                    'display' => false,
+                    'drawBorder' => false,
+                ],
+                'ticks' => [
+                    'autoSkip' => false,
+                    'maxTicksLimit' => $n,
+                    'maxRotation' => $rotacao,
+                    'minRotation' => 0,
+                    'fontSize' => $tickSize,
+                    'fontColor' => RelatorioConsolidadoLayout::TEXTO_SEC,
+                ],
+            ]],
+            'yAxes' => [[
+                'stacked' => false,
+                'gridLines' => [
+                    'color' => 'rgba(15, 23, 42, 0.06)',
+                    'drawBorder' => false,
+                    'lineWidth' => 0.5,
+                ],
+                'ticks' => [
+                    'beginAtZero' => true,
+                    'suggestedMax' => $yMax,
+                    'fontSize' => 9,
+                    'fontColor' => RelatorioConsolidadoLayout::TEXTO_SEC,
+                ],
+            ]],
+        ];
+
+        $data['options']['legend'] = [
+            'display' => true,
+            'labels' => [
+                'boxWidth' => 10,
+                'fontSize' => 10,
+                'fontColor' => RelatorioConsolidadoLayout::TEXTO_SEC,
+            ],
+        ];
+        $data['options']['plugins']['datalabels'] = [
+            'display' => true,
+            'anchor' => 'end',
+            'align' => 'end',
+            'clamp' => true,
+            'clip' => false,
+            'color' => RelatorioConsolidadoLayout::AZUL,
+            'backgroundColor' => 'rgba(255,255,255,0.82)',
+            'borderWidth' => 0,
+            'padding' => 1,
+            'font' => ['size' => 7, 'weight' => 'bold'],
+            'formatter' => '__DATALABEL_HOURS_BAR__',
+        ];
+        $padding = is_array($data['options']['layout']['padding'] ?? null)
+            ? $data['options']['layout']['padding']
+            : [];
+        $data['options']['layout']['padding'] = array_merge($padding, [
+            'top' => max((int) ($padding['top'] ?? 0), 22),
+            'bottom' => max((int) ($padding['bottom'] ?? 0), 8),
+        ]);
+
+        return $data;
     }
 
     /**
@@ -2961,6 +3181,7 @@ HTML;
                 '"__DATALABEL_QUESTOES__"' => 'function(value){return Number(value).toFixed(0)+" questões";}',
                 '"__DATALABEL_PERCENT__"' => 'function(value){return Number(value).toFixed(0)+"%";}',
                 '"__DATALABEL_HOURS__"' => 'function(value){var n=Number(value&&typeof value==="object"&&value.y!=null?value.y:value);if(!isFinite(n))return "";var r=Math.round(n*10)/10;if(r===0)return "";return (Math.abs(r%1)<1e-9?String(Math.round(r)):String(r).replace(".",","))+"h";}',
+                '"__DATALABEL_HOURS_BAR__"' => 'function(value){if(value==null||value==="")return "";var n=Number(value&&typeof value==="object"&&value.y!=null?value.y:value);if(!isFinite(n))return "";var r=Math.round(n*10)/10;return (Math.abs(r%1)<1e-9?String(Math.round(r)):String(r).replace(".",","))+"h";}',
                 '"__DATALABEL_VALUE__"' => 'function(value){var n=Number(value&&typeof value==="object"&&value.y!=null?value.y:value);if(!isFinite(n))return "";var r=Math.round(n*10)/10;if(r===0)return "";return Math.abs(r%1)<1e-9?String(Math.round(r)):String(r).replace(".",",");}',
                 '"__DATALABEL_BUBBLE_PERCENT__"' => 'function(value){return value&&value.r!=null?Number(value.r*10).toFixed(0)+"%":"";}',
                 // legado

@@ -15,6 +15,8 @@ final class RelatorioConsolidadoLayout
 {
     public const AZUL = '#001D3D';
 
+    public const AZUL_CLARO = '#3D6B99';
+
     public const DOURADO = '#BF8F00';
 
     public const VERMELHO = '#B42318';
@@ -107,6 +109,16 @@ final class RelatorioConsolidadoLayout
         return [self::AZUL, self::DOURADO, '#64748B', self::VERDE];
     }
 
+    /**
+     * Navy + azul mais claro — só os gráficos de Ritmo de estudos.
+     *
+     * @return list<string>
+     */
+    public static function paletaRitmo(): array
+    {
+        return [self::AZUL, self::AZUL_CLARO];
+    }
+
     public static function secao(string $titulo, string $intro, string $body, string $classe = ''): string
     {
         if (trim($body) === '') {
@@ -149,7 +161,7 @@ final class RelatorioConsolidadoLayout
     /**
      * @param  list<array{label: string, value: string, destaque?: bool}>  $items
      */
-    public static function cards(array $items): string
+    public static function cards(array $items, int $maxCols = 4): string
     {
         $items = array_values(array_filter(
             $items,
@@ -160,7 +172,8 @@ final class RelatorioConsolidadoLayout
         }
 
         $n = count($items);
-        $cols = $n <= 4 ? max($n, 1) : ($n <= 6 ? 3 : 4);
+        $maxCols = max(1, $maxCols);
+        $cols = $n <= $maxCols ? max($n, 1) : $maxCols;
         $linhas = array_chunk($items, $cols);
         $html = '<table class="mn-kpis"><tbody>';
         foreach ($linhas as $linha) {
@@ -168,9 +181,11 @@ final class RelatorioConsolidadoLayout
             $span = $cols - count($linha);
             foreach ($linha as $i => $item) {
                 $colspan = ($i === count($linha) - 1 && $span > 0) ? ' colspan="'.($span + 1).'"' : '';
+                $valor = (string) $item['value'];
+                $valorCls = mb_strlen($valor) > 12 ? 'kpi-value kpi-long' : 'kpi-value';
                 $html .= '<td class="kpi"'.$colspan.'>'
                     .'<div class="kpi-label">'.htmlspecialchars((string) $item['label'], ENT_QUOTES, 'UTF-8').'</div>'
-                    .'<div class="kpi-value">'.htmlspecialchars((string) $item['value'], ENT_QUOTES, 'UTF-8').'</div>'
+                    .'<div class="'.$valorCls.'">'.htmlspecialchars($valor, ENT_QUOTES, 'UTF-8').'</div>'
                     .'</td>';
             }
             $html .= '</tr>';
@@ -245,18 +260,18 @@ final class RelatorioConsolidadoLayout
      */
     public static function insights(array $paragrafos): string
     {
-        $html = '';
+        $items = [];
         foreach ($paragrafos as $p) {
             $p = trim(preg_replace('/\s+/u', ' ', (string) $p) ?? '');
             if ($p === '' || preg_match('/painel de insights/iu', $p)) {
                 continue;
             }
             foreach (self::extrairParesInsight($p) as $par) {
-                $html .= self::blocoInsight($par[0], $par[1]);
+                $items[] = ['label' => $par[0], 'value' => $par[1]];
             }
         }
 
-        return $html;
+        return self::cards($items, 3);
     }
 
     public static function alunoNome(string $nome): string
@@ -283,7 +298,6 @@ final class RelatorioConsolidadoLayout
         $ouro = self::DOURADO;
         $texto = self::TEXTO;
         $sec = self::TEXTO_SEC;
-        $borda = self::BORDA;
         $zebra = self::ZEBRA;
 
         return <<<CSS
@@ -301,29 +315,29 @@ img{max-width:100%; height:auto;}
 .mn-sec-intro{font-size:10.5pt; font-weight:400; color:{$sec}; margin:7px 0 0; padding-left:16px; page-break-after:avoid;}
 .mn-sec-body{margin-top:14px;}
 .mn-sec-keep{page-break-inside:avoid;}
-.mn-sec-insights{page-break-inside:avoid;}
+.mn-sec-insights{page-break-inside:auto;}
 .mn-sec-insights .mn-sec-head,.mn-sec-table .mn-sec-head{page-break-after:avoid;}
-.mn-sec-insights .mn-insight-item:first-child,.mn-sec-insights .mn-insight-block:nth-child(-n+2){page-break-before:avoid;}
+.mn-sec-insights .mn-kpis{border-spacing:14px 14px;}
 .mn-kpis{width:100%; border-collapse:separate; border-spacing:14px 0; table-layout:fixed; margin:0 0 8px;}
-.mn-kpis td.kpi{background:#ffffff; border:1px solid {$borda}; padding:18px 18px; vertical-align:top;}
+.mn-kpis td.kpi{background:#ffffff; border:1.5pt solid {$ouro}; border-radius:9px; padding:18px 18px; vertical-align:top; page-break-inside:avoid;}
 .kpi-label{font-size:8.5pt; font-weight:500; color:{$sec}; letter-spacing:0.04em; text-transform:uppercase; margin:0 0 8px; line-height:1.25;}
-.kpi-value{font-size:19pt; font-weight:700; color:{$azul}; line-height:1.1;}
+.kpi-value{font-size:19pt; font-weight:700; color:{$azul}; line-height:1.2; text-align:center; word-wrap:break-word; overflow-wrap:break-word; word-break:normal;}
+.kpi-long{font-size:11pt; font-weight:600; line-height:1.35;}
 .mn-chart{margin:8px 0 16px; page-break-inside:avoid;}
 .mn-chart-title{font-size:11pt; font-weight:600; color:{$azul}; margin:0 0 8px;}
 .mn-chart-note{font-size:9.5pt; font-weight:400; color:{$sec}; margin:0 0 12px;}
 .chart{width:100%; max-width:100%; margin:8px 0 0;}
 {$pieCss}
-.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed; margin:0;}
+.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed; margin:0; border:1.25pt solid {$azul};}
 .mn-table thead{display:table-header-group;}
-.mn-table th,.mn-table td{height:auto;}
+.mn-table th,.mn-table td{height:auto; border:1.25pt solid {$azul};}
 .mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}
 .mn-table th.num{text-align:right;}
 .mn-table td.num{white-space:nowrap;}
 .mn-table td.mn-horas{white-space:nowrap;}
-.mn-table td{border-bottom:1px solid #EEF0F3; padding:9px 11px; vertical-align:middle; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; font-size:9pt; font-weight:400; line-height:1.45; white-space:normal;}
+.mn-table td{padding:9px 11px; vertical-align:middle; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; font-size:9pt; font-weight:400; line-height:1.45; white-space:normal;}
 .mn-table td.mn-assunto,.mn-table td.mn-disc,.mn-table td.mn-mod{white-space:normal; word-wrap:break-word; overflow-wrap:break-word;}
-.mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num{text-align:center;}
-.mn-table td.mn-assunto{text-align:justify;}
+.mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num,.mn-table td.mn-assunto{text-align:center;}
 .mn-table td.mn-pct{text-align:right;}
 .mn-table tr.z td{background:{$zebra};}
 .mn-table tr{page-break-inside:avoid; break-inside:avoid; height:auto;}
