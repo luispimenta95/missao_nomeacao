@@ -13,8 +13,8 @@ Artisan::command('inspire', function () {
 | Relatórios do Coach (Tutory)
 |--------------------------------------------------------------------------
 |
-| Periodo 1 (dias 01–15): todo dia 16 às 00:00
-| Periodo 2 (dia 16–fim): às 00:00 do último dia do mês
+| Periodo 1 (dias 01–15): todo dia 16 às 10:30
+| Periodo 2 (dia 16–fim do mês anterior): dia 1 às 10:30
 |
 | Requer cron no servidor: * * * * * php /path/to/artisan schedule:run
 |
