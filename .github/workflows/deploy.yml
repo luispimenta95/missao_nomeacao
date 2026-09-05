@@ -1,0 +1,24 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: easingthemes/ssh-deploy@v5.1.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_KEY }}
+          ARGS: "-avzr --delete"
+          SERVER_PORT: ${{ secrets.HOSTINGER_PORT }}
+          REMOTE_HOST: ${{ secrets.HOSTINGER_HOST }}
+          REMOTE_USER: ${{ secrets.HOSTINGER_USER }}
+          TARGET: "public_html/server/"
+          EXCLUDE: "/.git/, /node_modules/"
