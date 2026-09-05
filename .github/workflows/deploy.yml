@@ -20,5 +20,5 @@ jobs:
           REMOTE_PORT: ${{ secrets.HOSTINGER_PORT }}
           REMOTE_HOST: ${{ secrets.HOSTINGER_HOST }}
           REMOTE_USER: ${{ secrets.HOSTINGER_USER }}
-          TARGET: "public_html/server/"
+          TARGET: "domains/missaonomeacao.com.br/public_html/server/"
           EXCLUDE: "/.git/, /node_modules/"
