@@ -22,14 +22,12 @@ class InscricaoController extends Controller
             'turma_id' => 'required|exists:turmas,id',
         ]);
 
-        // Get turma
         $turma = Turma::findOrFail($data['turma_id']);
 
-        // Check if there are available slots
-        if ($turma->available_slots !== null && $turma->available_slots <= 0) {
+        if (! $turma->aceitaInscricao()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Não há mais vagas disponíveis para esta turma.'
+                'message' => 'Esta preparação não está aceitando novos alunos no momento.'
             ], 400);
         }
 
@@ -49,8 +47,8 @@ class InscricaoController extends Controller
         try {
             MailHelper::emailInscricao([
                 'nome' => $data['name'],
-                'tituloTurma' => $turma->title,
-                'url' => $turma->checkout_url,
+                'tituloTurma' => $turma->nomePublicoExibido(),
+                'url' => $turma->linkCta() ?: $turma->checkout_url,
             ], $data['email']);
         } catch (\Throwable $e) {
             Log::warning('Falha ao enviar e-mail de inscrição', [
@@ -59,12 +57,13 @@ class InscricaoController extends Controller
             ]);
         }
 
-        // Redirect to checkout URL
-        if ($turma->checkout_url) {
+        $redirectUrl = $turma->linkCta();
+
+        if ($redirectUrl) {
             return response()->json([
                 'success' => true,
-                'redirect_url' => $turma->checkout_url,
-                'message' => 'Inscrição realizada com sucesso! Redirecionando para o checkout...'
+                'redirect_url' => $redirectUrl,
+                'message' => 'Inscrição realizada com sucesso! Redirecionando...'
             ]);
         }
 

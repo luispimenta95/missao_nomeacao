@@ -2,108 +2,86 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\TurmaRequest;
 use App\Models\Turma;
-use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class TurmaController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        $turmas = Turma::orderBy('status', 'asc')->orderBy('created_at', 'desc')->get();
+        $turmas = Turma::query()
+            ->orderByDesc('ativo')
+            ->orderBy('ordem_exibicao')
+            ->orderBy('title')
+            ->get();
+
         return view('admin.turmas.index', compact('turmas'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
-        return view('admin.turmas.create');
+        return view('admin.turmas.create', [
+            'turma' => new Turma([
+                'ativo' => true,
+                'exibir_no_site' => true,
+                'aceitar_novos_alunos' => true,
+                'grupo_exibicao' => Turma::GRUPO_TURMA_DIRECIONADA,
+                'acao_principal' => Turma::ACAO_CHECKOUT,
+                'ordem_exibicao' => (int) Turma::max('ordem_exibicao') + 1,
+            ]),
+        ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(TurmaRequest $request)
     {
-        $data = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'logo' => 'nullable|file|mimes:png,jpg,jpeg,svg|max:5120',
-            'checkout_url' => 'required|url|max:500',
-            'start_date' => 'nullable|date',
-            'available_slots' => 'nullable|integer|min:1',
-            'status' => 'required|in:aberta,fechada,completa',
-        ]);
+        $data = $request->payload();
+        $data['logo_path'] = $this->storeLogo($request, $data['title']);
 
-        $logoPath = null;
-        if ($request->hasFile('logo')) {
-            $file = $request->file('logo');
-            $filename = Str::slug($data['title']) . '-' . time() . '.' . $file->getClientOriginalExtension();
-            $logoPath = $file->storeAs('turmas', $filename, 'public');
-            $data['logo_path'] = $logoPath;
-        }
-
-        unset($data['logo']);
         Turma::create($data);
 
-        return redirect()->route('turmas.index')->with('success', 'Turma criada com sucesso.');
+        return redirect()->route('turmas.index')->with('success', 'Turma criada. As alterações passam a valer no site Missão Nomeação.');
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Turma $turma)
     {
         return view('admin.turmas.show', compact('turma'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(Turma $turma)
     {
         return view('admin.turmas.edit', compact('turma'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Turma $turma)
+    public function update(TurmaRequest $request, Turma $turma)
     {
-        $data = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'logo' => 'nullable|file|mimes:png,jpg,jpeg,svg|max:5120',
-            'checkout_url' => 'required|url|max:500',
-            'start_date' => 'nullable|date',
-            'available_slots' => 'nullable|integer|min:1',
-            'status' => 'required|in:aberta,fechada,completa',
-        ]);
+        $data = $request->payload();
 
         if ($request->hasFile('logo')) {
-            $file = $request->file('logo');
-            $filename = Str::slug($data['title']) . '-' . time() . '.' . $file->getClientOriginalExtension();
-            $logoPath = $file->storeAs('turmas', $filename, 'public');
-            $data['logo_path'] = $logoPath;
+            $data['logo_path'] = $this->storeLogo($request, $data['title']);
         }
 
-        unset($data['logo']);
         $turma->update($data);
 
-        return redirect()->route('turmas.index')->with('success', 'Turma atualizada com sucesso.');
+        return redirect()->route('turmas.index')->with('success', 'Turma atualizada. O site Missão Nomeação já reflete essa configuração.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Turma $turma)
     {
         $turma->delete();
+
         return redirect()->route('turmas.index')->with('success', 'Turma deletada com sucesso.');
+    }
+
+    private function storeLogo(TurmaRequest $request, string $title): ?string
+    {
+        if (! $request->hasFile('logo')) {
+            return null;
+        }
+
+        $file = $request->file('logo');
+        $filename = Str::slug($title).'-'.time().'.'.$file->getClientOriginalExtension();
+
+        return $file->storeAs('turmas', $filename, 'public');
     }
 }

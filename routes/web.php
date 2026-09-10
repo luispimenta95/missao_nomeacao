@@ -24,7 +24,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::get('/', function () {
     $materials = Material::with('turmas')->orderBy('created_at', 'desc')->get();
-    $turmas = Turma::where('status', 'aberta')->orderBy('created_at', 'desc')->get();
+    $turmas = Turma::query()->naMentoria()->ordenado()->get();
 
     return view('landing', compact('materials', 'turmas'));
 });

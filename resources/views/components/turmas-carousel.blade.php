@@ -14,7 +14,7 @@
                                         <!-- Logo Section -->
                                         <div class="h-48 bg-gray-100 flex items-center justify-center border-b border-gray-200">
                                             @if($turma->logo_path)
-                                                <img src="{{ asset('storage/' . $turma->logo_path) }}" alt="{{ $turma->title }}" class="h-full w-full object-contain p-4">
+                                                <img src="{{ asset('storage/' . $turma->logo_path) }}" alt="{{ $turma->nomePublicoExibido() }}" class="h-full w-full object-contain p-4">
                                             @else
                                                 <div class="text-gray-400 text-center">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -27,7 +27,17 @@
 
                                         <!-- Content Section -->
                                         <div class="p-6 flex flex-col flex-grow">
-                                            <h3 class="text-xl font-bold text-primary mb-2">{{ $turma->title }}</h3>
+                                            <div class="flex flex-wrap gap-2 mb-3">
+                                                <span class="inline-block px-2 py-1 rounded text-[11px] font-semibold tracking-wide
+                                                    @if($turma->estagio() === 'inscricoes_abertas') bg-green-100 text-green-800
+                                                    @elseif($turma->estagio() === 'lista_interesse') bg-blue-100 text-blue-800
+                                                    @else bg-yellow-100 text-yellow-800
+                                                    @endif">{{ $turma->badgePublico() }}</span>
+                                                @if($turma->momentoConcursoPublico())
+                                                    <span class="inline-block px-2 py-1 rounded text-[11px] font-semibold tracking-wide bg-yellow-600/15 text-yellow-700">{{ $turma->momentoConcursoPublico() }}</span>
+                                                @endif
+                                            </div>
+                                            <h3 class="text-xl font-bold text-primary mb-2">{{ $turma->nomePublicoExibido() }}</h3>
 
                                             @if($turma->description)
                                                 <p class="text-gray-600 text-sm mb-4 flex-grow line-clamp-3">{{ $turma->description }}</p>
@@ -35,28 +45,26 @@
 
                                             <!-- Info Footer -->
                                             <div class="pt-4 border-t border-gray-200 space-y-3">
-                                                @if($turma->start_date)
-                                                    <div class="flex items-center text-sm text-gray-600">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                        </svg>
-                                                        <span>Início: {{ $turma->start_date->format('d/m/Y') }}</span>
-                                                    </div>
-                                                @endif
-
-                                                @if($turma->available_slots)
-                                                    <div class="flex items-center text-sm text-gray-600">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.856-1.487M15 10a3 3 0 11-6 0 3 3 0 016 0zM6 20h12a3 3 0 003-3v-2a3 3 0 00-3-3H6a3 3 0 00-3 3v2a3 3 0 003 3z" />
-                                                        </svg>
-                                                        <span>{{ $turma->available_slots }} vagas</span>
-                                                    </div>
-                                                @endif
-
-                                                <div class="pt-4">
-                                                    <button type="button" onclick="openInscricaoModal({{ $turma->id }}, '{{ addslashes($turma->title) }}')" class="inline-block px-4 py-2 bg-primary text-white rounded-full text-sm font-semibold hover:bg-opacity-90 transition">
-                                                        Inscrever-se
-                                                    </button>
+                                                <div class="pt-2">
+                                                    @php
+                                                        $popupOpcoes = $turma->popupOpcoesNormalizadas();
+                                                    @endphp
+                                                    @if(count($popupOpcoes) > 0)
+                                                        <button type="button"
+                                                            data-popup-options='@json($popupOpcoes)'
+                                                            onclick="openTurmaPopup(this)"
+                                                            class="inline-block px-4 py-2 bg-primary text-white rounded-full text-sm font-semibold hover:bg-opacity-90 transition">
+                                                            {{ $turma->textoCtaPublico() }}
+                                                        </button>
+                                                    @elseif($turma->acao_principal === 'checkout' && $turma->aceitaInscricao())
+                                                        <button type="button" onclick="openInscricaoModal({{ $turma->id }}, '{{ addslashes($turma->nomePublicoExibido()) }}')" class="inline-block px-4 py-2 bg-primary text-white rounded-full text-sm font-semibold hover:bg-opacity-90 transition">
+                                                            {{ $turma->textoCtaPublico() }}
+                                                        </button>
+                                                    @elseif($turma->linkCta())
+                                                        <a href="{{ $turma->linkCta() }}" target="_blank" rel="noopener" class="inline-block px-4 py-2 bg-primary text-white rounded-full text-sm font-semibold hover:bg-opacity-90 transition">
+                                                            {{ $turma->textoCtaPublico() }}
+                                                        </a>
+                                                    @endif
                                                 </div>
                                             </div>
                                         </div>
@@ -98,6 +106,39 @@
         @endif
     </div>
 </section>
+
+<div id="turmaPopup" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
+    <div class="bg-gray-900 rounded-2xl w-full max-w-md p-6 mx-4 text-white border border-yellow-600">
+        <div class="flex items-start justify-between mb-4">
+            <h4 class="text-lg font-bold text-primary">Escolha a opção</h4>
+            <button type="button" id="closeTurmaPopup" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+        <div id="turmaPopupOptions" class="space-y-3"></div>
+    </div>
+</div>
+
+<script>
+    window.openTurmaPopup = function(button) {
+        const modal = document.getElementById('turmaPopup');
+        const list = document.getElementById('turmaPopupOptions');
+        if (!modal || !list) return;
+        const options = JSON.parse(button.getAttribute('data-popup-options') || '[]');
+        list.innerHTML = '';
+        options.forEach(function(option) {
+            const link = document.createElement('a');
+            link.href = option.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.className = 'block w-full text-center px-4 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-opacity-90';
+            link.textContent = option.label;
+            list.appendChild(link);
+        });
+        modal.classList.remove('hidden');
+    };
+    document.getElementById('closeTurmaPopup')?.addEventListener('click', function() {
+        document.getElementById('turmaPopup')?.classList.add('hidden');
+    });
+</script>
 
 <style>
     /* Hide scrollbar for mobile while keeping functionality */
