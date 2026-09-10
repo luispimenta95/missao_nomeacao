@@ -238,6 +238,16 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('php artisan migrate --force', $yml);
     }
 
+    public function test_deploy_nao_apaga_o_env_do_servidor(): void
+    {
+        $yml = (string) file_get_contents(base_path('.github/workflows/deploy.yml'));
+        $this->assertStringContainsString('--exclude=.env', $yml);
+        $this->assertStringContainsString('.env.backup', $yml);
+        $this->assertStringContainsString('if [ ! -f .env ]; then', $yml);
+        $this->assertStringContainsString('SCRIPT_AFTER_REQUIRED:', $yml);
+        $this->assertStringNotContainsString('TARGET: "domains/missaonomeacao.com.br/public_html/"', $yml);
+    }
+
     public function test_css_do_consolidado_nao_deixa_bloco_cinza_no_rodape(): void
     {
         $downloader = new CoachReportDownloader('1', false, static function (): void {});

@@ -16,17 +16,24 @@ jobs:
         uses: easingthemes/ssh-deploy@v5.1.0
         with:
           SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_KEY }}
-          ARGS: "-avzr --delete"
+          # --delete apaga no servidor o que não está no git. .env e sqlite
+          # existem só na Hostinger — o --exclude precisa estar nos ARGS
+          # (ssh-deploy quebra ARGS por espaço; não use aspas internas).
+          ARGS: "-avzr --delete --exclude=.env --exclude=.env.backup --exclude=.env.local --exclude=.env.production"
           REMOTE_PORT: ${{ secrets.HOSTINGER_PORT }}
           REMOTE_HOST: ${{ secrets.HOSTINGER_HOST }}
           REMOTE_USER: ${{ secrets.HOSTINGER_USER }}
           TARGET: "domains/missaonomeacao.com.br/public_html/server/"
-          EXCLUDE: "/.git/, /node_modules/, /vendor/, /.env, /database/*.sqlite*, /storage/logs/, /storage/framework/cache/, /storage/framework/sessions/, /storage/framework/views/"
+          EXCLUDE: "/.git/, /node_modules/, /vendor/, .env, .env.backup, .env.local, .env.production, /database/*.sqlite*, /storage/logs/, /storage/framework/cache/, /storage/framework/sessions/, /storage/framework/views/"
+          SCRIPT_AFTER_REQUIRED: "true"
           SCRIPT_AFTER: |
             cd domains/missaonomeacao.com.br/public_html/server
+            if [ ! -f .env ]; then
+              echo "ERRO: .env ausente em public_html/server. O rsync --delete nao deve apagar este arquivo."
+              exit 1
+            fi
             composer install --no-dev --no-interaction --optimize-autoloader
             if [ ! -f database/database.sqlite ]; then
               touch database/database.sqlite
             fi
             php artisan migrate --force --no-interaction
-
