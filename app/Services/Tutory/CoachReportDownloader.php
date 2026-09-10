@@ -2591,11 +2591,20 @@ HTML;
         $data = $this->normalizarCoresDataset($data);
         $data = $this->aplicarDatalabelsOficiais($data, $canvasId);
         $data = $this->aplicarIdentidadeVisualGrafico($data);
-        if ($this->eGraficoRitmo($canvasId)) {
-            $data = $this->aplicarBarrasRitmoEstudos($data);
+        if ($this->eGraficoBarrasAgrupadas($canvasId)) {
+            $data = $this->aplicarBarrasAgrupadasInstitucionais($data, $canvasId);
         }
 
         return $data;
+    }
+
+    private function eGraficoBarrasAgrupadas(string $canvasId): bool
+    {
+        return in_array($canvasId, [
+            'chart_line_comparativo',
+            'chart_horas_diarias',
+            'chart_questoes_dia',
+        ], true);
     }
 
     private function eGraficoRitmo(string $canvasId): bool
@@ -2692,17 +2701,26 @@ HTML;
     }
 
     /**
-     * Ritmo de estudos: linhas → barras verticais agrupadas, uma data real por grupo.
+     * Ritmo de estudos / acertos × erros: barras verticais agrupadas, uma data real por grupo.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private function aplicarBarrasRitmoEstudos(array $data): array
     {
+        return $this->aplicarBarrasAgrupadasInstitucionais($data, 'chart_line_comparativo');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function aplicarBarrasAgrupadasInstitucionais(array $data, string $canvasId): array
+    {
         $data = $this->alinharSeriesAsDatas($data, $this->datasCompactasDoPeriodo());
         $labels = is_array($data['data']['labels'] ?? null) ? $data['data']['labels'] : [];
         $n = max(1, count($labels));
-        $paleta = RelatorioConsolidadoLayout::paletaRitmo();
+        $eHoras = $this->eGraficoRitmo($canvasId);
 
         $data['type'] = 'bar';
         $data['options'] = is_array($data['options'] ?? null) ? $data['options'] : [];
@@ -2715,8 +2733,9 @@ HTML;
 
         $cat = $n >= 16 ? 0.70 : ($n >= 14 ? 0.76 : 0.82);
         $bar = $n >= 16 ? 0.80 : ($n >= 14 ? 0.82 : 0.85);
-        $tickSize = $n >= 16 ? 7 : 8;
+        $tickSize = $n >= 16 ? 8 : 10;
         $rotacao = $n >= 16 ? 15 : 0;
+        $navy = RelatorioConsolidadoLayout::AZUL;
 
         $max = 0.0;
         if (isset($data['data']['datasets']) && is_array($data['data']['datasets'])) {
@@ -2724,7 +2743,7 @@ HTML;
                 if (! is_array($ds)) {
                     continue;
                 }
-                $cor = $paleta[$i % count($paleta)];
+                $cor = RelatorioConsolidadoLayout::corSerieBarra((string) ($ds['label'] ?? ''), $i);
                 $data['data']['datasets'][$i]['type'] = 'bar';
                 $data['data']['datasets'][$i]['fill'] = false;
                 $data['data']['datasets'][$i]['backgroundColor'] = $cor;
@@ -2732,15 +2751,20 @@ HTML;
                 $data['data']['datasets'][$i]['borderWidth'] = 0;
                 $data['data']['datasets'][$i]['categoryPercentage'] = $cat;
                 $data['data']['datasets'][$i]['barPercentage'] = $bar;
+                $data['data']['datasets'][$i]['borderRadius'] = 3;
+                $data['data']['datasets'][$i]['borderSkipped'] = 'bottom';
+                $data['data']['datasets'][$i]['shadowOffsetX'] = 0;
+                $data['data']['datasets'][$i]['shadowOffsetY'] = 0;
+                $data['data']['datasets'][$i]['shadowBlur'] = 0;
                 unset(
                     $data['data']['datasets'][$i]['pointRadius'],
                     $data['data']['datasets'][$i]['lineTension'],
                     $data['data']['datasets'][$i]['spanGaps']
                 );
                 $data['data']['datasets'][$i]['datalabels'] = [
-                    'align' => 'end',
+                    'align' => $i === 0 ? 'left' : 'right',
                     'anchor' => 'end',
-                    'offset' => $i === 0 ? 2 : 10,
+                    'offset' => $i === 0 ? 4 : 8,
                 ];
                 foreach (is_array($ds['data'] ?? null) ? $ds['data'] : [] as $valor) {
                     if (is_numeric($valor) && (float) $valor > $max) {
@@ -2750,7 +2774,12 @@ HTML;
             }
         }
 
-        $yMax = $max > 0 ? $max * 1.28 : 1;
+        $yMax = $max > 0 ? $max * 1.32 : 1;
+        $eixo = [
+            'fontSize' => $tickSize,
+            'fontColor' => $navy,
+            'fontStyle' => '600',
+        ];
         $data['options']['scales'] = [
             'xAxes' => [[
                 'stacked' => false,
@@ -2758,28 +2787,27 @@ HTML;
                     'display' => false,
                     'drawBorder' => false,
                 ],
-                'ticks' => [
+                'ticks' => array_merge($eixo, [
                     'autoSkip' => false,
                     'maxTicksLimit' => $n,
                     'maxRotation' => $rotacao,
                     'minRotation' => 0,
                     'fontSize' => $tickSize,
-                    'fontColor' => RelatorioConsolidadoLayout::TEXTO_SEC,
-                ],
+                ]),
             ]],
             'yAxes' => [[
                 'stacked' => false,
                 'gridLines' => [
-                    'color' => 'rgba(15, 23, 42, 0.06)',
+                    'color' => 'rgba(15, 23, 42, 0.08)',
                     'drawBorder' => false,
                     'lineWidth' => 0.5,
+                    'zeroLineColor' => 'rgba(15, 23, 42, 0.08)',
                 ],
-                'ticks' => [
+                'ticks' => array_merge($eixo, [
                     'beginAtZero' => true,
                     'suggestedMax' => $yMax,
-                    'fontSize' => 9,
-                    'fontColor' => RelatorioConsolidadoLayout::TEXTO_SEC,
-                ],
+                    'fontSize' => 10,
+                ]),
             ]],
         ];
 
@@ -2788,27 +2816,29 @@ HTML;
             'labels' => [
                 'boxWidth' => 10,
                 'fontSize' => 10,
-                'fontColor' => RelatorioConsolidadoLayout::TEXTO_SEC,
+                'fontColor' => $navy,
+                'fontStyle' => '600',
             ],
         ];
+        $data['options']['cornerRadius'] = 3;
         $data['options']['plugins']['datalabels'] = [
             'display' => true,
             'anchor' => 'end',
             'align' => 'end',
             'clamp' => true,
             'clip' => false,
-            'color' => RelatorioConsolidadoLayout::AZUL,
-            'backgroundColor' => 'rgba(255,255,255,0.82)',
+            'color' => $navy,
+            'backgroundColor' => 'rgba(255,255,255,0.88)',
             'borderWidth' => 0,
             'padding' => 1,
-            'font' => ['size' => 7, 'weight' => 'bold'],
-            'formatter' => '__DATALABEL_HOURS_BAR__',
+            'font' => ['size' => 8, 'weight' => '600'],
+            'formatter' => $eHoras ? '__DATALABEL_HOURS_BAR__' : '__DATALABEL_COUNT_BAR__',
         ];
         $padding = is_array($data['options']['layout']['padding'] ?? null)
             ? $data['options']['layout']['padding']
             : [];
         $data['options']['layout']['padding'] = array_merge($padding, [
-            'top' => max((int) ($padding['top'] ?? 0), 22),
+            'top' => max((int) ($padding['top'] ?? 0), 24),
             'bottom' => max((int) ($padding['bottom'] ?? 0), 8),
         ]);
 
@@ -3182,6 +3212,7 @@ HTML;
                 '"__DATALABEL_PERCENT__"' => 'function(value){return Number(value).toFixed(0)+"%";}',
                 '"__DATALABEL_HOURS__"' => 'function(value){var n=Number(value&&typeof value==="object"&&value.y!=null?value.y:value);if(!isFinite(n))return "";var r=Math.round(n*10)/10;if(r===0)return "";return (Math.abs(r%1)<1e-9?String(Math.round(r)):String(r).replace(".",","))+"h";}',
                 '"__DATALABEL_HOURS_BAR__"' => 'function(value){if(value==null||value==="")return "";var n=Number(value&&typeof value==="object"&&value.y!=null?value.y:value);if(!isFinite(n))return "";var r=Math.round(n*10)/10;return (Math.abs(r%1)<1e-9?String(Math.round(r)):String(r).replace(".",","))+"h";}',
+                '"__DATALABEL_COUNT_BAR__"' => 'function(value){if(value==null||value==="")return "";var n=Number(value&&typeof value==="object"&&value.y!=null?value.y:value);if(!isFinite(n))return "";return String(Math.round(n));}',
                 '"__DATALABEL_VALUE__"' => 'function(value){var n=Number(value&&typeof value==="object"&&value.y!=null?value.y:value);if(!isFinite(n))return "";var r=Math.round(n*10)/10;if(r===0)return "";return Math.abs(r%1)<1e-9?String(Math.round(r)):String(r).replace(".",",");}',
                 '"__DATALABEL_BUBBLE_PERCENT__"' => 'function(value){return value&&value.r!=null?Number(value.r*10).toFixed(0)+"%":"";}',
                 // legado

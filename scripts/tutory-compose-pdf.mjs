@@ -226,9 +226,13 @@ function aplicarDatasBrasileiras() {
   return { forcar };
 }
 
-/** Rótulos de horas nos vértices do gráfico de motivação (Chart.js v2). */
+/** Rótulos permanentes nos gráficos de barras agrupadas (Chart.js v2). */
 function labelHoursOnChartVertices() {
-  const hoursIds = new Set(['chart_horas_diarias', 'chart_line_comparativo']);
+  const chartIds = {
+    chart_horas_diarias: 'hours',
+    chart_line_comparativo: 'hours',
+    chart_questoes_dia: 'count',
+  };
   if (!window.Chart || !Chart.instances) return 0;
 
   function formatHourLabel(value) {
@@ -243,23 +247,42 @@ function labelHoursOnChartVertices() {
     return `${txt}h`;
   }
 
-  let n = 0;
+  function formatCountLabel(value) {
+    if (value == null || value === '') return '';
+    const raw = (value && typeof value === 'object' && 'y' in value) ? value.y : value;
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return '';
+    return String(Math.round(num));
+  }
+
+  function corSerie(label, index) {
+    const h = String(label || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z]+/g, '');
+    if (h.includes('erro') || h.includes('liquid') || h.includes('estudad')) return '#BF8F00';
+    if (h.includes('acerto') || h.includes('bruta') || h.includes('planejad')) return '#001D3D';
+    return index % 2 === 0 ? '#001D3D' : '#BF8F00';
+  }
+
+  let applied = 0;
   for (const k of Object.keys(Chart.instances)) {
     const inst = Chart.instances[k];
     const chart = inst.chart || inst;
     const canvas = inst.canvas || (chart && chart.canvas) || (inst.ctx && inst.ctx.canvas);
     const id = canvas && canvas.id ? canvas.id : '';
-    if (!hoursIds.has(id) || !chart || !chart.options) continue;
+    const kind = chartIds[id];
+    if (!kind || !chart || !chart.options) continue;
 
-    const paleta = ['#001D3D', '#3D6B99'];
-    const n = (chart.data && chart.data.labels) ? chart.data.labels.length : 1;
-    const cat = n >= 16 ? 0.70 : (n >= 14 ? 0.76 : 0.82);
-    const barPct = n >= 16 ? 0.80 : (n >= 14 ? 0.82 : 0.85);
+    const nLabels = (chart.data && chart.data.labels) ? chart.data.labels.length : 1;
+    const cat = nLabels >= 16 ? 0.70 : (nLabels >= 14 ? 0.76 : 0.82);
+    const barPct = nLabels >= 16 ? 0.80 : (nLabels >= 14 ? 0.82 : 0.85);
     if (chart.config) chart.config.type = 'bar';
     chart.type = 'bar';
     if (chart.data && Array.isArray(chart.data.datasets)) {
       chart.data.datasets.forEach((ds, i) => {
-        const cor = paleta[i % paleta.length];
+        const cor = corSerie(ds.label, i);
         ds.type = 'bar';
         ds.fill = false;
         ds.backgroundColor = cor;
@@ -267,7 +290,13 @@ function labelHoursOnChartVertices() {
         ds.borderWidth = 0;
         ds.categoryPercentage = cat;
         ds.barPercentage = barPct;
-        ds.datalabels = { align: 'end', anchor: 'end', offset: i === 0 ? 2 : 10 };
+        ds.borderRadius = 3;
+        ds.borderSkipped = 'bottom';
+        ds.datalabels = {
+          align: i === 0 ? 'left' : 'right',
+          anchor: 'end',
+          offset: i === 0 ? 4 : 8,
+        };
       });
     }
     chart.options.scales = chart.options.scales || {};
@@ -276,31 +305,36 @@ function labelHoursOnChartVertices() {
       gridLines: { display: false, drawBorder: false },
       ticks: {
         autoSkip: false,
-        maxTicksLimit: Math.max(n, 1),
-        maxRotation: n >= 16 ? 15 : 0,
+        maxTicksLimit: Math.max(nLabels, 1),
+        maxRotation: nLabels >= 16 ? 15 : 0,
         minRotation: 0,
-        fontSize: n >= 16 ? 7 : 8,
-        fontColor: '#4B5563',
+        fontSize: nLabels >= 16 ? 8 : 10,
+        fontColor: '#001D3D',
+        fontStyle: '600',
       },
     }];
     chart.options.scales.yAxes = [{
       stacked: false,
-      gridLines: { color: 'rgba(15, 23, 42, 0.06)', drawBorder: false, lineWidth: 0.5 },
-      ticks: { beginAtZero: true, fontSize: 9, fontColor: '#4B5563' },
+      gridLines: { color: 'rgba(15, 23, 42, 0.08)', drawBorder: false, lineWidth: 0.5 },
+      ticks: { beginAtZero: true, fontSize: 10, fontColor: '#001D3D', fontStyle: '600' },
     }];
-    chart.options.legend = Object.assign({}, chart.options.legend || {}, { display: true });
+    chart.options.legend = Object.assign({}, chart.options.legend || {}, {
+      display: true,
+      labels: { boxWidth: 10, fontSize: 10, fontColor: '#001D3D', fontStyle: '600' },
+    });
+    chart.options.cornerRadius = 3;
 
     const labels = {
       display: true,
       clamp: true,
       clip: false,
       color: '#001D3D',
-      backgroundColor: 'rgba(255,255,255,0.82)',
+      backgroundColor: 'rgba(255,255,255,0.88)',
       borderRadius: 0,
       padding: { top: 1, right: 2, bottom: 1, left: 2 },
-      font: { size: 7, weight: 'bold' },
-      offset: 2,
-      formatter: formatHourLabel,
+      font: { size: 8, weight: '600' },
+      offset: 4,
+      formatter: kind === 'hours' ? formatHourLabel : formatCountLabel,
       align: 'end',
       anchor: 'end',
     };
@@ -313,7 +347,7 @@ function labelHoursOnChartVertices() {
     const padding = chart.options.layout.padding;
     if (typeof padding === 'number') {
       chart.options.layout.padding = {
-        top: Math.max(padding, 18),
+        top: Math.max(padding, 24),
         right: padding,
         bottom: Math.max(padding, 18),
         left: padding,
@@ -321,13 +355,13 @@ function labelHoursOnChartVertices() {
     } else {
       const base = padding && typeof padding === 'object' ? padding : {};
       chart.options.layout.padding = Object.assign({}, base, {
-        top: Math.max(Number(base.top) || 0, 18),
+        top: Math.max(Number(base.top) || 0, 24),
         bottom: Math.max(Number(base.bottom) || 0, 18),
       });
     }
-    n += 1;
+    applied += 1;
   }
-  return n;
+  return applied;
 }
 
 const COMPOSER_CSS = `
@@ -436,19 +470,22 @@ html, body {
   margin: 0;
 }
 .metric-label, .main-numbers p {
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 9.5pt;
+  font-weight: 600;
   color: var(--mn-sec);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin: 0 0 8px;
+  line-height: 1.20;
+  text-align: left;
 }
 .metric-value, .main-numbers h3 {
-  font-size: 22px;
+  font-size: 21pt;
   font-weight: 700;
   color: var(--mn-azul);
   margin: 0;
-  text-align: center;
+  line-height: 1.20;
+  text-align: right;
 }
 .mn-legacy .row {
   display: flex;
@@ -503,7 +540,7 @@ html, body {
   vertical-align: middle;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  line-height: 1.45;
+  line-height: 1.15;
   height: auto;
   white-space: normal;
   font-size: 9pt;
@@ -518,12 +555,17 @@ html, body {
 .mn-sec-body th.num {
   text-align: right;
 }
+.mn-sec-body th.mn-disc,
+.mn-sec-body th.mn-assunto,
+.mn-sec-body th.mn-mod,
+.mn-sec-body th.mn-horas,
+.mn-sec-body th.mn-qtd { text-align: center; vertical-align: middle; }
 .mn-sec-body tbody td { vertical-align: middle; }
 .mn-sec-body tbody td.mn-disc,
 .mn-sec-body tbody td.mn-mod,
 .mn-sec-body tbody td.mn-horas,
-.mn-sec-body tbody td.num { text-align: center; }
-.mn-sec-body tbody td.mn-assunto { text-align: center; }
+.mn-sec-body tbody td.num { text-align: center; vertical-align: middle; }
+.mn-sec-body tbody td.mn-assunto { text-align: center; vertical-align: middle; }
 .mn-sec-body tbody td.mn-pct { text-align: right; }
 .mn-sec-body tbody tr:nth-child(even) td { background: var(--mn-zebra); }
 .mn-sec-body tbody tr { break-inside: avoid; page-break-inside: avoid; }
@@ -561,21 +603,30 @@ html, body {
   vertical-align: top;
 }
 .kpi-label {
-  font-size: 8.5pt;
-  font-weight: 500;
+  font-size: 9.5pt;
+  font-weight: 600;
   color: var(--mn-sec);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin: 0 0 8px;
-  line-height: 1.25;
+  line-height: 1.20;
+  text-align: left;
 }
 .kpi-value {
-  font-size: 19pt;
+  font-size: 21pt;
   font-weight: 700;
   color: var(--mn-azul);
-  line-height: 1.1;
-  text-align: center;
+  line-height: 1.20;
+  text-align: right;
   word-wrap: break-word;
+  padding: 2px 2px 0 8px;
+}
+.kpi-long {
+  font-size: 11.5pt;
+  font-weight: 700;
+  line-height: 1.20;
+  text-align: left;
+  padding: 2px 0 0;
 }
 @media print {
   .mn-sec-head, .mn-chart, .metric-card, .main-header-card {
@@ -879,6 +930,15 @@ async function extractProgresso(page) {
   });
 }
 
+function headerPeriodoHtml(rotulo) {
+  const safe = String(rotulo || '').replace(/</g, '');
+  const parts = safe.split(/\s+•\s+/);
+  if (parts.length === 2) {
+    return `${parts[0]}<span style="display:inline-block;width:3.2px;height:3.2px;border-radius:50%;background:currentColor;margin:0 0.48em;vertical-align:middle;position:relative;top:-0.06em;"></span>${parts[1]}`;
+  }
+  return safe.replace(/\s*\/\s*/g, '<span style="display:inline-block;width:3.2px;height:3.2px;border-radius:50%;background:currentColor;margin:0 0.48em;vertical-align:middle;position:relative;top:-0.06em;"></span>');
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (ch) => ({
     '&': '&amp;',
@@ -957,6 +1017,19 @@ function columnWidths(roles) {
   return w;
 }
 
+function classForRole(role) {
+  switch (role) {
+    case 'horas': return 'num mn-horas';
+    case 'pct': return 'num mn-pct';
+    case 'num':
+    case 'data': return 'num mn-qtd';
+    case 'assunto': return 'mn-assunto';
+    case 'disciplina': return 'mn-disc';
+    case 'modalidade': return 'mn-mod';
+    default: return '';
+  }
+}
+
 function injectTableColgroups(html) {
   if (!html) return html;
   return String(html).replace(/<table\b[^>]*>[\s\S]*?<\/table>/gi, (table) => {
@@ -973,7 +1046,21 @@ function injectTableColgroups(html) {
     const roles = headers.map(columnRole);
     const widths = columnWidths(roles);
     const cols = roles.map((role, i) => `<col class="mn-c-${role}" style="width:${widths[i]}%">`).join('');
-    return table.replace(/<table\b[^>]*>/i, (open) => `${open}<colgroup>${cols}</colgroup>`);
+    let out = table.replace(/<table\b[^>]*>/i, (open) => `${open}<colgroup>${cols}</colgroup>`);
+    out = out.replace(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi, (tr) => {
+      let col = 0;
+      return tr.replace(/<(t[dh])\b([^>]*)>/gi, (full, tag, attrs) => {
+        const role = roles[col] || 'texto';
+        col += 1;
+        const cls = classForRole(role);
+        if (!cls) return full;
+        if (/\bclass\s*=/.test(attrs)) {
+          return `<${tag}${attrs.replace(/class=(['"])/i, `class=$1${cls} `)}>`;
+        }
+        return `<${tag} class="${cls}"${attrs}>`;
+      });
+    });
+    return out;
   });
 }
 
@@ -1049,7 +1136,8 @@ function formatInsightsHtml(html) {
     out += '<tr>';
     row.forEach((item, idx) => {
       const span = (idx === row.length - 1 && row.length < cols) ? ` colspan="${cols - row.length + 1}"` : '';
-      out += `<td class="kpi"${span}><div class="kpi-label">${escapeHtml(item[0])}</div><div class="kpi-value">${escapeHtml(item[1])}</div></td>`;
+      const valueCls = String(item[1] || '').length > 12 ? 'kpi-value kpi-long' : 'kpi-value';
+      out += `<td class="kpi"${span}><div class="kpi-label">${escapeHtml(item[0])}</div><div class="${valueCls}">${escapeHtml(item[1])}</div></td>`;
     });
     out += '</tr>';
   }
@@ -1159,9 +1247,9 @@ try {
     format: 'A4',
     printBackground: true,
     displayHeaderFooter: true,
-    headerTemplate: `<div style="font-family:Inter,'DejaVu Sans',Helvetica,sans-serif;font-size:8px;width:100%;padding:8px 16mm 8px;color:#001D3D;display:flex;justify-content:space-between;border-bottom:0.6px solid #BF8F00;box-sizing:border-box;">
-      <span style="font-weight:700;">MISSÃO NOMEAÇÃO •</span>
-      <span style="color:#4B5563;">${rotuloPeriodo.replace(/</g, '')}</span>
+    headerTemplate: `<div style="font-family:Inter,'DejaVu Sans',Helvetica,sans-serif;font-size:8px;width:100%;padding:8px 16mm 8px;color:#001D3D;display:flex;justify-content:space-between;align-items:center;border-bottom:0.6px solid #BF8F00;box-sizing:border-box;">
+      <span style="font-weight:700;">MISSÃO NOMEAÇÃO</span>
+      <span style="color:#4B5563;display:flex;align-items:center;">${headerPeriodoHtml(rotuloPeriodo)}</span>
     </div>`,
     footerTemplate: `<div style="font-family:Inter,'DejaVu Sans',Helvetica,sans-serif;font-size:7.5px;width:100%;padding:0 16mm;color:#4B5563;text-align:right;">
       Página <span class="pageNumber"></span> de <span class="totalPages"></span>

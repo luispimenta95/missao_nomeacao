@@ -180,7 +180,7 @@ class RelatoriosMentorTest extends TestCase
             $mes->invoke($downloader, $primeiro)->format('Y-m-d')
         );
         $this->assertSame(
-            'AGOSTO/PERÍODO 2',
+            'AGOSTO • PERÍODO 2',
             RelatorioConsolidadoLayout::rotuloPeriodo('2', $mes->invoke($downloader, $primeiro))
         );
     }
@@ -222,9 +222,10 @@ class RelatoriosMentorTest extends TestCase
         $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());
         $this->assertStringNotContainsString('aplicarMarcaDaguaPdf', $php);
         $this->assertStringContainsString('aplicarCabecalhoRodape', $php);
-        $this->assertSame('AGOSTO/PERÍODO 1', RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10')));
-        $this->assertSame('AGOSTO/PERÍODO 2', RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-08-20')));
-        $this->assertSame('MISSÃO NOMEAÇÃO •', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
+        $this->assertSame('AGOSTO • PERÍODO 1', RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10')));
+        $this->assertSame('AGOSTO • PERÍODO 2', RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-08-20')));
+        $this->assertSame('MISSÃO NOMEAÇÃO', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
+        $this->assertStringNotContainsString('MISSÃO NOMEAÇÃO •', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
     }
 
     public function test_css_do_consolidado_nao_deixa_bloco_cinza_no_rodape(): void
@@ -298,12 +299,41 @@ class RelatoriosMentorTest extends TestCase
         $this->assertFalse($cfg['options']['scales']['xAxes'][0]['stacked']);
         $this->assertFalse($cfg['options']['scales']['xAxes'][0]['ticks']['autoSkip']);
         $this->assertSame(RelatorioConsolidadoLayout::AZUL, $cfg['data']['datasets'][0]['backgroundColor']);
-        $this->assertSame(RelatorioConsolidadoLayout::AZUL_CLARO, $cfg['data']['datasets'][1]['backgroundColor']);
+        $this->assertSame(RelatorioConsolidadoLayout::DOURADO, $cfg['data']['datasets'][1]['backgroundColor']);
         $this->assertSame('__DATALABEL_HOURS_BAR__', $cfg['options']['plugins']['datalabels']['formatter']);
-        $this->assertNotContains(RelatorioConsolidadoLayout::DOURADO, [
+        $this->assertSame(RelatorioConsolidadoLayout::AZUL, $cfg['options']['scales']['xAxes'][0]['ticks']['fontColor']);
+        $this->assertSame('600', $cfg['options']['scales']['xAxes'][0]['ticks']['fontStyle']);
+        $this->assertSame(RelatorioConsolidadoLayout::AZUL, $cfg['options']['scales']['yAxes'][0]['ticks']['fontColor']);
+        $this->assertNotContains(RelatorioConsolidadoLayout::AZUL_CLARO, [
             $cfg['data']['datasets'][0]['backgroundColor'],
             $cfg['data']['datasets'][1]['backgroundColor'],
         ]);
+    }
+
+    public function test_acertos_e_erros_por_dia_vira_barras_navy_dourado(): void
+    {
+        $downloader = new CoachReportDownloader('2', false, static function (): void {});
+        $ref = new ReflectionClass($downloader);
+        $barras = $ref->getMethod('aplicarBarrasAgrupadasInstitucionais');
+
+        $fonte = [
+            'type' => 'line',
+            'data' => [
+                'labels' => ['16/08', '17/08'],
+                'datasets' => [
+                    ['label' => 'Acertos', 'data' => [120, 80]],
+                    ['label' => 'Erros', 'data' => [28, 12]],
+                ],
+            ],
+        ];
+        $cfg = $barras->invoke($downloader, $fonte, 'chart_questoes_dia');
+        $this->assertSame('bar', $cfg['type']);
+        $this->assertFalse($cfg['options']['scales']['xAxes'][0]['stacked']);
+        $this->assertSame(RelatorioConsolidadoLayout::AZUL, $cfg['data']['datasets'][0]['backgroundColor']);
+        $this->assertSame(RelatorioConsolidadoLayout::DOURADO, $cfg['data']['datasets'][1]['backgroundColor']);
+        $this->assertSame('__DATALABEL_COUNT_BAR__', $cfg['options']['plugins']['datalabels']['formatter']);
+        $this->assertSame(RelatorioConsolidadoLayout::AZUL, $cfg['options']['scales']['xAxes'][0]['ticks']['fontColor']);
+        $this->assertSame('600', $cfg['options']['scales']['yAxes'][0]['ticks']['fontStyle']);
     }
 
     public function test_grafico_de_horas_diarias_tem_rotulos_nos_vertices(): void
@@ -312,19 +342,23 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('__DATALABEL_HOURS__', $php);
         $this->assertStringContainsString('__DATALABEL_HOURS_BAR__', $php);
         $this->assertStringContainsString('__DATALABEL_VALUE__', $php);
+        $this->assertStringContainsString('__DATALABEL_COUNT_BAR__', $php);
         $this->assertStringContainsString('$isHours ? \'__DATALABEL_HOURS__\' : \'__DATALABEL_VALUE__\'', $php);
 
         $script = (string) file_get_contents(base_path('scripts/tutory-compose-pdf.mjs'));
         $this->assertStringContainsString('labelHoursOnChartVertices', $script);
         $this->assertStringContainsString('chart_horas_diarias', $script);
         $this->assertStringContainsString('chart_line_comparativo', $script);
+        $this->assertStringContainsString('chart_questoes_dia', $script);
         $this->assertStringContainsString("chart.config.type = 'bar'", $script);
         $this->assertStringContainsString('return `${txt}h`', $script);
         $this->assertStringNotContainsString('stripPercentFromHoursCharts', $script);
         $this->assertStringContainsString('Horas planejadas × horas estudadas', $script);
         $this->assertStringContainsString('Horas estudadas = horas brutas registradas.', $script);
         $this->assertStringNotContainsString('Horas planejadas × horas (brutas) estudadas', $script);
-        $this->assertStringContainsString('MISSÃO NOMEAÇÃO •', $script);
+        $this->assertStringContainsString('MISSÃO NOMEAÇÃO', $script);
+        $this->assertStringNotContainsString('MISSÃO NOMEAÇÃO •', $script);
+        $this->assertStringContainsString('headerPeriodoHtml', $script);
         $this->assertStringContainsString("top: '34mm'", $script);
         $this->assertStringContainsString("right: '16mm'", $script);
     }

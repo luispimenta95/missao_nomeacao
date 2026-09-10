@@ -8,6 +8,20 @@ use Tests\TestCase;
 
 class RelatorioConsolidadoLayoutTest extends TestCase
 {
+    public function test_paleta_dos_graficos_de_barras_e_navy_e_dourado(): void
+    {
+        $this->assertSame(
+            [RelatorioConsolidadoLayout::AZUL, RelatorioConsolidadoLayout::DOURADO],
+            RelatorioConsolidadoLayout::paletaRitmo()
+        );
+        $this->assertSame(RelatorioConsolidadoLayout::AZUL, RelatorioConsolidadoLayout::corSerieBarra('Horas brutas', 0));
+        $this->assertSame(RelatorioConsolidadoLayout::DOURADO, RelatorioConsolidadoLayout::corSerieBarra('Horas líquidas', 1));
+        $this->assertSame(RelatorioConsolidadoLayout::AZUL, RelatorioConsolidadoLayout::corSerieBarra('Horas planejadas', 0));
+        $this->assertSame(RelatorioConsolidadoLayout::DOURADO, RelatorioConsolidadoLayout::corSerieBarra('Horas estudadas', 1));
+        $this->assertSame(RelatorioConsolidadoLayout::AZUL, RelatorioConsolidadoLayout::corSerieBarra('Acertos', 0));
+        $this->assertSame(RelatorioConsolidadoLayout::DOURADO, RelatorioConsolidadoLayout::corSerieBarra('Erros', 1));
+    }
+
     public function test_ordem_fixa_das_secoes(): void
     {
         $this->assertSame([
@@ -121,6 +135,7 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertGreaterThan($largurasRev['disciplina'], $largurasRev['assunto']);
         $this->assertGreaterThan($largurasRev['num'], $largurasRev['assunto']);
         $this->assertStringContainsString('Teoria do crime', $revisoes);
+        $this->assertStringContainsString('class="num mn-qtd"', $revisoes);
 
         $historico = RelatorioConsolidadoLayout::tabela(
             ['Disciplina', 'Assunto', 'Modalidade', 'Horas'],
@@ -180,8 +195,13 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('white-space:nowrap', $css);
         $this->assertStringContainsString('.mn-table td.mn-horas{white-space:nowrap;}', $css);
         $this->assertStringContainsString('.mn-table th,.mn-table td{height:auto; border:1.25pt solid #001D3D;}', $css);
-        $this->assertStringContainsString('.mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num,.mn-table td.mn-assunto{text-align:center;}', $css);
+        $this->assertStringContainsString('.mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num,.mn-table td.mn-assunto{text-align:center; vertical-align:middle;}', $css);
         $this->assertStringContainsString('.mn-table td.mn-pct{text-align:right;}', $css);
+        $this->assertStringContainsString('.mn-table th.mn-disc,.mn-table th.mn-assunto,.mn-table th.mn-mod,.mn-table th.mn-horas,.mn-table th.mn-qtd{text-align:center; vertical-align:middle;}', $css);
+        $this->assertStringContainsString('line-height:1.15', $css);
+        $this->assertStringContainsString('.kpi-label{font-size:9.5pt; font-weight:600;', $css);
+        $this->assertStringContainsString('.kpi-value{font-size:21pt; font-weight:700;', $css);
+        $this->assertStringContainsString('.kpi-long{font-size:11.5pt; font-weight:700; line-height:1.20;', $css);
         $this->assertStringContainsString('.mn-table th{background:#001D3D; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}', $css);
         $this->assertStringNotContainsString('width:18%', $css);
         $this->assertStringNotContainsString('width:1%', $css);
@@ -227,10 +247,14 @@ class RelatorioConsolidadoLayoutTest extends TestCase
 
     public function test_cabecalho_e_hierarquia_de_abertura(): void
     {
-        $this->assertSame('MISSÃO NOMEAÇÃO •', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
+        $this->assertSame('MISSÃO NOMEAÇÃO', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
         $this->assertSame(
-            'AGOSTO/PERÍODO 1',
+            'AGOSTO • PERÍODO 1',
             RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10'))
+        );
+        $this->assertSame(
+            'SETEMBRO • PERÍODO 2',
+            RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-09-20'))
         );
         $this->assertSame(
             RelatorioConsolidadoLayout::INTRO_HISTORICO,
