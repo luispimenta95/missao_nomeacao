@@ -26,6 +26,9 @@ use DOMXPath;
 use GuzzleHttp\Cookie\FileCookieJar;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\SQLiteDatabaseDoesNotExistException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
