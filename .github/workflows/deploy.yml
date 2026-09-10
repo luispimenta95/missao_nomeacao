@@ -21,4 +21,12 @@ jobs:
           REMOTE_HOST: ${{ secrets.HOSTINGER_HOST }}
           REMOTE_USER: ${{ secrets.HOSTINGER_USER }}
           TARGET: "domains/missaonomeacao.com.br/public_html/server/"
-          EXCLUDE: "/.git/, /node_modules/"
+          EXCLUDE: "/.git/, /node_modules/, /vendor/, /.env, /database/*.sqlite*, /storage/logs/, /storage/framework/cache/, /storage/framework/sessions/, /storage/framework/views/"
+          SCRIPT_AFTER: |
+            cd domains/missaonomeacao.com.br/public_html/server
+            composer install --no-dev --no-interaction --optimize-autoloader
+            if [ ! -f database/database.sqlite ]; then
+              touch database/database.sqlite
+            fi
+            php artisan migrate --force --no-interaction
+

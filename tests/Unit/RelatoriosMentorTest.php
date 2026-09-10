@@ -228,6 +228,15 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringNotContainsString('MISSÃO NOMEAÇÃO •', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
     }
 
+    public function test_deploy_nao_apaga_o_sqlite_do_servidor(): void
+    {
+        $yml = (string) file_get_contents(base_path('.github/workflows/deploy.yml'));
+        $this->assertStringContainsString('public_html/server/', $yml);
+        $this->assertStringContainsString('/database/*.sqlite*', $yml);
+        $this->assertStringContainsString('touch database/database.sqlite', $yml);
+        $this->assertStringContainsString('php artisan migrate --force', $yml);
+    }
+
     public function test_css_do_consolidado_nao_deixa_bloco_cinza_no_rodape(): void
     {
         $downloader = new CoachReportDownloader('1', false, static function (): void {});

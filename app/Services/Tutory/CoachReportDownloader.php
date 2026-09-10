@@ -24,9 +24,8 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use DOMXPath;
 use GuzzleHttp\Cookie\FileCookieJar;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\SQLiteDatabaseDoesNotExistException;
 use RuntimeException;
 use Throwable;
 
@@ -1510,14 +1509,22 @@ class CoachReportDownloader
 
     /**
      * Lista alunos do admin, envia os PDFs por e-mail e apaga os arquivos da pasta.
+     * Se o SQLite local não existir, os PDFs são preservados.
      */
     private function enviarEmailsDosAlunos(): void
     {
         try {
             $this->enviarEmailsDosAlunosSemLimpar();
-        } finally {
-            $this->removerPdfsBaixados();
+        } catch (QueryException|SQLiteDatabaseDoesNotExistException $exc) {
+            $this->log('Banco local indisponível; e-mails não enviados.');
+            $this->log($exc->getMessage());
+            $this->log('PDFs preservados em '.$this->pastaDownload);
+            $this->log('No servidor: touch database/database.sqlite && php artisan migrate --force');
+
+            return;
         }
+
+        $this->removerPdfsBaixados();
     }
 
     /**
