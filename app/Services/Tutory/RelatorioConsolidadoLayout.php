@@ -78,12 +78,12 @@ final class RelatorioConsolidadoLayout
         $mes = self::MESES[(int) $ref->format('n')] ?? mb_strtoupper($ref->format('F'));
         $n = $periodo === '2' ? '2' : '1';
 
-        return $mes.'/PERÍODO '.$n;
+        return $mes.' • PERÍODO '.$n;
     }
 
     public static function textoCabecalhoEsquerdo(): string
     {
-        return 'MISSÃO NOMEAÇÃO •';
+        return 'MISSÃO NOMEAÇÃO';
     }
 
     public static function corPercentual(?float $pct): string
@@ -110,13 +110,27 @@ final class RelatorioConsolidadoLayout
     }
 
     /**
-     * Navy + azul mais claro — só os gráficos de Ritmo de estudos.
+     * Navy + dourado institucional — gráficos de barras agrupadas do consolidado.
      *
      * @return list<string>
      */
     public static function paletaRitmo(): array
     {
-        return [self::AZUL, self::AZUL_CLARO];
+        return [self::AZUL, self::DOURADO];
+    }
+
+    public static function corSerieBarra(string $label, int $index): string
+    {
+        $h = self::normalizarRotulo($label);
+        if (str_contains($h, 'erro') || str_contains($h, 'liquid') || str_contains($h, 'estudad')) {
+            return self::DOURADO;
+        }
+        if (str_contains($h, 'acerto') || str_contains($h, 'bruta') || str_contains($h, 'planejad')) {
+            return self::AZUL;
+        }
+        $paleta = self::paletaRitmo();
+
+        return $paleta[$index % count($paleta)];
     }
 
     public static function secao(string $titulo, string $intro, string $body, string $classe = ''): string
@@ -320,9 +334,9 @@ img{max-width:100%; height:auto;}
 .mn-sec-insights .mn-kpis{border-spacing:14px 14px;}
 .mn-kpis{width:100%; border-collapse:separate; border-spacing:14px 0; table-layout:fixed; margin:0 0 8px;}
 .mn-kpis td.kpi{background:#ffffff; border:1.5pt solid {$ouro}; border-radius:9px; padding:18px 18px; vertical-align:top; page-break-inside:avoid;}
-.kpi-label{font-size:8.5pt; font-weight:500; color:{$sec}; letter-spacing:0.04em; text-transform:uppercase; margin:0 0 8px; line-height:1.25;}
-.kpi-value{font-size:19pt; font-weight:700; color:{$azul}; line-height:1.2; text-align:center; word-wrap:break-word; overflow-wrap:break-word; word-break:normal;}
-.kpi-long{font-size:11pt; font-weight:600; line-height:1.35;}
+.kpi-label{font-size:9.5pt; font-weight:600; color:{$sec}; letter-spacing:0.04em; text-transform:uppercase; margin:0 0 8px; line-height:1.20; text-align:left;}
+.kpi-value{font-size:21pt; font-weight:700; color:{$azul}; line-height:1.20; text-align:right; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; padding:2px 2px 0 8px;}
+.kpi-long{font-size:11.5pt; font-weight:700; line-height:1.20; text-align:left; padding:2px 0 0;}
 .mn-chart{margin:8px 0 16px; page-break-inside:avoid;}
 .mn-chart-title{font-size:11pt; font-weight:600; color:{$azul}; margin:0 0 8px;}
 .mn-chart-note{font-size:9.5pt; font-weight:400; color:{$sec}; margin:0 0 12px;}
@@ -333,11 +347,12 @@ img{max-width:100%; height:auto;}
 .mn-table th,.mn-table td{height:auto; border:1.25pt solid {$azul};}
 .mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}
 .mn-table th.num{text-align:right;}
+.mn-table th.mn-disc,.mn-table th.mn-assunto,.mn-table th.mn-mod,.mn-table th.mn-horas,.mn-table th.mn-qtd{text-align:center; vertical-align:middle;}
 .mn-table td.num{white-space:nowrap;}
 .mn-table td.mn-horas{white-space:nowrap;}
-.mn-table td{padding:9px 11px; vertical-align:middle; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; font-size:9pt; font-weight:400; line-height:1.45; white-space:normal;}
+.mn-table td{padding:9px 11px; vertical-align:middle; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; font-size:9pt; font-weight:400; line-height:1.15; white-space:normal;}
 .mn-table td.mn-assunto,.mn-table td.mn-disc,.mn-table td.mn-mod{white-space:normal; word-wrap:break-word; overflow-wrap:break-word;}
-.mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num,.mn-table td.mn-assunto{text-align:center;}
+.mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num,.mn-table td.mn-assunto{text-align:center; vertical-align:middle;}
 .mn-table td.mn-pct{text-align:right;}
 .mn-table tr.z td{background:{$zebra};}
 .mn-table tr{page-break-inside:avoid; break-inside:avoid; height:auto;}
@@ -381,8 +396,7 @@ CSS;
 
             $marca = self::textoCabecalhoEsquerdo();
             $canvas->page_text($left, 26.0, $marca, $bold, 8.0, $azul);
-            $rotuloW = $metrics->getTextWidth($rotuloPeriodo, $regular, 8.0);
-            $canvas->page_text($right - $rotuloW, 26.0, $rotuloPeriodo, $regular, 8.0, $cinza);
+            self::desenharRotuloPeriodo($canvas, $metrics, $regular, $rotuloPeriodo, $right, 26.0, 8.0, $cinza);
             $canvas->page_line($left, 48.0, $right, 48.0, $ouro, 0.6);
 
             $pag = 'Página {PAGE_NUM} de {PAGE_COUNT}';
@@ -391,6 +405,51 @@ CSS;
         } catch (Throwable) {
             // Relatório segue válido sem chrome de página.
         }
+    }
+
+    /**
+     * Desenha "MÊS • PERÍODO N" com bolinha no centro óptico das letras.
+     *
+     * @param  array{0?: float, 1?: float, 2?: float}  $color
+     */
+    private static function desenharRotuloPeriodo(
+        object $canvas,
+        object $metrics,
+        string $font,
+        string $rotuloPeriodo,
+        float $right,
+        float $yBaseline,
+        float $size,
+        array $color,
+    ): void {
+        $partes = preg_split('/\s+•\s+/u', $rotuloPeriodo) ?: [];
+        if (count($partes) !== 2) {
+            $rotuloW = $metrics->getTextWidth($rotuloPeriodo, $font, $size);
+            $canvas->page_text($right - $rotuloW, $yBaseline, $rotuloPeriodo, $font, $size, $color);
+
+            return;
+        }
+
+        [$mes, $periodo] = $partes;
+        $mesW = $metrics->getTextWidth($mes, $font, $size);
+        $perW = $metrics->getTextWidth($periodo, $font, $size);
+        $gap = $size * 0.42;
+        $raio = max(1.05, $size * 0.145);
+        $total = $mesW + $gap + ($raio * 2) + $gap + $perW;
+        $x = $right - $total;
+        $canvas->page_text($x, $yBaseline, $mes, $font, $size, $color);
+        $cx = $x + $mesW + $gap + $raio;
+        // page_text() usa o topo da caixa da linha; circle() usa o mesmo eixo, sem descontar a altura da fonte.
+        $fontHeight = $metrics->getFontHeight($font, $size);
+        $cy = $yBaseline + ($fontHeight * 0.38);
+        if (method_exists($canvas, 'page_script')) {
+            $canvas->page_script(static function ($pageNumber, $pageCount, $pageCanvas) use ($cx, $cy, $raio, $color): void {
+                if (method_exists($pageCanvas, 'circle')) {
+                    $pageCanvas->circle($cx, $cy, $raio, $color, 0.01, [], true);
+                }
+            });
+        }
+        $canvas->page_text($x + $mesW + $gap + ($raio * 2) + $gap, $yBaseline, $periodo, $font, $size, $color);
     }
 
     /**
@@ -582,7 +641,7 @@ CSS;
         return match ($papel) {
             'horas' => 'num mn-horas',
             'pct' => 'num mn-pct',
-            'num', 'data' => 'num',
+            'num', 'data' => 'num mn-qtd',
             'assunto' => 'mn-assunto',
             'disciplina' => 'mn-disc',
             'modalidade' => 'mn-mod',
