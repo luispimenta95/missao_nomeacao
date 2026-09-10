@@ -221,6 +221,7 @@ class RelatoriosMentorTest extends TestCase
     {
         $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());
         $this->assertStringNotContainsString('aplicarMarcaDaguaPdf', $php);
+        $this->assertStringContainsString('use Illuminate\\Support\\Facades\\Http;', $php);
         $this->assertStringContainsString('aplicarCabecalhoRodape', $php);
         $this->assertSame('AGOSTO • PERÍODO 1', RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10')));
         $this->assertSame('AGOSTO • PERÍODO 2', RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-08-20')));
