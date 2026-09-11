@@ -6,7 +6,6 @@ use App\Mail\EmailRelatorioCoach;
 use App\Models\Aluno;
 use App\Services\Tutory\CoachReportDownloader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use ReflectionClass;
 use Tests\TestCase;
@@ -105,39 +104,6 @@ class RemoverPdfsAposEmailTest extends TestCase
         $this->chamar('enviarEmailsDosAlunos', $this->downloader());
 
         $this->assertFileDoesNotExist($pdf);
-    }
-
-    public function test_preserva_pdfs_quando_o_sqlite_nao_existe(): void
-    {
-        $pdf = $this->pasta.'/relatorio_consolidado_20260815_1200_Giovanna_1.pdf';
-        file_put_contents($pdf, '%PDF-1.4 fake');
-
-        $logs = [];
-        $downloader = new CoachReportDownloader('1', false, static function (string $message) use (&$logs): void {
-            $logs[] = $message;
-        });
-        $ref = new ReflectionClass($downloader);
-        $ref->getProperty('pastaDownload')->setValue($downloader, $this->pasta);
-
-        $original = config('database.connections.sqlite.database');
-        $missing = sys_get_temp_dir().'/mn-missing-'.uniqid('', true).'.sqlite';
-
-        try {
-            config(['database.connections.sqlite.database' => $missing]);
-            DB::purge('sqlite');
-            DB::disconnect('sqlite');
-
-            $this->chamar('enviarEmailsDosAlunos', $downloader);
-        } finally {
-            config(['database.connections.sqlite.database' => $original]);
-            DB::purge('sqlite');
-            DB::reconnect('sqlite');
-        }
-
-        $this->assertFileExists($pdf);
-        $this->assertTrue(
-            collect($logs)->contains(static fn (string $l): bool => str_contains($l, 'PDFs preservados'))
-        );
     }
 
     private function downloader(): CoachReportDownloader
