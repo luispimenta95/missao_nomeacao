@@ -1,0 +1,21 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Hostinger aponta o domínio para public_html, não para public/.
+    # Sem este arquivo, /server/login é 404 do Apache (o front controller está em public/).
+
+    # Não exponha arquivos e pastas do Laravel.
+    RewriteRule ^\.env - [F,L]
+    RewriteRule ^(composer\.(json|lock)|artisan|phpunit\.xml)$ - [F,L]
+    RewriteRule ^(app|bootstrap|config|database|docker|docs|resources|routes|scripts|storage|tests|vendor)/ - [F,L]
+
+    # Já está em public/ — o .htaccess de lá envia para index.php.
+    RewriteRule ^public($|/) - [L]
+
+    # /server/login → public/login (Laravel)
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
