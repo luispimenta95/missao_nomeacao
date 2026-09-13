@@ -215,19 +215,11 @@ final class RelatorioConsolidadoLayout
         $valorHtml = htmlspecialchars($valor, ENT_QUOTES, 'UTF-8');
         if (self::eValorNumerico($valor)) {
             $compact = $cols >= 4;
-            $valorCls = 'kpi-value';
-            if ($compact && mb_strlen(trim($valor)) >= 5) {
-                $valorCls .= ' kpi-value-sm';
-            }
+            $valorCls = 'kpi-value '.self::classeTamanhoValor($valor, $cols);
 
             return '<td class="kpi kpi-num'.($compact ? ' kpi-compact' : '').'"'.$colspan.'>'
-                .'<table class="kpi-inner"><colgroup>'
-                .'<col class="kpi-c-label" style="width:40%">'
-                .'<col class="kpi-c-value" style="width:60%">'
-                .'</colgroup><tbody><tr>'
-                .'<td class="kpi-label">'.$labelHtml.'</td>'
-                .'<td class="'.$valorCls.'">'.$valorHtml.'</td>'
-                .'</tr></tbody></table>'
+                .'<div class="kpi-label">'.$labelHtml.'</div>'
+                .'<div class="'.$valorCls.'">'.$valorHtml.'</div>'
                 .'</td>';
         }
 
@@ -244,9 +236,22 @@ final class RelatorioConsolidadoLayout
         $v = trim($valor);
 
         return $v !== '' && (bool) preg_match(
-            '/^(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,3}(?:[.,]\d+)?\s*%|\d{1,6}(?:[.,]\d+)?\s*h(?:oras?)?|\d{1,6})$/iu',
+            '/^(?:\d{1,4}:\d{2}(?::\d{2})?|\d{1,3}(?:[.,]\d+)?\s*%|\d{1,6}(?:[.,]\d+)?\s*h(?:oras?)?|\d{1,6})$/iu',
             $v
         );
+    }
+
+    public static function classeTamanhoValor(string $valor, int $cols = 3): string
+    {
+        $len = mb_strlen(trim($valor));
+
+        return match (true) {
+            $len <= 3 => 'kpi-v-a',
+            $len <= 4 => 'kpi-v-b',
+            $len <= 5 => 'kpi-v-c',
+            $len <= 6 => 'kpi-v-d',
+            default => 'kpi-v-e',
+        };
     }
 
     /**
@@ -374,6 +379,7 @@ img{max-width:100%; height:auto;}
 .mn-sec-insights .mn-kpis{border-spacing:14px 14px;}
 .mn-kpis{width:100%; border-collapse:separate; border-spacing:14px 0; table-layout:fixed; margin:0 0 8px;}
 .mn-kpis td.kpi{background:#ffffff; border:1.5pt solid {$ouro}; border-radius:9px; padding:18px 18px; vertical-align:middle; page-break-inside:avoid;}
+.mn-kpis td.kpi.kpi-num{vertical-align:top;}
 .kpi-inner{width:100%; border-collapse:collapse; border-spacing:0; table-layout:fixed; margin:0; padding:0; border:0;}
 .kpi-inner col.kpi-c-label{width:40%;}
 .kpi-inner col.kpi-c-value{width:60%;}
@@ -381,16 +387,23 @@ img{max-width:100%; height:auto;}
 .kpi-row{display:table; width:100%; table-layout:fixed; margin:0; padding:0; border:0;}
 .kpi-stack{display:block; width:100%; margin:0; padding:0;}
 .kpi-label{font-size:9.5pt; font-weight:600; color:{$sec}; letter-spacing:0.04em; text-transform:uppercase; margin:0; line-height:1.15; text-align:left;}
-.kpi-value{font-size:21pt; font-weight:700; color:{$azul}; line-height:1.05; text-align:right; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; padding:0 2px 0 6px; white-space:nowrap;}
+.kpi-value{font-size:21pt; font-weight:700; color:{$azul}; line-height:0.95; text-align:left; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; padding:0; white-space:nowrap; letter-spacing:-0.03em;}
 .kpi-row .kpi-label,.kpi-row .kpi-value{display:table-cell; vertical-align:middle;}
-.kpi-row .kpi-label,.kpi-num .kpi-label{width:40%; padding:0 6px 0 0;}
-.kpi-row .kpi-value,.kpi-num .kpi-value{width:60%;}
+.kpi-num .kpi-label{display:block; width:auto; max-width:92%; margin:0 0 2px; padding:0; font-size:8pt; line-height:1.12; font-weight:600;}
+.kpi-num .kpi-value{display:block; width:auto; max-width:100%; margin:4px 0 0; padding:0; font-weight:700; text-align:left; white-space:nowrap; letter-spacing:-0.04em; line-height:0.92;}
+.kpi-num .kpi-v-a{font-size:52pt;}
+.kpi-num .kpi-v-b{font-size:44pt;}
+.kpi-num .kpi-v-c{font-size:40pt;}
+.kpi-num .kpi-v-d{font-size:34pt;}
+.kpi-num .kpi-v-e{font-size:28pt;}
 .kpi-compact .kpi-label{font-size:8pt; line-height:1.12;}
-.kpi-compact .kpi-value{font-size:18pt;}
-.kpi-value-sm{font-size:16.5pt;}
-.kpi-compact .kpi-value-sm{font-size:15pt;}
+.kpi-compact .kpi-v-a{font-size:38pt;}
+.kpi-compact .kpi-v-b{font-size:34pt;}
+.kpi-compact .kpi-v-c{font-size:30pt;}
+.kpi-compact .kpi-v-d{font-size:26pt;}
+.kpi-compact .kpi-v-e{font-size:22pt;}
 .kpi-text .kpi-label{margin:0 0 6px; line-height:1.20;}
-.kpi-long{font-size:11.5pt; font-weight:700; line-height:1.20; text-align:left; padding:0; white-space:normal;}
+.kpi-long{font-size:11.5pt; font-weight:700; line-height:1.20; text-align:left; padding:0; white-space:normal; letter-spacing:0;}
 .mn-chart{margin:8px 0 16px; page-break-inside:avoid;}
 .mn-chart-title{font-size:11pt; font-weight:600; color:{$azul}; margin:0 0 8px;}
 .mn-chart-note{font-size:9.5pt; font-weight:400; color:{$sec}; margin:0 0 12px;}
