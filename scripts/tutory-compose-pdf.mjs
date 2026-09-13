@@ -492,37 +492,36 @@ html, body {
   box-shadow: none !important;
   text-align: left;
   margin: 0;
-  display: table;
-  width: 100%;
-  table-layout: fixed;
 }
 .metric-label, .main-numbers p {
-  display: table-cell;
-  width: 38%;
-  vertical-align: middle;
-  font-size: 9.5pt;
+  display: block;
+  font-size: 8pt;
   font-weight: 600;
   color: var(--mn-sec);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin: 0;
-  padding: 0 8px 0 0;
-  line-height: 1.15;
+  margin: 0 0 4px;
+  padding: 0;
+  line-height: 1.12;
   text-align: left;
 }
 .metric-value, .main-numbers h3 {
-  display: table-cell;
-  width: 62%;
-  vertical-align: middle;
-  font-size: 21pt;
+  display: block;
+  font-size: 46pt;
   font-weight: 700;
   color: var(--mn-azul);
-  margin: 0;
-  line-height: 1.05;
-  text-align: right;
-  padding: 0 2px 0 8px;
+  margin: 4px 0 0;
+  line-height: 0.92;
+  text-align: left;
+  padding: 0;
   white-space: nowrap;
+  letter-spacing: -0.04em;
 }
+.metric-value.kpi-v-a, .main-numbers h3.kpi-v-a { font-size: 52pt; }
+.metric-value.kpi-v-b, .main-numbers h3.kpi-v-b { font-size: 44pt; }
+.metric-value.kpi-v-c, .main-numbers h3.kpi-v-c { font-size: 40pt; }
+.metric-value.kpi-v-d, .main-numbers h3.kpi-v-d { font-size: 34pt; }
+.metric-value.kpi-v-e, .main-numbers h3.kpi-v-e { font-size: 28pt; }
 .mn-legacy .row {
   display: flex;
   flex-wrap: wrap;
@@ -638,6 +637,7 @@ html, body {
   padding: 18px;
   vertical-align: middle;
 }
+.mn-sec-body .mn-kpis td.kpi.kpi-num { vertical-align: top; }
 .kpi-inner {
   width: 100%;
   border-collapse: collapse !important;
@@ -675,20 +675,46 @@ html, body {
   font-size: 21pt;
   font-weight: 700;
   color: var(--mn-azul);
-  line-height: 1.05;
-  text-align: right;
+  line-height: 0.95;
+  text-align: left;
   word-wrap: break-word;
-  padding: 0 2px 0 8px;
+  padding: 0;
   white-space: nowrap;
+  letter-spacing: -0.03em;
 }
-.kpi-num .kpi-label,
-.kpi-num .kpi-value { display: table-cell; vertical-align: middle; }
-.kpi-num .kpi-label { width: 40%; padding: 0 6px 0 0; }
-.kpi-num .kpi-value { width: 60%; }
+.kpi-num .kpi-label {
+  display: block;
+  width: auto;
+  max-width: 92%;
+  margin: 0 0 2px;
+  padding: 0;
+  font-size: 8pt;
+  line-height: 1.12;
+  font-weight: 600;
+}
+.kpi-num .kpi-value {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  margin: 4px 0 0;
+  padding: 0;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+  letter-spacing: -0.04em;
+  line-height: 0.92;
+}
+.kpi-num .kpi-v-a { font-size: 52pt; }
+.kpi-num .kpi-v-b { font-size: 44pt; }
+.kpi-num .kpi-v-c { font-size: 40pt; }
+.kpi-num .kpi-v-d { font-size: 34pt; }
+.kpi-num .kpi-v-e { font-size: 28pt; }
 .kpi-compact .kpi-label { font-size: 8pt; line-height: 1.12; }
-.kpi-compact .kpi-value { font-size: 18pt; }
-.kpi-value-sm { font-size: 16.5pt; }
-.kpi-compact .kpi-value-sm { font-size: 15pt; }
+.kpi-compact .kpi-v-a { font-size: 38pt; }
+.kpi-compact .kpi-v-b { font-size: 34pt; }
+.kpi-compact .kpi-v-c { font-size: 30pt; }
+.kpi-compact .kpi-v-d { font-size: 26pt; }
+.kpi-compact .kpi-v-e { font-size: 22pt; }
 .kpi-text .kpi-label { margin: 0 0 6px; line-height: 1.20; }
 .kpi-long {
   font-size: 11.5pt;
@@ -803,11 +829,20 @@ async function extractDesempenho(page) {
       const el = document.querySelector(sel);
       return el ? el.outerHTML : '';
     }
+    function classifyMetricValues(root) {
+      if (!root) return '';
+      const clone = root.cloneNode(true);
+      clone.querySelectorAll('.metric-value, .main-numbers h3').forEach((el) => {
+        const len = (el.textContent || '').trim().length;
+        el.classList.add(len <= 3 ? 'kpi-v-a' : len <= 4 ? 'kpi-v-b' : len <= 5 ? 'kpi-v-c' : len <= 6 ? 'kpi-v-d' : 'kpi-v-e');
+      });
+      return clone.outerHTML;
+    }
     return {
       nome: (document.querySelector('.aluno-details h4') || {}).textContent?.trim() || '',
       curso: (document.querySelector('.aluno-details p') || {}).textContent?.trim() || '',
       header: htmlOf('.main-header-card'),
-      metrics: htmlOf('.metrics-grid'),
+      metrics: classifyMetricValues(document.querySelector('.metrics-grid')) || htmlOf('.metrics-grid'),
     };
   }).then((parts) => ({ ...parts, css }));
 }
@@ -944,6 +979,10 @@ async function extractQuestoes(page) {
         wrap.appendChild(n.cloneNode(true));
         n = n.nextElementSibling;
       }
+      wrap.querySelectorAll('.metric-value, .main-numbers h3').forEach((el) => {
+        const len = (el.textContent || '').trim().length;
+        el.classList.add(len <= 3 ? 'kpi-v-a' : len <= 4 ? 'kpi-v-b' : len <= 5 ? 'kpi-v-c' : len <= 6 ? 'kpi-v-d' : 'kpi-v-e');
+      });
       return wrap.innerHTML;
     }
     return {
@@ -1175,7 +1214,16 @@ function parseInsightPart(text) {
 
 function isNumericKpiValue(value) {
   const v = String(value || '').trim();
-  return /^(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,3}(?:[.,]\d+)?\s*%|\d{1,6}(?:[.,]\d+)?\s*h(?:oras?)?|\d{1,6})$/i.test(v);
+  return /^(?:\d{1,4}:\d{2}(?::\d{2})?|\d{1,3}(?:[.,]\d+)?\s*%|\d{1,6}(?:[.,]\d+)?\s*h(?:oras?)?|\d{1,6})$/i.test(v);
+}
+
+function kpiSizeClass(value) {
+  const len = String(value || '').trim().length;
+  if (len <= 3) return 'kpi-v-a';
+  if (len <= 4) return 'kpi-v-b';
+  if (len <= 5) return 'kpi-v-c';
+  if (len <= 6) return 'kpi-v-d';
+  return 'kpi-v-e';
 }
 
 function kpiCellHtml(label, value, span, cols) {
@@ -1183,8 +1231,7 @@ function kpiCellHtml(label, value, span, cols) {
   const valueHtml = escapeHtml(value);
   if (isNumericKpiValue(value)) {
     const compact = cols >= 4;
-    const valueCls = (compact && String(value || '').trim().length >= 5) ? 'kpi-value kpi-value-sm' : 'kpi-value';
-    return `<td class="kpi kpi-num${compact ? ' kpi-compact' : ''}"${span}><table class="kpi-inner"><colgroup><col class="kpi-c-label" style="width:40%"><col class="kpi-c-value" style="width:60%"></colgroup><tbody><tr><td class="kpi-label">${labelHtml}</td><td class="${valueCls}">${valueHtml}</td></tr></tbody></table></td>`;
+    return `<td class="kpi kpi-num${compact ? ' kpi-compact' : ''}"${span}><div class="kpi-label">${labelHtml}</div><div class="kpi-value ${kpiSizeClass(value)}">${valueHtml}</div></td>`;
   }
   return `<td class="kpi kpi-text"${span}><div class="kpi-stack"><div class="kpi-label">${labelHtml}</div><div class="kpi-value kpi-long">${valueHtml}</div></div></td>`;
 }

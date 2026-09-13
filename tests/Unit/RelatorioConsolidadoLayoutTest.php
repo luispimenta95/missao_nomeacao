@@ -86,10 +86,11 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('kpi-long', $html);
         $this->assertStringContainsString('kpi-num', $html);
         $this->assertStringContainsString('kpi-text', $html);
-        $this->assertStringContainsString('kpi-inner', $html);
+        $this->assertStringContainsString('kpi-v-a', $html);
         $this->assertStringContainsString('kpi-stack', $html);
         $this->assertStringContainsString('class="kpi kpi-num"', $html);
         $this->assertStringContainsString('class="kpi kpi-text"', $html);
+        $this->assertStringNotContainsString('kpi-inner', $html);
         $this->assertStringNotContainsString('mn-insight-block', $html);
     }
 
@@ -211,9 +212,17 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('.kpi-inner{width:100%; border-collapse:collapse;', $css);
         $this->assertStringContainsString('.kpi-row{display:table; width:100%; table-layout:fixed;', $css);
         $this->assertStringContainsString('.kpi-row .kpi-label,.kpi-row .kpi-value{display:table-cell; vertical-align:middle;}', $css);
-        $this->assertStringContainsString('.kpi-num .kpi-label{width:40%;', $css);
-        $this->assertStringContainsString('.kpi-num .kpi-value{width:60%;}', $css);
+        $this->assertStringContainsString('.kpi-num .kpi-label{display:block; width:auto;', $css);
+        $this->assertStringContainsString('.kpi-num .kpi-v-a{font-size:52pt;}', $css);
+        $this->assertStringContainsString('.kpi-num .kpi-v-b{font-size:44pt;}', $css);
+        $this->assertStringContainsString('.kpi-num .kpi-v-c{font-size:40pt;}', $css);
+        $this->assertStringContainsString('.kpi-num .kpi-v-d{font-size:34pt;}', $css);
+        $this->assertStringContainsString('.kpi-num .kpi-v-e{font-size:28pt;}', $css);
         $this->assertStringContainsString('.kpi-compact .kpi-label{font-size:8pt;', $css);
+        $this->assertStringContainsString('.kpi-compact .kpi-v-a{font-size:38pt;}', $css);
+        $this->assertStringContainsString('.kpi-compact .kpi-v-b{font-size:34pt;}', $css);
+        $this->assertStringNotContainsString('.kpi-num .kpi-label{width:40%;', $css);
+        $this->assertStringNotContainsString('.kpi-compact .kpi-value{font-size:18pt;}', $css);
         $this->assertStringContainsString('.kpi-text .kpi-label{margin:0 0 6px; line-height:1.20;}', $css);
         $this->assertStringContainsString('.mn-table th{background:#001D3D; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}', $css);
         $this->assertStringNotContainsString('width:18%', $css);
@@ -258,7 +267,8 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringNotContainsString('kpi-hot', $tres);
         $this->assertSame(4, substr_count($quatro, 'kpi-num'));
         $this->assertStringContainsString('kpi-compact', $quatro);
-        $this->assertStringContainsString('kpi-inner', $quatro);
+        $this->assertStringContainsString('kpi-v-a', $quatro);
+        $this->assertStringNotContainsString('kpi-inner', $quatro);
         $texto = RelatorioConsolidadoLayout::cards([
             ['label' => 'Matéria mais estudada', 'value' => 'Direito Constitucional'],
         ]);
@@ -266,10 +276,33 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('kpi-stack', $texto);
         $this->assertStringContainsString('kpi-long', $texto);
         $this->assertStringNotContainsString('kpi-inner', $texto);
+        $this->assertStringNotContainsString('kpi-num', $texto);
         $this->assertTrue(RelatorioConsolidadoLayout::eValorNumerico('32h'));
         $this->assertTrue(RelatorioConsolidadoLayout::eValorNumerico('78,1%'));
         $this->assertTrue(RelatorioConsolidadoLayout::eValorNumerico('03:16'));
+        $this->assertTrue(RelatorioConsolidadoLayout::eValorNumerico('979:00'));
+        $this->assertTrue(RelatorioConsolidadoLayout::eValorNumerico('0%'));
         $this->assertFalse(RelatorioConsolidadoLayout::eValorNumerico('Direito Constitucional'));
+        $this->assertSame('kpi-v-a', RelatorioConsolidadoLayout::classeTamanhoValor('0%'));
+        $this->assertSame('kpi-v-a', RelatorioConsolidadoLayout::classeTamanhoValor('84%'));
+        $this->assertSame('kpi-v-a', RelatorioConsolidadoLayout::classeTamanhoValor('282'));
+        $this->assertSame('kpi-v-c', RelatorioConsolidadoLayout::classeTamanhoValor('83,7%'));
+        $this->assertSame('kpi-v-c', RelatorioConsolidadoLayout::classeTamanhoValor('00:00'));
+        $this->assertSame('kpi-v-d', RelatorioConsolidadoLayout::classeTamanhoValor('979:00'));
+    }
+
+    public function test_cards_numericos_maximizam_o_valor_abaixo_do_rotulo(): void
+    {
+        $html = RelatorioConsolidadoLayout::cards([
+            ['label' => 'Total de horas', 'value' => '979:00'],
+            ['label' => '% de acertos', 'value' => '84%'],
+            ['label' => 'Progresso geral', 'value' => '0%'],
+        ]);
+        $this->assertStringContainsString('<div class="kpi-label">Total de horas</div><div class="kpi-value kpi-v-d">979:00</div>', $html);
+        $this->assertStringContainsString('<div class="kpi-label">% de acertos</div><div class="kpi-value kpi-v-a">84%</div>', $html);
+        $this->assertStringContainsString('<div class="kpi-label">Progresso geral</div><div class="kpi-value kpi-v-a">0%</div>', $html);
+        $this->assertStringNotContainsString('kpi-inner', $html);
+        $this->assertStringNotContainsString('kpi-text', $html);
     }
 
     public function test_cabecalho_e_hierarquia_de_abertura(): void

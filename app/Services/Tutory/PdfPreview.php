@@ -20,10 +20,10 @@ final class PdfPreview
         $rotulo = RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-01'));
 
         $cards = RelatorioConsolidadoLayout::cards([
-            ['label' => 'Total de Horas', 'value' => '32h'],
-            ['label' => '% de acertos', 'value' => '78,1%'],
-            ['label' => 'Questões', 'value' => '248'],
-            ['label' => 'Revisões', 'value' => '12'],
+            ['label' => 'Total de Horas', 'value' => '979:00'],
+            ['label' => '% de acertos', 'value' => '84%'],
+            ['label' => 'Questões', 'value' => '282'],
+            ['label' => 'Progresso geral', 'value' => '0%'],
         ]);
 
         $ritmo = RelatorioConsolidadoLayout::grafico(
@@ -33,19 +33,19 @@ final class PdfPreview
         );
 
         $insights = RelatorioConsolidadoLayout::insights([
-            'Média diária 03:16',
+            'Média diária 00:00',
             'A matéria mais estudada foi Direito Constitucional.',
             'A matéria menos estudada foi SEDES - PORTUGUÊS.',
             'A matéria com maior solicitação de tempo extra foi SEDES - CONHECIMENTOS BÁSICOS.',
-            'Exercícios realizados 248',
-            'Acertos 194',
-            'Taxa de acertos 78,1%',
+            'Exercícios realizados 282',
+            'Acertos 306',
+            'Taxa de acertos 84%',
         ]);
 
         $questoes = RelatorioConsolidadoLayout::cards([
-            ['label' => 'Questões realizadas', 'value' => '248'],
-            ['label' => 'Acertos', 'value' => '194'],
-            ['label' => 'Percentual de acertos', 'value' => '78,1%'],
+            ['label' => 'Questões realizadas', 'value' => '282'],
+            ['label' => 'Acertos', 'value' => '306'],
+            ['label' => 'Percentual de acertos', 'value' => '83,7%'],
         ]);
 
         $assuntos = RelatorioConsolidadoLayout::tabela(
