@@ -180,7 +180,7 @@ class RelatoriosMentorTest extends TestCase
             $mes->invoke($downloader, $primeiro)->format('Y-m-d')
         );
         $this->assertSame(
-            'AGOSTO • PERÍODO 2',
+            'AGOSTO - PERÍODO 2',
             RelatorioConsolidadoLayout::rotuloPeriodo('2', $mes->invoke($downloader, $primeiro))
         );
     }
@@ -223,8 +223,8 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringNotContainsString('aplicarMarcaDaguaPdf', $php);
         $this->assertStringContainsString('use Illuminate\\Support\\Facades\\Http;', $php);
         $this->assertStringContainsString('aplicarCabecalhoRodape', $php);
-        $this->assertSame('AGOSTO • PERÍODO 1', RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10')));
-        $this->assertSame('AGOSTO • PERÍODO 2', RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-08-20')));
+        $this->assertSame('AGOSTO - PERÍODO 1', RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10')));
+        $this->assertSame('AGOSTO - PERÍODO 2', RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-08-20')));
         $this->assertSame('MISSÃO NOMEAÇÃO', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
         $this->assertStringNotContainsString('MISSÃO NOMEAÇÃO •', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
     }
@@ -401,6 +401,10 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('MISSÃO NOMEAÇÃO', $script);
         $this->assertStringNotContainsString('MISSÃO NOMEAÇÃO •', $script);
         $this->assertStringContainsString('headerPeriodoHtml', $script);
+        $this->assertStringContainsString("replace(/\\s+[•/]\\s+/g, ' - ')", $script);
+        $this->assertStringNotContainsString('border-radius:50%', $script);
+        $this->assertStringContainsString('.kpi-num .kpi-v-a { font-size: 24pt; }', $script);
+        $this->assertStringNotContainsString('font-size: 52pt', $script);
         $this->assertStringContainsString("top: '34mm'", $script);
         $this->assertStringContainsString("right: '16mm'", $script);
     }
