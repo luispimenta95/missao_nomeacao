@@ -507,7 +507,7 @@ html, body {
 }
 .metric-value, .main-numbers h3 {
   display: block;
-  font-size: 46pt;
+  font-size: 22pt;
   font-weight: 700;
   color: var(--mn-azul);
   margin: 4px 0 0;
@@ -517,11 +517,11 @@ html, body {
   white-space: nowrap;
   letter-spacing: -0.04em;
 }
-.metric-value.kpi-v-a, .main-numbers h3.kpi-v-a { font-size: 52pt; }
-.metric-value.kpi-v-b, .main-numbers h3.kpi-v-b { font-size: 44pt; }
-.metric-value.kpi-v-c, .main-numbers h3.kpi-v-c { font-size: 40pt; }
-.metric-value.kpi-v-d, .main-numbers h3.kpi-v-d { font-size: 34pt; }
-.metric-value.kpi-v-e, .main-numbers h3.kpi-v-e { font-size: 28pt; }
+.metric-value.kpi-v-a, .main-numbers h3.kpi-v-a { font-size: 24pt; }
+.metric-value.kpi-v-b, .main-numbers h3.kpi-v-b { font-size: 22pt; }
+.metric-value.kpi-v-c, .main-numbers h3.kpi-v-c { font-size: 20pt; }
+.metric-value.kpi-v-d, .main-numbers h3.kpi-v-d { font-size: 18pt; }
+.metric-value.kpi-v-e, .main-numbers h3.kpi-v-e { font-size: 16pt; }
 .mn-legacy .row {
   display: flex;
   flex-wrap: wrap;
@@ -594,14 +594,15 @@ html, body {
 .mn-sec-body th.mn-assunto,
 .mn-sec-body th.mn-mod,
 .mn-sec-body th.mn-horas,
-.mn-sec-body th.mn-qtd { text-align: center; vertical-align: middle; }
+.mn-sec-body th.mn-qtd,
+.mn-sec-body th.mn-pct { text-align: center; vertical-align: middle; }
 .mn-sec-body tbody td { vertical-align: middle; }
 .mn-sec-body tbody td.mn-disc,
 .mn-sec-body tbody td.mn-mod,
 .mn-sec-body tbody td.mn-horas,
 .mn-sec-body tbody td.num { text-align: center; vertical-align: middle; }
 .mn-sec-body tbody td.mn-assunto { text-align: center; vertical-align: middle; }
-.mn-sec-body tbody td.mn-pct { text-align: right; }
+.mn-sec-body tbody td.mn-pct { text-align: center; }
 .mn-sec-body tbody tr:nth-child(even) td { background: var(--mn-zebra); }
 .mn-sec-body tbody tr { break-inside: avoid; page-break-inside: avoid; }
 .mn-sec-body img {
@@ -704,17 +705,17 @@ html, body {
   letter-spacing: -0.04em;
   line-height: 0.92;
 }
-.kpi-num .kpi-v-a { font-size: 52pt; }
-.kpi-num .kpi-v-b { font-size: 44pt; }
-.kpi-num .kpi-v-c { font-size: 40pt; }
-.kpi-num .kpi-v-d { font-size: 34pt; }
-.kpi-num .kpi-v-e { font-size: 28pt; }
+.kpi-num .kpi-v-a { font-size: 24pt; }
+.kpi-num .kpi-v-b { font-size: 22pt; }
+.kpi-num .kpi-v-c { font-size: 20pt; }
+.kpi-num .kpi-v-d { font-size: 18pt; }
+.kpi-num .kpi-v-e { font-size: 16pt; }
 .kpi-compact .kpi-label { font-size: 8pt; line-height: 1.12; }
-.kpi-compact .kpi-v-a { font-size: 38pt; }
-.kpi-compact .kpi-v-b { font-size: 34pt; }
-.kpi-compact .kpi-v-c { font-size: 30pt; }
-.kpi-compact .kpi-v-d { font-size: 26pt; }
-.kpi-compact .kpi-v-e { font-size: 22pt; }
+.kpi-compact .kpi-v-a { font-size: 20pt; }
+.kpi-compact .kpi-v-b { font-size: 18pt; }
+.kpi-compact .kpi-v-c { font-size: 16.5pt; }
+.kpi-compact .kpi-v-d { font-size: 15pt; }
+.kpi-compact .kpi-v-e { font-size: 13.5pt; }
 .kpi-text .kpi-label { margin: 0 0 6px; line-height: 1.20; }
 .kpi-long {
   font-size: 11.5pt;
@@ -1040,12 +1041,9 @@ async function extractProgresso(page) {
 }
 
 function headerPeriodoHtml(rotulo) {
-  const safe = String(rotulo || '').replace(/</g, '');
-  const parts = safe.split(/\s+•\s+/);
-  if (parts.length === 2) {
-    return `${parts[0]}<span style="display:inline-block;width:3.2px;height:3.2px;border-radius:50%;background:currentColor;margin:0 0.48em;vertical-align:middle;position:relative;top:-0.06em;"></span>${parts[1]}`;
-  }
-  return safe.replace(/\s*\/\s*/g, '<span style="display:inline-block;width:3.2px;height:3.2px;border-radius:50%;background:currentColor;margin:0 0.48em;vertical-align:middle;position:relative;top:-0.06em;"></span>');
+  return String(rotulo || '')
+    .replace(/</g, '')
+    .replace(/\s+[•/]\s+/g, ' - ');
 }
 
 function escapeHtml(value) {

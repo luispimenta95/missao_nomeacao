@@ -26,7 +26,7 @@ Ordem fixa:
 | **Questões** `questoes` | Bolha, top melhores/piores, evolução por matéria |
 | **Progresso do plano** `progresso` | Progresso principal, panorama, modalidades, desempenho de questões |
 
-Performance por assunto aparece só uma vez, na implementação do relatório de Questões. Identidade: azul `#001D3D`, dourado `#BF8F00`, Inter, cabeçalho `MISSÃO NOMEAÇÃO` / `MÊS • PERÍODO N`, rodapé `Página X de Y`. Sem marca d'água diagonal.
+Performance por assunto aparece só uma vez, na implementação do relatório de Questões. Identidade: azul `#001D3D`, dourado `#BF8F00`, Inter, cabeçalho `MISSÃO NOMEAÇÃO` / `MÊS - PERÍODO N`, rodapé `Página X de Y`. Sem marca d'água diagonal.
 
 ## Fluxo
 

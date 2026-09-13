@@ -78,7 +78,7 @@ final class RelatorioConsolidadoLayout
         $mes = self::MESES[(int) $ref->format('n')] ?? mb_strtoupper($ref->format('F'));
         $n = $periodo === '2' ? '2' : '1';
 
-        return $mes.' • PERÍODO '.$n;
+        return $mes.' - PERÍODO '.$n;
     }
 
     public static function textoCabecalhoEsquerdo(): string
@@ -391,17 +391,17 @@ img{max-width:100%; height:auto;}
 .kpi-row .kpi-label,.kpi-row .kpi-value{display:table-cell; vertical-align:middle;}
 .kpi-num .kpi-label{display:block; width:auto; max-width:92%; margin:0 0 2px; padding:0; font-size:8pt; line-height:1.12; font-weight:600;}
 .kpi-num .kpi-value{display:block; width:auto; max-width:100%; margin:4px 0 0; padding:0; font-weight:700; text-align:left; white-space:nowrap; letter-spacing:-0.04em; line-height:0.92;}
-.kpi-num .kpi-v-a{font-size:52pt;}
-.kpi-num .kpi-v-b{font-size:44pt;}
-.kpi-num .kpi-v-c{font-size:40pt;}
-.kpi-num .kpi-v-d{font-size:34pt;}
-.kpi-num .kpi-v-e{font-size:28pt;}
+.kpi-num .kpi-v-a{font-size:24pt;}
+.kpi-num .kpi-v-b{font-size:22pt;}
+.kpi-num .kpi-v-c{font-size:20pt;}
+.kpi-num .kpi-v-d{font-size:18pt;}
+.kpi-num .kpi-v-e{font-size:16pt;}
 .kpi-compact .kpi-label{font-size:8pt; line-height:1.12;}
-.kpi-compact .kpi-v-a{font-size:38pt;}
-.kpi-compact .kpi-v-b{font-size:34pt;}
-.kpi-compact .kpi-v-c{font-size:30pt;}
-.kpi-compact .kpi-v-d{font-size:26pt;}
-.kpi-compact .kpi-v-e{font-size:22pt;}
+.kpi-compact .kpi-v-a{font-size:20pt;}
+.kpi-compact .kpi-v-b{font-size:18pt;}
+.kpi-compact .kpi-v-c{font-size:16.5pt;}
+.kpi-compact .kpi-v-d{font-size:15pt;}
+.kpi-compact .kpi-v-e{font-size:13.5pt;}
 .kpi-text .kpi-label{margin:0 0 6px; line-height:1.20;}
 .kpi-long{font-size:11.5pt; font-weight:700; line-height:1.20; text-align:left; padding:0; white-space:normal; letter-spacing:0;}
 .mn-chart{margin:8px 0 16px; page-break-inside:avoid;}
@@ -414,19 +414,19 @@ img{max-width:100%; height:auto;}
 .mn-table th,.mn-table td{height:auto; border:1.25pt solid {$azul};}
 .mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}
 .mn-table th.num{text-align:right;}
-.mn-table th.mn-disc,.mn-table th.mn-assunto,.mn-table th.mn-mod,.mn-table th.mn-horas,.mn-table th.mn-qtd{text-align:center; vertical-align:middle;}
+.mn-table th.mn-disc,.mn-table th.mn-assunto,.mn-table th.mn-mod,.mn-table th.mn-horas,.mn-table th.mn-qtd,.mn-table th.mn-pct{text-align:center; vertical-align:middle;}
 .mn-table td.num{white-space:nowrap;}
 .mn-table td.mn-horas{white-space:nowrap;}
 .mn-table td{padding:9px 11px; vertical-align:middle; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; font-size:9pt; font-weight:400; line-height:1.15; white-space:normal;}
 .mn-table td.mn-assunto,.mn-table td.mn-disc,.mn-table td.mn-mod{white-space:normal; word-wrap:break-word; overflow-wrap:break-word;}
 .mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num,.mn-table td.mn-assunto{text-align:center; vertical-align:middle;}
-.mn-table td.mn-pct{text-align:right;}
+.mn-table td.mn-pct{text-align:center;}
 .mn-table tr.z td{background:{$zebra};}
 .mn-table tr{page-break-inside:avoid; break-inside:avoid; height:auto;}
 .mn-table thead{page-break-after:avoid;}
 .mn-table tbody tr:first-child,.mn-table tbody tr:nth-child(2){page-break-before:avoid;}
 .pct{font-weight:600; font-size:9.5pt;}
-.bar-track{display:block; height:3px; background:#EEF0F3; margin-top:6px; width:72px; overflow:hidden;}
+.bar-track{display:block; height:3px; background:#EEF0F3; margin:6px auto 0; width:72px; overflow:hidden;}
 .bar-fill{display:block; height:3px;}
 .mn-insight-item,.mn-insight-block{page-break-inside:avoid; margin:0 0 16px;}
 .mn-insight-block{padding:10px 0 10px 12px; border-left:2px solid {$ouro};}
@@ -463,7 +463,8 @@ CSS;
 
             $marca = self::textoCabecalhoEsquerdo();
             $canvas->page_text($left, 26.0, $marca, $bold, 8.0, $azul);
-            self::desenharRotuloPeriodo($canvas, $metrics, $regular, $rotuloPeriodo, $right, 26.0, 8.0, $cinza);
+            $rotuloW = $metrics->getTextWidth($rotuloPeriodo, $regular, 8.0);
+            $canvas->page_text($right - $rotuloW, 26.0, $rotuloPeriodo, $regular, 8.0, $cinza);
             $canvas->page_line($left, 48.0, $right, 48.0, $ouro, 0.6);
 
             $pag = 'Página {PAGE_NUM} de {PAGE_COUNT}';
@@ -472,51 +473,6 @@ CSS;
         } catch (Throwable) {
             // Relatório segue válido sem chrome de página.
         }
-    }
-
-    /**
-     * Desenha "MÊS • PERÍODO N" com bolinha no centro óptico das letras.
-     *
-     * @param  array{0?: float, 1?: float, 2?: float}  $color
-     */
-    private static function desenharRotuloPeriodo(
-        object $canvas,
-        object $metrics,
-        string $font,
-        string $rotuloPeriodo,
-        float $right,
-        float $yBaseline,
-        float $size,
-        array $color,
-    ): void {
-        $partes = preg_split('/\s+•\s+/u', $rotuloPeriodo) ?: [];
-        if (count($partes) !== 2) {
-            $rotuloW = $metrics->getTextWidth($rotuloPeriodo, $font, $size);
-            $canvas->page_text($right - $rotuloW, $yBaseline, $rotuloPeriodo, $font, $size, $color);
-
-            return;
-        }
-
-        [$mes, $periodo] = $partes;
-        $mesW = $metrics->getTextWidth($mes, $font, $size);
-        $perW = $metrics->getTextWidth($periodo, $font, $size);
-        $gap = $size * 0.42;
-        $raio = max(1.05, $size * 0.145);
-        $total = $mesW + $gap + ($raio * 2) + $gap + $perW;
-        $x = $right - $total;
-        $canvas->page_text($x, $yBaseline, $mes, $font, $size, $color);
-        $cx = $x + $mesW + $gap + $raio;
-        // page_text() usa o topo da caixa da linha; circle() usa o mesmo eixo, sem descontar a altura da fonte.
-        $fontHeight = $metrics->getFontHeight($font, $size);
-        $cy = $yBaseline + ($fontHeight * 0.38);
-        if (method_exists($canvas, 'page_script')) {
-            $canvas->page_script(static function ($pageNumber, $pageCount, $pageCanvas) use ($cx, $cy, $raio, $color): void {
-                if (method_exists($pageCanvas, 'circle')) {
-                    $pageCanvas->circle($cx, $cy, $raio, $color, 0.01, [], true);
-                }
-            });
-        }
-        $canvas->page_text($x + $mesW + $gap + ($raio * 2) + $gap, $yBaseline, $periodo, $font, $size, $color);
     }
 
     /**
