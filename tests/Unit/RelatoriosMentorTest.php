@@ -330,9 +330,13 @@ class RelatoriosMentorTest extends TestCase
         $this->assertSame('600', $cfg['options']['scales']['yAxes'][0]['scaleLabel']['fontStyle']);
         $this->assertSame('end', $cfg['options']['plugins']['datalabels']['align']);
         $this->assertSame('end', $cfg['options']['plugins']['datalabels']['anchor']);
-        $this->assertSame(4, $cfg['data']['datasets'][0]['datalabels']['offset']);
-        $this->assertSame(14, $cfg['data']['datasets'][1]['datalabels']['offset']);
+        $this->assertSame(2, $cfg['data']['datasets'][0]['datalabels']['offset']);
+        $this->assertSame(8, $cfg['data']['datasets'][1]['datalabels']['offset']);
         $this->assertSame('end', $cfg['data']['datasets'][0]['datalabels']['align']);
+        $this->assertSame(7, $cfg['options']['plugins']['datalabels']['font']['size']);
+        $this->assertNull($cfg['options']['plugins']['datalabels']['backgroundColor']);
+        $this->assertSame(10.0, $cfg['options']['scales']['yAxes'][0]['ticks']['max']);
+        $this->assertSame(2, $cfg['options']['scales']['yAxes'][0]['ticks']['stepSize']);
         $this->assertLessThan(0.70, $cfg['data']['datasets'][0]['categoryPercentage']);
         $this->assertGreaterThan($cfg['data']['datasets'][0]['categoryPercentage'], $cfg['data']['datasets'][0]['barPercentage']);
         $this->assertNotContains(RelatorioConsolidadoLayout::AZUL_CLARO, [
@@ -368,9 +372,10 @@ class RelatoriosMentorTest extends TestCase
         $this->assertSame('Questões', $cfg['options']['scales']['yAxes'][0]['scaleLabel']['labelString']);
         $this->assertSame('top', $cfg['options']['legend']['position']);
         $this->assertSame(0, $cfg['options']['scales']['xAxes'][0]['ticks']['maxRotation']);
-        $this->assertSame(4, $cfg['data']['datasets'][0]['datalabels']['offset']);
-        $this->assertSame(14, $cfg['data']['datasets'][1]['datalabels']['offset']);
+        $this->assertSame(2, $cfg['data']['datasets'][0]['datalabels']['offset']);
+        $this->assertSame(8, $cfg['data']['datasets'][1]['datalabels']['offset']);
         $this->assertSame('end', $cfg['data']['datasets'][0]['datalabels']['align']);
+        $this->assertSame(7, $cfg['options']['plugins']['datalabels']['font']['size']);
     }
 
     public function test_grafico_de_horas_diarias_tem_rotulos_nos_vertices(): void

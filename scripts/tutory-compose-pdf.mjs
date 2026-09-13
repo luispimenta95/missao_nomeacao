@@ -276,8 +276,8 @@ function labelHoursOnChartVertices() {
     if (!kind || !chart || !chart.options) continue;
 
     const nLabels = (chart.data && chart.data.labels) ? chart.data.labels.length : 1;
-    const cat = nLabels >= 16 ? 0.52 : (nLabels >= 13 ? 0.56 : 0.60);
-    const barPct = 0.86;
+    const cat = nLabels >= 16 ? 0.62 : (nLabels >= 13 ? 0.68 : 0.72);
+    const barPct = 0.88;
     const tickSize = nLabels >= 16 ? 9 : 10;
     if (chart.config) chart.config.type = 'bar';
     chart.type = 'bar';
@@ -293,7 +293,7 @@ function labelHoursOnChartVertices() {
         ds.barPercentage = barPct;
         ds.borderRadius = 3;
         ds.borderSkipped = 'bottom';
-        ds.datalabels = { align: 'end', anchor: 'end', offset: i === 1 ? 14 : 4 };
+        ds.datalabels = { align: 'end', anchor: 'end', offset: i === 1 ? 8 : 2 };
       });
     }
     chart.options.scales = chart.options.scales || {};
@@ -312,6 +312,23 @@ function labelHoursOnChartVertices() {
         fontStyle: '600',
       },
     }];
+    const yTicks = { beginAtZero: true, fontSize: tickSize, fontColor: '#001D3D', fontStyle: '600' };
+    if (kind === 'hours') {
+      let maxH = 0;
+      (chart.data.datasets || []).forEach((ds) => {
+        (ds.data || []).forEach((v) => {
+          const n = Number(v && typeof v === 'object' && 'y' in v ? v.y : v);
+          if (Number.isFinite(n) && n > maxH) maxH = n;
+        });
+      });
+      let yTop = 10;
+      if (maxH > 10) {
+        yTop = Math.max(10, Math.ceil(maxH / 2) * 2);
+        if (maxH >= yTop) yTop += 2;
+      }
+      yTicks.max = yTop;
+      yTicks.stepSize = 2;
+    }
     chart.options.scales.yAxes = [{
       stacked: false,
       gridLines: { color: 'rgba(0, 0, 0, 0.05)', drawBorder: false, lineWidth: 0.4, zeroLineColor: 'rgba(0, 0, 0, 0.05)', drawTicks: false },
@@ -320,14 +337,14 @@ function labelHoursOnChartVertices() {
         labelString: kind === 'hours' ? 'Horas' : 'Questões',
         fontColor: '#001D3D',
         fontStyle: '600',
-        fontSize: tickSize,
+        fontSize: 10,
       },
-      ticks: { beginAtZero: true, fontSize: tickSize, fontColor: '#001D3D', fontStyle: '600' },
+      ticks: yTicks,
     }];
     chart.options.legend = Object.assign({}, chart.options.legend || {}, {
       display: true,
       position: 'top',
-      labels: { boxWidth: 10, fontSize: 10, fontColor: '#001D3D', fontStyle: '600', padding: 16 },
+      labels: { boxWidth: 10, fontSize: 10, fontColor: '#001D3D', fontStyle: '600', padding: 12 },
     });
     chart.options.cornerRadius = 3;
 
@@ -336,11 +353,11 @@ function labelHoursOnChartVertices() {
       clamp: true,
       clip: false,
       color: '#001D3D',
-      backgroundColor: 'rgba(255,255,255,0.88)',
+      backgroundColor: null,
       borderRadius: 0,
-      padding: { top: 1, right: 2, bottom: 1, left: 2 },
-      font: { size: 9, weight: '600' },
-      offset: 4,
+      padding: 0,
+      font: { size: 7, weight: '600' },
+      offset: 2,
       formatter: kind === 'hours' ? formatHourLabel : formatCountLabel,
       align: 'end',
       anchor: 'end',
@@ -354,16 +371,16 @@ function labelHoursOnChartVertices() {
     const padding = chart.options.layout.padding;
     if (typeof padding === 'number') {
       chart.options.layout.padding = {
-        top: Math.max(padding, 28),
+        top: Math.max(padding, 16),
         right: padding,
-        bottom: Math.max(padding, 18),
+        bottom: Math.max(padding, 12),
         left: padding,
       };
     } else {
       const base = padding && typeof padding === 'object' ? padding : {};
       chart.options.layout.padding = Object.assign({}, base, {
-        top: Math.max(Number(base.top) || 0, 28),
-        bottom: Math.max(Number(base.bottom) || 0, 18),
+        top: Math.max(Number(base.top) || 0, 16),
+        bottom: Math.max(Number(base.bottom) || 0, 12),
       });
     }
     applied += 1;
