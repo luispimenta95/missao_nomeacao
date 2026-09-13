@@ -276,8 +276,9 @@ function labelHoursOnChartVertices() {
     if (!kind || !chart || !chart.options) continue;
 
     const nLabels = (chart.data && chart.data.labels) ? chart.data.labels.length : 1;
-    const cat = nLabels >= 16 ? 0.70 : (nLabels >= 14 ? 0.76 : 0.82);
-    const barPct = nLabels >= 16 ? 0.80 : (nLabels >= 14 ? 0.82 : 0.85);
+    const cat = nLabels >= 16 ? 0.52 : (nLabels >= 13 ? 0.56 : 0.60);
+    const barPct = 0.86;
+    const tickSize = nLabels >= 16 ? 9 : 10;
     if (chart.config) chart.config.type = 'bar';
     chart.type = 'bar';
     if (chart.data && Array.isArray(chart.data.datasets)) {
@@ -292,35 +293,41 @@ function labelHoursOnChartVertices() {
         ds.barPercentage = barPct;
         ds.borderRadius = 3;
         ds.borderSkipped = 'bottom';
-        ds.datalabels = {
-          align: i === 0 ? 'left' : 'right',
-          anchor: 'end',
-          offset: i === 0 ? 4 : 8,
-        };
+        ds.datalabels = { align: 'end', anchor: 'end', offset: i === 1 ? 14 : 4 };
       });
     }
     chart.options.scales = chart.options.scales || {};
     chart.options.scales.xAxes = [{
       stacked: false,
+      categoryPercentage: cat,
+      barPercentage: barPct,
       gridLines: { display: false, drawBorder: false },
       ticks: {
         autoSkip: false,
         maxTicksLimit: Math.max(nLabels, 1),
-        maxRotation: nLabels >= 16 ? 15 : 0,
+        maxRotation: 0,
         minRotation: 0,
-        fontSize: nLabels >= 16 ? 8 : 10,
+        fontSize: tickSize,
         fontColor: '#001D3D',
         fontStyle: '600',
       },
     }];
     chart.options.scales.yAxes = [{
       stacked: false,
-      gridLines: { color: 'rgba(15, 23, 42, 0.08)', drawBorder: false, lineWidth: 0.5 },
-      ticks: { beginAtZero: true, fontSize: 10, fontColor: '#001D3D', fontStyle: '600' },
+      gridLines: { color: 'rgba(0, 0, 0, 0.05)', drawBorder: false, lineWidth: 0.4, zeroLineColor: 'rgba(0, 0, 0, 0.05)', drawTicks: false },
+      scaleLabel: {
+        display: true,
+        labelString: kind === 'hours' ? 'Horas' : 'Questões',
+        fontColor: '#001D3D',
+        fontStyle: '600',
+        fontSize: tickSize,
+      },
+      ticks: { beginAtZero: true, fontSize: tickSize, fontColor: '#001D3D', fontStyle: '600' },
     }];
     chart.options.legend = Object.assign({}, chart.options.legend || {}, {
       display: true,
-      labels: { boxWidth: 10, fontSize: 10, fontColor: '#001D3D', fontStyle: '600' },
+      position: 'top',
+      labels: { boxWidth: 10, fontSize: 10, fontColor: '#001D3D', fontStyle: '600', padding: 16 },
     });
     chart.options.cornerRadius = 3;
 
@@ -332,7 +339,7 @@ function labelHoursOnChartVertices() {
       backgroundColor: 'rgba(255,255,255,0.88)',
       borderRadius: 0,
       padding: { top: 1, right: 2, bottom: 1, left: 2 },
-      font: { size: 8, weight: '600' },
+      font: { size: 9, weight: '600' },
       offset: 4,
       formatter: kind === 'hours' ? formatHourLabel : formatCountLabel,
       align: 'end',
@@ -347,7 +354,7 @@ function labelHoursOnChartVertices() {
     const padding = chart.options.layout.padding;
     if (typeof padding === 'number') {
       chart.options.layout.padding = {
-        top: Math.max(padding, 24),
+        top: Math.max(padding, 28),
         right: padding,
         bottom: Math.max(padding, 18),
         left: padding,
@@ -355,7 +362,7 @@ function labelHoursOnChartVertices() {
     } else {
       const base = padding && typeof padding === 'object' ? padding : {};
       chart.options.layout.padding = Object.assign({}, base, {
-        top: Math.max(Number(base.top) || 0, 24),
+        top: Math.max(Number(base.top) || 0, 28),
         bottom: Math.max(Number(base.bottom) || 0, 18),
       });
     }
@@ -468,24 +475,36 @@ html, body {
   box-shadow: none !important;
   text-align: left;
   margin: 0;
+  display: table;
+  width: 100%;
+  table-layout: fixed;
 }
 .metric-label, .main-numbers p {
+  display: table-cell;
+  width: 38%;
+  vertical-align: middle;
   font-size: 9.5pt;
   font-weight: 600;
   color: var(--mn-sec);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin: 0 0 8px;
-  line-height: 1.20;
+  margin: 0;
+  padding: 0 8px 0 0;
+  line-height: 1.15;
   text-align: left;
 }
 .metric-value, .main-numbers h3 {
+  display: table-cell;
+  width: 62%;
+  vertical-align: middle;
   font-size: 21pt;
   font-weight: 700;
   color: var(--mn-azul);
   margin: 0;
-  line-height: 1.20;
+  line-height: 1.05;
   text-align: right;
+  padding: 0 2px 0 8px;
+  white-space: nowrap;
 }
 .mn-legacy .row {
   display: flex;
@@ -600,33 +619,67 @@ html, body {
   border: 1.5pt solid var(--mn-ouro) !important;
   border-radius: 9px;
   padding: 18px;
-  vertical-align: top;
+  vertical-align: middle;
 }
+.kpi-inner {
+  width: 100%;
+  border-collapse: collapse !important;
+  table-layout: fixed;
+  margin: 0 !important;
+  padding: 0;
+  border: 0 !important;
+}
+.kpi-inner td {
+  border: 0 !important;
+  padding: 0 !important;
+  vertical-align: middle !important;
+  background: transparent !important;
+}
+.kpi-row {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+}
+.kpi-stack { display: block; width: 100%; margin: 0; padding: 0; }
 .kpi-label {
   font-size: 9.5pt;
   font-weight: 600;
   color: var(--mn-sec);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin: 0 0 8px;
-  line-height: 1.20;
+  margin: 0;
+  line-height: 1.15;
   text-align: left;
 }
 .kpi-value {
   font-size: 21pt;
   font-weight: 700;
   color: var(--mn-azul);
-  line-height: 1.20;
+  line-height: 1.05;
   text-align: right;
   word-wrap: break-word;
-  padding: 2px 2px 0 8px;
+  padding: 0 2px 0 8px;
+  white-space: nowrap;
 }
+.kpi-num .kpi-label,
+.kpi-num .kpi-value { display: table-cell; vertical-align: middle; }
+.kpi-num .kpi-label { width: 40%; padding: 0 6px 0 0; }
+.kpi-num .kpi-value { width: 60%; }
+.kpi-compact .kpi-label { font-size: 8pt; line-height: 1.12; }
+.kpi-compact .kpi-value { font-size: 18pt; }
+.kpi-value-sm { font-size: 16.5pt; }
+.kpi-compact .kpi-value-sm { font-size: 15pt; }
+.kpi-text .kpi-label { margin: 0 0 6px; line-height: 1.20; }
 .kpi-long {
   font-size: 11.5pt;
   font-weight: 700;
   line-height: 1.20;
   text-align: left;
-  padding: 2px 0 0;
+  padding: 0;
+  white-space: normal;
 }
 @media print {
   .mn-sec-head, .mn-chart, .metric-card, .main-header-card {
@@ -1103,6 +1156,22 @@ function parseInsightPart(text) {
   return null;
 }
 
+function isNumericKpiValue(value) {
+  const v = String(value || '').trim();
+  return /^(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,3}(?:[.,]\d+)?\s*%|\d{1,6}(?:[.,]\d+)?\s*h(?:oras?)?|\d{1,6})$/i.test(v);
+}
+
+function kpiCellHtml(label, value, span, cols) {
+  const labelHtml = escapeHtml(label);
+  const valueHtml = escapeHtml(value);
+  if (isNumericKpiValue(value)) {
+    const compact = cols >= 4;
+    const valueCls = (compact && String(value || '').trim().length >= 5) ? 'kpi-value kpi-value-sm' : 'kpi-value';
+    return `<td class="kpi kpi-num${compact ? ' kpi-compact' : ''}"${span}><table class="kpi-inner"><colgroup><col class="kpi-c-label" style="width:40%"><col class="kpi-c-value" style="width:60%"></colgroup><tbody><tr><td class="kpi-label">${labelHtml}</td><td class="${valueCls}">${valueHtml}</td></tr></tbody></table></td>`;
+  }
+  return `<td class="kpi kpi-text"${span}><div class="kpi-stack"><div class="kpi-label">${labelHtml}</div><div class="kpi-value kpi-long">${valueHtml}</div></div></td>`;
+}
+
 function formatInsightsHtml(html) {
   if (!html) return '';
   if (/mn-kpis/.test(html) && /kpi-value/.test(html)) return html;
@@ -1136,8 +1205,7 @@ function formatInsightsHtml(html) {
     out += '<tr>';
     row.forEach((item, idx) => {
       const span = (idx === row.length - 1 && row.length < cols) ? ` colspan="${cols - row.length + 1}"` : '';
-      const valueCls = String(item[1] || '').length > 12 ? 'kpi-value kpi-long' : 'kpi-value';
-      out += `<td class="kpi"${span}><div class="kpi-label">${escapeHtml(item[0])}</div><div class="${valueCls}">${escapeHtml(item[1])}</div></td>`;
+      out += kpiCellHtml(item[0], item[1], span, cols);
     });
     out += '</tr>';
   }
