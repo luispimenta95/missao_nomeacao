@@ -2741,8 +2741,8 @@ HTML;
             ? $data['options']['layout']
             : [];
 
-        $cat = $n >= 16 ? 0.52 : ($n >= 13 ? 0.56 : 0.60);
-        $bar = 0.86;
+        $cat = $n >= 16 ? 0.62 : ($n >= 13 ? 0.68 : 0.72);
+        $bar = 0.88;
         $tickSize = $n >= 16 ? 9 : 10;
         $navy = RelatorioConsolidadoLayout::AZUL;
 
@@ -2773,7 +2773,7 @@ HTML;
                 $data['data']['datasets'][$i]['datalabels'] = [
                     'align' => 'end',
                     'anchor' => 'end',
-                    'offset' => $i === 1 ? 14 : 4,
+                    'offset' => $i === 1 ? 8 : 2,
                 ];
                 foreach (is_array($ds['data'] ?? null) ? $ds['data'] : [] as $valor) {
                     if (is_numeric($valor) && (float) $valor > $max) {
@@ -2784,11 +2784,27 @@ HTML;
         }
 
         $yMax = $max > 0 ? $max * 1.40 : 1;
+        $yHoras = 10.0;
+        if ($max > 10) {
+            $yHoras = max(10.0, ceil($max / 2) * 2);
+            if ($max >= $yHoras) {
+                $yHoras += 2;
+            }
+        }
         $eixo = [
             'fontSize' => $tickSize,
             'fontColor' => $navy,
             'fontStyle' => '600',
         ];
+        $yTicks = array_merge($eixo, [
+            'beginAtZero' => true,
+        ]);
+        if ($eHoras) {
+            $yTicks['max'] = $yHoras;
+            $yTicks['stepSize'] = 2;
+        } else {
+            $yTicks['suggestedMax'] = $yMax;
+        }
         $data['options']['scales'] = [
             'xAxes' => [[
                 'stacked' => false,
@@ -2819,12 +2835,9 @@ HTML;
                     'labelString' => $eHoras ? 'Horas' : 'Questões',
                     'fontColor' => $navy,
                     'fontStyle' => '600',
-                    'fontSize' => $tickSize,
+                    'fontSize' => 10,
                 ],
-                'ticks' => array_merge($eixo, [
-                    'beginAtZero' => true,
-                    'suggestedMax' => $yMax,
-                ]),
+                'ticks' => $yTicks,
             ]],
         ];
 
@@ -2844,21 +2857,21 @@ HTML;
             'display' => true,
             'anchor' => 'end',
             'align' => 'end',
-            'offset' => 4,
+            'offset' => 2,
             'clamp' => true,
             'clip' => false,
             'color' => $navy,
-            'backgroundColor' => 'rgba(255,255,255,0.88)',
+            'backgroundColor' => null,
             'borderWidth' => 0,
-            'padding' => 1,
-            'font' => ['size' => 9, 'weight' => '600'],
+            'padding' => 0,
+            'font' => ['size' => 7, 'weight' => '600'],
             'formatter' => $eHoras ? '__DATALABEL_HOURS_BAR__' : '__DATALABEL_COUNT_BAR__',
         ];
         $padding = is_array($data['options']['layout']['padding'] ?? null)
             ? $data['options']['layout']['padding']
             : [];
         $data['options']['layout']['padding'] = array_merge($padding, [
-            'top' => max((int) ($padding['top'] ?? 0), 28),
+            'top' => max((int) ($padding['top'] ?? 0), 16),
             'bottom' => max((int) ($padding['bottom'] ?? 0), 8),
         ]);
 
@@ -3252,8 +3265,8 @@ HTML;
                 // Pizza: render nítido na proporção do PDF (único ajuste de tamanho)
                 $width = self::PIE_RENDER_WIDTH;
                 $height = self::PIE_RENDER_HEIGHT;
-            } elseif ($type === 'bar' && $labelCount <= 4) {
-                $height = 320;
+            } elseif ($type === 'bar') {
+                $height = $labelCount <= 4 ? 320 : 280;
             }
 
             $payload = [
