@@ -324,6 +324,17 @@ class RelatoriosMentorTest extends TestCase
         $this->assertSame(RelatorioConsolidadoLayout::AZUL, $cfg['options']['scales']['xAxes'][0]['ticks']['fontColor']);
         $this->assertSame('600', $cfg['options']['scales']['xAxes'][0]['ticks']['fontStyle']);
         $this->assertSame(RelatorioConsolidadoLayout::AZUL, $cfg['options']['scales']['yAxes'][0]['ticks']['fontColor']);
+        $this->assertSame(0, $cfg['options']['scales']['xAxes'][0]['ticks']['maxRotation']);
+        $this->assertSame('top', $cfg['options']['legend']['position']);
+        $this->assertSame('Horas', $cfg['options']['scales']['yAxes'][0]['scaleLabel']['labelString']);
+        $this->assertSame('600', $cfg['options']['scales']['yAxes'][0]['scaleLabel']['fontStyle']);
+        $this->assertSame('end', $cfg['options']['plugins']['datalabels']['align']);
+        $this->assertSame('end', $cfg['options']['plugins']['datalabels']['anchor']);
+        $this->assertSame(4, $cfg['data']['datasets'][0]['datalabels']['offset']);
+        $this->assertSame(14, $cfg['data']['datasets'][1]['datalabels']['offset']);
+        $this->assertSame('end', $cfg['data']['datasets'][0]['datalabels']['align']);
+        $this->assertLessThan(0.70, $cfg['data']['datasets'][0]['categoryPercentage']);
+        $this->assertGreaterThan($cfg['data']['datasets'][0]['categoryPercentage'], $cfg['data']['datasets'][0]['barPercentage']);
         $this->assertNotContains(RelatorioConsolidadoLayout::AZUL_CLARO, [
             $cfg['data']['datasets'][0]['backgroundColor'],
             $cfg['data']['datasets'][1]['backgroundColor'],
@@ -354,6 +365,12 @@ class RelatoriosMentorTest extends TestCase
         $this->assertSame('__DATALABEL_COUNT_BAR__', $cfg['options']['plugins']['datalabels']['formatter']);
         $this->assertSame(RelatorioConsolidadoLayout::AZUL, $cfg['options']['scales']['xAxes'][0]['ticks']['fontColor']);
         $this->assertSame('600', $cfg['options']['scales']['yAxes'][0]['ticks']['fontStyle']);
+        $this->assertSame('Questões', $cfg['options']['scales']['yAxes'][0]['scaleLabel']['labelString']);
+        $this->assertSame('top', $cfg['options']['legend']['position']);
+        $this->assertSame(0, $cfg['options']['scales']['xAxes'][0]['ticks']['maxRotation']);
+        $this->assertSame(4, $cfg['data']['datasets'][0]['datalabels']['offset']);
+        $this->assertSame(14, $cfg['data']['datasets'][1]['datalabels']['offset']);
+        $this->assertSame('end', $cfg['data']['datasets'][0]['datalabels']['align']);
     }
 
     public function test_grafico_de_horas_diarias_tem_rotulos_nos_vertices(): void
@@ -449,7 +466,10 @@ class RelatoriosMentorTest extends TestCase
                 $this->assertStringContainsString('MISSÃO', $txt);
                 $this->assertStringContainsString('NOMEAÇÃO', $txt);
                 $this->assertStringContainsString('GIOVANNA', $txt);
-                $this->assertStringContainsStringIgnoringCase('Total de Horas', $txt);
+                $this->assertStringContainsStringIgnoringCase('Total de', $txt);
+                $this->assertStringContainsStringIgnoringCase('Horas', $txt);
+                $this->assertStringContainsString('10h', $txt);
+                $this->assertStringContainsString('80%', $txt);
                 $this->assertStringContainsString('Seu desempenho', $txt);
                 $this->assertStringContainsString('Painel de Insights', $txt);
                 $this->assertStringContainsString('Desempenho em questões', $txt);

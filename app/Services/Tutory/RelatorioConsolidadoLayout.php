@@ -195,18 +195,58 @@ final class RelatorioConsolidadoLayout
             $span = $cols - count($linha);
             foreach ($linha as $i => $item) {
                 $colspan = ($i === count($linha) - 1 && $span > 0) ? ' colspan="'.($span + 1).'"' : '';
-                $valor = (string) $item['value'];
-                $valorCls = mb_strlen($valor) > 12 ? 'kpi-value kpi-long' : 'kpi-value';
-                $html .= '<td class="kpi"'.$colspan.'>'
-                    .'<div class="kpi-label">'.htmlspecialchars((string) $item['label'], ENT_QUOTES, 'UTF-8').'</div>'
-                    .'<div class="'.$valorCls.'">'.htmlspecialchars($valor, ENT_QUOTES, 'UTF-8').'</div>'
-                    .'</td>';
+                $html .= self::htmlCardItem(
+                    (string) $item['label'],
+                    (string) $item['value'],
+                    $colspan,
+                    $cols
+                );
             }
             $html .= '</tr>';
         }
         $html .= '</tbody></table>';
 
         return $html;
+    }
+
+    private static function htmlCardItem(string $label, string $valor, string $colspan, int $cols): string
+    {
+        $labelHtml = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+        $valorHtml = htmlspecialchars($valor, ENT_QUOTES, 'UTF-8');
+        if (self::eValorNumerico($valor)) {
+            $compact = $cols >= 4;
+            $valorCls = 'kpi-value';
+            if ($compact && mb_strlen(trim($valor)) >= 5) {
+                $valorCls .= ' kpi-value-sm';
+            }
+
+            return '<td class="kpi kpi-num'.($compact ? ' kpi-compact' : '').'"'.$colspan.'>'
+                .'<table class="kpi-inner"><colgroup>'
+                .'<col class="kpi-c-label" style="width:40%">'
+                .'<col class="kpi-c-value" style="width:60%">'
+                .'</colgroup><tbody><tr>'
+                .'<td class="kpi-label">'.$labelHtml.'</td>'
+                .'<td class="'.$valorCls.'">'.$valorHtml.'</td>'
+                .'</tr></tbody></table>'
+                .'</td>';
+        }
+
+        return '<td class="kpi kpi-text"'.$colspan.'>'
+            .'<div class="kpi-stack">'
+            .'<div class="kpi-label">'.$labelHtml.'</div>'
+            .'<div class="kpi-value kpi-long">'.$valorHtml.'</div>'
+            .'</div>'
+            .'</td>';
+    }
+
+    public static function eValorNumerico(string $valor): bool
+    {
+        $v = trim($valor);
+
+        return $v !== '' && (bool) preg_match(
+            '/^(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,3}(?:[.,]\d+)?\s*%|\d{1,6}(?:[.,]\d+)?\s*h(?:oras?)?|\d{1,6})$/iu',
+            $v
+        );
     }
 
     /**
@@ -333,10 +373,24 @@ img{max-width:100%; height:auto;}
 .mn-sec-insights .mn-sec-head,.mn-sec-table .mn-sec-head{page-break-after:avoid;}
 .mn-sec-insights .mn-kpis{border-spacing:14px 14px;}
 .mn-kpis{width:100%; border-collapse:separate; border-spacing:14px 0; table-layout:fixed; margin:0 0 8px;}
-.mn-kpis td.kpi{background:#ffffff; border:1.5pt solid {$ouro}; border-radius:9px; padding:18px 18px; vertical-align:top; page-break-inside:avoid;}
-.kpi-label{font-size:9.5pt; font-weight:600; color:{$sec}; letter-spacing:0.04em; text-transform:uppercase; margin:0 0 8px; line-height:1.20; text-align:left;}
-.kpi-value{font-size:21pt; font-weight:700; color:{$azul}; line-height:1.20; text-align:right; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; padding:2px 2px 0 8px;}
-.kpi-long{font-size:11.5pt; font-weight:700; line-height:1.20; text-align:left; padding:2px 0 0;}
+.mn-kpis td.kpi{background:#ffffff; border:1.5pt solid {$ouro}; border-radius:9px; padding:18px 18px; vertical-align:middle; page-break-inside:avoid;}
+.kpi-inner{width:100%; border-collapse:collapse; border-spacing:0; table-layout:fixed; margin:0; padding:0; border:0;}
+.kpi-inner col.kpi-c-label{width:40%;}
+.kpi-inner col.kpi-c-value{width:60%;}
+.kpi-inner td{border:0; margin:0; padding:0; vertical-align:middle; background:transparent;}
+.kpi-row{display:table; width:100%; table-layout:fixed; margin:0; padding:0; border:0;}
+.kpi-stack{display:block; width:100%; margin:0; padding:0;}
+.kpi-label{font-size:9.5pt; font-weight:600; color:{$sec}; letter-spacing:0.04em; text-transform:uppercase; margin:0; line-height:1.15; text-align:left;}
+.kpi-value{font-size:21pt; font-weight:700; color:{$azul}; line-height:1.05; text-align:right; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; padding:0 2px 0 6px; white-space:nowrap;}
+.kpi-row .kpi-label,.kpi-row .kpi-value{display:table-cell; vertical-align:middle;}
+.kpi-row .kpi-label,.kpi-num .kpi-label{width:40%; padding:0 6px 0 0;}
+.kpi-row .kpi-value,.kpi-num .kpi-value{width:60%;}
+.kpi-compact .kpi-label{font-size:8pt; line-height:1.12;}
+.kpi-compact .kpi-value{font-size:18pt;}
+.kpi-value-sm{font-size:16.5pt;}
+.kpi-compact .kpi-value-sm{font-size:15pt;}
+.kpi-text .kpi-label{margin:0 0 6px; line-height:1.20;}
+.kpi-long{font-size:11.5pt; font-weight:700; line-height:1.20; text-align:left; padding:0; white-space:normal;}
 .mn-chart{margin:8px 0 16px; page-break-inside:avoid;}
 .mn-chart-title{font-size:11pt; font-weight:600; color:{$azul}; margin:0 0 8px;}
 .mn-chart-note{font-size:9.5pt; font-weight:400; color:{$sec}; margin:0 0 12px;}

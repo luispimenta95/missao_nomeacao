@@ -2741,10 +2741,9 @@ HTML;
             ? $data['options']['layout']
             : [];
 
-        $cat = $n >= 16 ? 0.70 : ($n >= 14 ? 0.76 : 0.82);
-        $bar = $n >= 16 ? 0.80 : ($n >= 14 ? 0.82 : 0.85);
-        $tickSize = $n >= 16 ? 8 : 10;
-        $rotacao = $n >= 16 ? 15 : 0;
+        $cat = $n >= 16 ? 0.52 : ($n >= 13 ? 0.56 : 0.60);
+        $bar = 0.86;
+        $tickSize = $n >= 16 ? 9 : 10;
         $navy = RelatorioConsolidadoLayout::AZUL;
 
         $max = 0.0;
@@ -2772,9 +2771,9 @@ HTML;
                     $data['data']['datasets'][$i]['spanGaps']
                 );
                 $data['data']['datasets'][$i]['datalabels'] = [
-                    'align' => $i === 0 ? 'left' : 'right',
+                    'align' => 'end',
                     'anchor' => 'end',
-                    'offset' => $i === 0 ? 4 : 8,
+                    'offset' => $i === 1 ? 14 : 4,
                 ];
                 foreach (is_array($ds['data'] ?? null) ? $ds['data'] : [] as $valor) {
                     if (is_numeric($valor) && (float) $valor > $max) {
@@ -2784,7 +2783,7 @@ HTML;
             }
         }
 
-        $yMax = $max > 0 ? $max * 1.32 : 1;
+        $yMax = $max > 0 ? $max * 1.40 : 1;
         $eixo = [
             'fontSize' => $tickSize,
             'fontColor' => $navy,
@@ -2793,6 +2792,8 @@ HTML;
         $data['options']['scales'] = [
             'xAxes' => [[
                 'stacked' => false,
+                'categoryPercentage' => $cat,
+                'barPercentage' => $bar,
                 'gridLines' => [
                     'display' => false,
                     'drawBorder' => false,
@@ -2800,34 +2801,42 @@ HTML;
                 'ticks' => array_merge($eixo, [
                     'autoSkip' => false,
                     'maxTicksLimit' => $n,
-                    'maxRotation' => $rotacao,
+                    'maxRotation' => 0,
                     'minRotation' => 0,
-                    'fontSize' => $tickSize,
                 ]),
             ]],
             'yAxes' => [[
                 'stacked' => false,
                 'gridLines' => [
-                    'color' => 'rgba(15, 23, 42, 0.08)',
+                    'color' => 'rgba(0, 0, 0, 0.05)',
                     'drawBorder' => false,
-                    'lineWidth' => 0.5,
-                    'zeroLineColor' => 'rgba(15, 23, 42, 0.08)',
+                    'lineWidth' => 0.4,
+                    'zeroLineColor' => 'rgba(0, 0, 0, 0.05)',
+                    'drawTicks' => false,
+                ],
+                'scaleLabel' => [
+                    'display' => true,
+                    'labelString' => $eHoras ? 'Horas' : 'Questões',
+                    'fontColor' => $navy,
+                    'fontStyle' => '600',
+                    'fontSize' => $tickSize,
                 ],
                 'ticks' => array_merge($eixo, [
                     'beginAtZero' => true,
                     'suggestedMax' => $yMax,
-                    'fontSize' => 10,
                 ]),
             ]],
         ];
 
         $data['options']['legend'] = [
             'display' => true,
+            'position' => 'top',
             'labels' => [
                 'boxWidth' => 10,
                 'fontSize' => 10,
                 'fontColor' => $navy,
                 'fontStyle' => '600',
+                'padding' => 16,
             ],
         ];
         $data['options']['cornerRadius'] = 3;
@@ -2835,20 +2844,21 @@ HTML;
             'display' => true,
             'anchor' => 'end',
             'align' => 'end',
+            'offset' => 4,
             'clamp' => true,
             'clip' => false,
             'color' => $navy,
             'backgroundColor' => 'rgba(255,255,255,0.88)',
             'borderWidth' => 0,
             'padding' => 1,
-            'font' => ['size' => 8, 'weight' => '600'],
+            'font' => ['size' => 9, 'weight' => '600'],
             'formatter' => $eHoras ? '__DATALABEL_HOURS_BAR__' : '__DATALABEL_COUNT_BAR__',
         ];
         $padding = is_array($data['options']['layout']['padding'] ?? null)
             ? $data['options']['layout']['padding']
             : [];
         $data['options']['layout']['padding'] = array_merge($padding, [
-            'top' => max((int) ($padding['top'] ?? 0), 24),
+            'top' => max((int) ($padding['top'] ?? 0), 28),
             'bottom' => max((int) ($padding['bottom'] ?? 0), 8),
         ]);
 
