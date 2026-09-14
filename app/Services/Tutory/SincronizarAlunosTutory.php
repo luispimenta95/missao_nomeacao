@@ -11,9 +11,12 @@ use Throwable;
  *
  * Nome da Tutory prevalece. E-mail da Tutory prevalece se o aluno já existir.
  * recebe_email fica sempre true. Nome é único: duplicidade só é logada.
+ * O cadastro "Aluno teste" da Tutory é ignorado e não entra na tabela local.
  */
 class SincronizarAlunosTutory
 {
+    private const NOME_ALUNO_IGNORADO = 'Aluno teste';
+
     /** @var callable(string): void */
     private $logger;
 
@@ -90,6 +93,11 @@ class SincronizarAlunosTutory
 
         if ($nomeTutory === '') {
             $this->log('Aluno da Tutory ignorado: nome vazio (id='.($tutoryId !== '' ? $tutoryId : '—').').');
+
+            return 'pulado';
+        }
+        if ($this->eAlunoTeste($nomeTutory)) {
+            $this->log('Aluno da Tutory ignorado: "'.$nomeTutory.'" não é cadastrado (id='.($tutoryId !== '' ? $tutoryId : '—').').');
 
             return 'pulado';
         }
@@ -234,6 +242,11 @@ class SincronizarAlunosTutory
         $this->log("Atualizado: {$aluno->nome} <{$aluno->email}> (recebe_email=true)");
 
         return 'atualizado';
+    }
+
+    private function eAlunoTeste(string $nome): bool
+    {
+        return Aluno::normalizarNome($nome) === Aluno::normalizarNome(self::NOME_ALUNO_IGNORADO);
     }
 
     private function outroComNome(string $nome, int|string|null $excetoId): ?Aluno
