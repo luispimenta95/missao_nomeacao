@@ -18,7 +18,7 @@ class RemoverPdfsSqliteAusenteTest extends TestCase
         file_put_contents($pdf, '%PDF-1.4 fake');
 
         $logs = [];
-        $downloader = new CoachReportDownloader('1', false, static function (string $message) use (&$logs): void {
+        $downloader = new CoachReportDownloader('1', static function (string $message) use (&$logs): void {
             $logs[] = $message;
         });
         $ref = new ReflectionClass($downloader);

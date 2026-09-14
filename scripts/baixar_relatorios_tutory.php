@@ -9,7 +9,7 @@
  *
  * Uso:
  *   php scripts/baixar_relatorios_tutory.php --periodo=1
- *   php scripts/baixar_relatorios_tutory.php --periodo=2 --teste
+ *   php scripts/baixar_relatorios_tutory.php --periodo=2
  *
  * Credenciais e pastas vêm do .env (veja .env.example / docs/tutory-relatorios.md).
  */
@@ -23,7 +23,7 @@ require __DIR__.'/../vendor/autoload.php';
 $app = require __DIR__.'/../bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-$options = getopt('', ['periodo:', 'teste', 'help']);
+$options = getopt('', ['periodo:', 'help']);
 
 if (isset($options['help']) || ! isset($options['periodo'])) {
     fwrite(STDERR, <<<'HELP'
@@ -31,13 +31,12 @@ Gera o relatório consolidado do Coach no Tutory para alunos ativos (CLI/HTTP).
 
 Uso:
   php scripts/baixar_relatorios_tutory.php --periodo=1
-  php scripts/baixar_relatorios_tutory.php --periodo=2 --teste
+  php scripts/baixar_relatorios_tutory.php --periodo=2
 
 Opções:
   --periodo=1|2   Obrigatório.
                   1 = Dia inicial: 01 / Dia final: 15
                   2 = Dia inicial: 16 / Dia final: último dia do mês
-  --teste         Baixa só os relatórios da aluna Giovanna
   --help          Mostra esta ajuda
 
 HELP);
@@ -50,12 +49,9 @@ if (! in_array($periodo, ['1', '2'], true)) {
     exit(1);
 }
 
-$teste = array_key_exists('teste', $options);
-
 try {
     $downloader = new CoachReportDownloader(
         periodo: $periodo,
-        teste: $teste,
         logger: static function (string $message): void {
             echo $message.PHP_EOL;
         },

@@ -48,7 +48,7 @@ O renderer individual `scripts/tutory-render-pdf.mjs` continua no repositório p
 **Não rode `npm install`.** O comando `npm` não existe nesse servidor e **não é necessário**. O PDF consolidado sai com PHP/Dompdf por padrão (`TUTORY_PDF_ENGINE=dompdf`).
 
 ```bash
-php artisan tutory:baixar-relatorios --periodo=1 --teste
+php artisan tutory:baixar-relatorios --periodo=1
 ```
 
 Log esperado:
@@ -56,7 +56,7 @@ Log esperado:
 ```
 PDF com PHP/Dompdf — não usa npm/Node. Ignore "npm: command not found".
 Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via PHP/Dompdf (TUTORY_PDF_ENGINE=dompdf)
-[Giovanna] TUTORY_PDF_ENGINE=dompdf — gerando o consolidado com PHP/Dompdf
+[Nome do aluno] TUTORY_PDF_ENGINE=dompdf — gerando o consolidado com PHP/Dompdf
 ```
 
 ## Modelos-fonte (`RELATORIOS`)
@@ -104,11 +104,10 @@ Se `PASTA_DOWNLOAD` estiver vazio, usa `public/pdfs`.
 ## Uso
 
 ```bash
-# Regenerar só a Giovanna:
 # período 1 = dias 01–15 do mês corrente
 # período 2 = dia 16 até o último dia do mês (no dia 1–15, usa o mês anterior)
-php artisan tutory:baixar-relatorios --periodo=1 --teste
-php artisan tutory:baixar-relatorios --periodo=2 --teste
+php artisan tutory:baixar-relatorios --periodo=1
+php artisan tutory:baixar-relatorios --periodo=2
 ```
 
 Arquivo gerado: `relatorio_consolidado_{Ymd_Hi}_{aluno}_{periodo}.pdf`  

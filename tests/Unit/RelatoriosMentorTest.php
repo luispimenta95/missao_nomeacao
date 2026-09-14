@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Console\Commands\BaixarRelatoriosTutoryCommand;
 use App\Services\Tutory\CoachReportDownloader;
 use App\Services\Tutory\RelatorioConsolidadoLayout;
 use App\Services\Tutory\RelatorioPdfCapas;
@@ -23,6 +24,15 @@ class RelatoriosMentorTest extends TestCase
             ['Desempenho', 'Estudos', 'Horas Líquidas', 'Desempenho em Questões', 'Progresso do plano'],
             array_column($relatorios, 'nome')
         );
+    }
+
+    public function test_nao_existe_aluna_teste_nem_opcao_teste_no_comando(): void
+    {
+        $ref = new ReflectionClass(CoachReportDownloader::class);
+        $this->assertFalse($ref->hasConstant('ALUNA_TESTE'));
+
+        $comando = new BaixarRelatoriosTutoryCommand;
+        $this->assertFalse($comando->getDefinition()->hasOption('teste'));
     }
 
     public function test_extrai_modelo_com_hifen_do_nome_do_arquivo(): void
@@ -58,7 +68,7 @@ class RelatoriosMentorTest extends TestCase
                 '%PDF-1.4 consolidado'
             );
 
-            $downloader = new CoachReportDownloader('1', false, static function (): void {});
+            $downloader = new CoachReportDownloader('1', static function (): void {});
             $ref = new ReflectionClass($downloader);
             $ref->getProperty('pastaDownload')->setValue($downloader, $pasta);
 
@@ -113,7 +123,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_binario_node_nao_quebra_quando_o_path_e_minimo(): void
     {
-        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $downloader = new CoachReportDownloader('1', static function (): void {});
         $ref = new ReflectionClass($downloader);
         $bin = $ref->getMethod('binarioNode')->invoke($downloader);
 
@@ -125,7 +135,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_sem_node_o_motor_do_pdf_e_dompdf(): void
     {
-        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $downloader = new CoachReportDownloader('1', static function (): void {});
         $ref = new ReflectionClass($downloader);
         $bin = $ref->getMethod('binarioNode')->invoke($downloader);
         $pode = $ref->getMethod('podeUsarPuppeteer')->invoke($downloader);
@@ -139,7 +149,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_motor_padrao_e_dompdf_sem_npm(): void
     {
-        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $downloader = new CoachReportDownloader('1', static function (): void {});
         $ref = new ReflectionClass($downloader);
 
         $this->assertFalse($ref->getMethod('podeUsarPuppeteer')->invoke($downloader));
@@ -151,7 +161,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_sem_pacote_puppeteer_nao_usa_o_compositor(): void
     {
-        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $downloader = new CoachReportDownloader('1', static function (): void {});
         $ref = new ReflectionClass($downloader);
         $instalado = $ref->getMethod('pacotePuppeteerInstalado')->invoke($downloader);
         $esperado = is_file(base_path('node_modules/puppeteer/package.json'))
@@ -167,7 +177,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_periodo_2_no_dia_1_usa_a_quinzena_do_mes_anterior(): void
     {
-        $downloader = new CoachReportDownloader('2', false, static function (): void {});
+        $downloader = new CoachReportDownloader('2', static function (): void {});
         $ref = new ReflectionClass($downloader);
         $iso = $ref->getMethod('datasPeriodoIso');
         $br = $ref->getMethod('datasPeriodoBr');
@@ -188,7 +198,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_periodo_2_a_partir_do_dia_16_usa_o_mes_corrente(): void
     {
-        $downloader = new CoachReportDownloader('2', false, static function (): void {});
+        $downloader = new CoachReportDownloader('2', static function (): void {});
         $ref = new ReflectionClass($downloader);
         $iso = $ref->getMethod('datasPeriodoIso');
 
@@ -204,7 +214,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_periodo_1_nao_recua_o_mes_antes_do_dia_16(): void
     {
-        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $downloader = new CoachReportDownloader('1', static function (): void {});
         $ref = new ReflectionClass($downloader);
         $iso = $ref->getMethod('datasPeriodoIso');
 
@@ -252,7 +262,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_css_do_consolidado_nao_deixa_bloco_cinza_no_rodape(): void
     {
-        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $downloader = new CoachReportDownloader('1', static function (): void {});
         $ref = new ReflectionClass($downloader);
         $css = $ref->getMethod('cssPdfConsolidado')->invoke($downloader, 'DejaVu Sans', '');
 
@@ -283,7 +293,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_ritmo_de_estudos_vira_barras_agrupadas_com_todas_as_datas(): void
     {
-        $downloader = new CoachReportDownloader('2', false, static function (): void {});
+        $downloader = new CoachReportDownloader('2', static function (): void {});
         $ref = new ReflectionClass($downloader);
         $alinhar = $ref->getMethod('alinharSeriesAsDatas');
         $barras = $ref->getMethod('aplicarBarrasRitmoEstudos');
@@ -349,7 +359,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_acertos_e_erros_por_dia_vira_barras_navy_dourado(): void
     {
-        $downloader = new CoachReportDownloader('2', false, static function (): void {});
+        $downloader = new CoachReportDownloader('2', static function (): void {});
         $ref = new ReflectionClass($downloader);
         $barras = $ref->getMethod('aplicarBarrasAgrupadasInstitucionais');
 
@@ -462,7 +472,7 @@ class RelatoriosMentorTest extends TestCase
         ];
 
         try {
-            $downloader = new CoachReportDownloader('1', false, static function (): void {});
+            $downloader = new CoachReportDownloader('1', static function (): void {});
             $ref = new ReflectionClass($downloader);
             $ok = $ref->getMethod('gerarPdfConsolidadoDoHtml')->invoke($downloader, 'Giovanna', $htmls, $destino);
 
@@ -525,7 +535,7 @@ class RelatoriosMentorTest extends TestCase
      */
     private function chamar(string $metodo, string $arquivo): mixed
     {
-        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $downloader = new CoachReportDownloader('1', static function (): void {});
         $ref = new ReflectionClass($downloader);
 
         return $ref->getMethod($metodo)->invoke($downloader, $arquivo);

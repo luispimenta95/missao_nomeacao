@@ -36,8 +36,6 @@ class CoachReportDownloader
 {
     private const BASE = 'https://admin.tutory.com.br';
 
-    private const ALUNA_TESTE = 'Giovanna';
-
     private const MAX_TENTATIVAS = 3;
 
     /**
@@ -117,8 +115,6 @@ class CoachReportDownloader
 
     private string $periodo;
 
-    private bool $teste;
-
     private string $cookieFile;
 
     private ?FileCookieJar $cookieJar = null;
@@ -133,11 +129,9 @@ class CoachReportDownloader
 
     public function __construct(
         string $periodo,
-        bool $teste = false,
         ?callable $logger = null,
     ) {
         $this->periodo = $periodo;
-        $this->teste = $teste;
         $this->logger = $logger ?? static function (string $message): void {
             echo $message.PHP_EOL;
         };
@@ -1549,12 +1543,6 @@ class CoachReportDownloader
 
         $query = Aluno::query()->orderBy('nome');
         $alunos = $query->get();
-        if ($this->teste) {
-            $alvo = mb_strtolower(self::ALUNA_TESTE);
-            $alunos = $alunos
-                ->filter(static fn (Aluno $a) => str_contains(mb_strtolower($a->nome), $alvo))
-                ->values();
-        }
 
         if ($alunos->isEmpty()) {
             $this->log('Nenhum aluno cadastrado no admin para envio.');
@@ -1575,7 +1563,7 @@ class CoachReportDownloader
             $pdfs = $this->encontrarPdfsAluno($aluno->nome);
             if ($pdfs === []) {
                 $this->log("[{$aluno->nome}] Nenhum PDF encontrado em {$this->pastaDownload}");
-                $this->log("[{$aluno->nome}] Dica: o nome no admin deve coincidir com o do Tutory (ex.: Giovanna).");
+                $this->log("[{$aluno->nome}] Dica: o nome no admin deve coincidir com o do Tutory.");
                 $falhas++;
 
                 continue;
@@ -3407,18 +3395,6 @@ HTML;
         )));
 
         $alunos = $this->coletarAlunosAtivos();
-        if ($this->teste) {
-            $alvo = mb_strtolower(self::ALUNA_TESTE);
-            $alunos = array_values(array_filter(
-                $alunos,
-                static fn (array $a) => str_contains(mb_strtolower($a['nome']), $alvo)
-            ));
-            if ($alunos !== []) {
-                $this->log('Modo --teste: '.$alunos[0]['nome'].' (id '.$alunos[0]['id'].')');
-            } else {
-                $this->log("Modo --teste: '".self::ALUNA_TESTE."' não encontrada.");
-            }
-        }
 
         if ($alunos === []) {
             $fim = new \DateTimeImmutable('now');
