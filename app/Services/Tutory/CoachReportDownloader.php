@@ -833,6 +833,14 @@ class CoachReportDownloader
             return false;
         }
 
+        try {
+            RelatorioPdfCapas::aplicar($destino);
+        } catch (Throwable $exc) {
+            $this->log("[{$nome}] Falha ao anexar as capas: ".$exc->getMessage());
+
+            return false;
+        }
+
         $this->log("[{$nome}] Relatório consolidado salvo: {$destino}");
 
         return true;
@@ -1111,6 +1119,7 @@ class CoachReportDownloader
                 return false;
             }
             file_put_contents($destino, $bytes);
+            RelatorioPdfCapas::aplicar($destino);
             $this->log("[{$nome}] Relatório consolidado (Dompdf) salvo: {$destino}");
 
             return true;

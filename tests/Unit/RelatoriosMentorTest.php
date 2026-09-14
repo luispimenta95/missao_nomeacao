@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Services\Tutory\CoachReportDownloader;
 use App\Services\Tutory\RelatorioConsolidadoLayout;
+use App\Services\Tutory\RelatorioPdfCapas;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -223,6 +224,7 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringNotContainsString('aplicarMarcaDaguaPdf', $php);
         $this->assertStringContainsString('use Illuminate\\Support\\Facades\\Http;', $php);
         $this->assertStringContainsString('aplicarCabecalhoRodape', $php);
+        $this->assertStringContainsString('RelatorioPdfCapas::aplicar', $php);
         $this->assertSame('AGOSTO - PERÍODO 1', RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10')));
         $this->assertSame('AGOSTO - PERÍODO 2', RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-08-20')));
         $this->assertSame('MISSÃO NOMEAÇÃO', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
@@ -468,6 +470,7 @@ class RelatoriosMentorTest extends TestCase
             $this->assertFileExists($destino);
             $this->assertGreaterThan(500, filesize($destino));
             $this->assertSame('%PDF', substr((string) file_get_contents($destino), 0, 4));
+            $this->assertGreaterThanOrEqual(3, RelatorioPdfCapas::contarPaginas($destino));
 
             $pdftotext = trim((string) shell_exec('command -v pdftotext 2>/dev/null'));
             if ($pdftotext !== '') {
