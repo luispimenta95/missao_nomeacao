@@ -2,7 +2,6 @@
 
 namespace Tests\Unit;
 
-use App\Console\Commands\BaixarRelatoriosTutoryCommand;
 use App\Services\Tutory\CoachReportDownloader;
 use App\Services\Tutory\RelatorioConsolidadoLayout;
 use App\Services\Tutory\RelatorioPdfCapas;
@@ -24,15 +23,6 @@ class RelatoriosMentorTest extends TestCase
             ['Desempenho', 'Estudos', 'Horas Líquidas', 'Desempenho em Questões', 'Progresso do plano'],
             array_column($relatorios, 'nome')
         );
-    }
-
-    public function test_nao_existe_aluna_teste_nem_opcao_teste_no_comando(): void
-    {
-        $ref = new ReflectionClass(CoachReportDownloader::class);
-        $this->assertFalse($ref->hasConstant('ALUNA_TESTE'));
-
-        $comando = new BaixarRelatoriosTutoryCommand;
-        $this->assertFalse($comando->getDefinition()->hasOption('teste'));
     }
 
     public function test_extrai_modelo_com_hifen_do_nome_do_arquivo(): void

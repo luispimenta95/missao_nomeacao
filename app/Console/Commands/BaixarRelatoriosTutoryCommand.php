@@ -9,7 +9,8 @@ use Throwable;
 class BaixarRelatoriosTutoryCommand extends Command
 {
     protected $signature = 'tutory:baixar-relatorios
-                            {--periodo= : 1 = dias 01–15; 2 = dia 16 até o último dia do mês}';
+                            {--periodo= : 1 = dias 01–15; 2 = dia 16 até o último dia do mês}
+                            {--teste : Baixa só o relatório da aluna Giovanna}';
 
     protected $description = 'Gera o relatório consolidado do Coach com PHP/Dompdf (sem npm/Node) e envia por e-mail';
 
@@ -24,11 +25,16 @@ class BaixarRelatoriosTutoryCommand extends Command
             return self::FAILURE;
         }
 
+        $teste = (bool) $this->option('teste');
+        if ($teste) {
+            $this->warn('Modo --teste ativo: processa apenas Giovanna.');
+        }
         $this->line('PDF com PHP/Dompdf — não usa npm/Node. Ignore "npm: command not found".');
 
         try {
             $downloader = new CoachReportDownloader(
                 periodo: $periodo,
+                teste: $teste,
                 logger: function (string $message): void {
                     $this->line($message);
                 },
