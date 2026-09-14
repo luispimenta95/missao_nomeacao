@@ -1,0 +1,173 @@
+<?php
+
+namespace Tests\Unit;
+
+use App\Models\Aluno;
+use App\Services\Tutory\SincronizarAlunosTutory;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class SincronizarAlunosTutoryTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_cadastra_aluno_ativo_com_recebe_email_true(): void
+    {
+        $logs = [];
+        $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        });
+
+        $resultado = $sync->sincronizarLista([
+            ['id' => '1001', 'nome' => 'Maria Silva', 'email' => 'maria@example.com'],
+        ]);
+
+        $this->assertSame(1, $resultado['criados']);
+        $aluno = Aluno::query()->first();
+        $this->assertNotNull($aluno);
+        $this->assertSame('1001', $aluno->tutory_id);
+        $this->assertSame('Maria Silva', $aluno->nome);
+        $this->assertSame('maria@example.com', $aluno->email);
+        $this->assertTrue($aluno->recebe_email);
+        $this->assertTrue(collect($logs)->contains(fn (string $m) => str_contains($m, 'Cadastrado: Maria Silva')));
+    }
+
+    public function test_nome_da_tutory_prevalece_quando_diverge(): void
+    {
+        $aluno = Aluno::create([
+            'tutory_id' => '1001',
+            'nome' => 'Maria da Plataforma',
+            'email' => 'maria@example.com',
+            'recebe_email' => false,
+        ]);
+        $logs = [];
+        $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        });
+
+        $sync->sincronizarLista([
+            ['id' => '1001', 'nome' => 'Maria Silva', 'email' => 'maria@example.com'],
+        ]);
+
+        $aluno->refresh();
+        $this->assertSame('Maria Silva', $aluno->nome);
+        $this->assertTrue($aluno->recebe_email);
+        $this->assertTrue(collect($logs)->contains(
+            fn (string $m) => str_contains($m, 'Nome divergente') && str_contains($m, 'Maria da Plataforma') && str_contains($m, 'Maria Silva')
+        ));
+    }
+
+    public function test_email_da_tutory_prevalece_quando_aluno_ja_existe(): void
+    {
+        $aluno = Aluno::create([
+            'nome' => 'João Lima',
+            'email' => 'joao.plataforma@example.com',
+            'recebe_email' => true,
+        ]);
+        $logs = [];
+        $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        });
+
+        $sync->sincronizarLista([
+            ['id' => '2002', 'nome' => 'João Lima', 'email' => 'joao.tutory@example.com'],
+        ]);
+
+        $aluno->refresh();
+        $this->assertSame('joao.tutory@example.com', $aluno->email);
+        $this->assertSame('2002', $aluno->tutory_id);
+        $this->assertTrue(collect($logs)->contains(
+            fn (string $m) => str_contains($m, 'E-mail divergente') && str_contains($m, 'joao.plataforma@example.com')
+        ));
+    }
+
+    public function test_log_quando_nome_duplicado_no_cadastro(): void
+    {
+        Aluno::create([
+            'tutory_id' => '1111',
+            'nome' => 'Ana Souza',
+            'email' => 'ana.existente@example.com',
+            'recebe_email' => true,
+        ]);
+        $logs = [];
+        $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        });
+
+        $resultado = $sync->sincronizarLista([
+            ['id' => '3003', 'nome' => 'Ana Souza', 'email' => 'ana.nova@example.com'],
+        ]);
+
+        $this->assertSame(0, $resultado['criados']);
+        $this->assertSame(1, $resultado['pulados']);
+        $this->assertSame(1, Aluno::query()->count());
+        $this->assertSame('ana.existente@example.com', Aluno::query()->first()->email);
+        $this->assertTrue(collect($logs)->contains(
+            fn (string $m) => str_contains($m, 'Nome duplicado ao cadastrar') && str_contains($m, 'Ana Souza')
+        ));
+    }
+
+    public function test_log_quando_nome_duplicado_na_edicao(): void
+    {
+        Aluno::create([
+            'nome' => 'Carla A',
+            'email' => 'carla.a@example.com',
+            'recebe_email' => true,
+        ]);
+        $alvo = Aluno::create([
+            'tutory_id' => '4004',
+            'nome' => 'Carla B',
+            'email' => 'carla.b@example.com',
+            'recebe_email' => true,
+        ]);
+        $logs = [];
+        $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        });
+
+        $resultado = $sync->sincronizarLista([
+            ['id' => '4004', 'nome' => 'Carla A', 'email' => 'carla.b@example.com'],
+        ]);
+
+        $this->assertSame(1, $resultado['pulados'] + $resultado['inalterados'] + $resultado['atualizados']);
+        $alvo->refresh();
+        $this->assertSame('Carla B', $alvo->nome);
+        $this->assertTrue(collect($logs)->contains(
+            fn (string $m) => str_contains($m, 'Nome duplicado ao editar') && str_contains($m, 'Carla A')
+        ));
+    }
+
+    public function test_casa_por_email_mesmo_com_nome_diferente(): void
+    {
+        Aluno::create([
+            'nome' => 'Nome Antigo',
+            'email' => 'mesmo@example.com',
+            'recebe_email' => false,
+        ]);
+        $sync = new SincronizarAlunosTutory(logger: static function (): void {});
+        $sync->sincronizarLista([
+            ['id' => '5005', 'nome' => 'Nome Tutory', 'email' => 'mesmo@example.com'],
+        ]);
+
+        $this->assertSame(1, Aluno::query()->count());
+        $aluno = Aluno::query()->first();
+        $this->assertSame('Nome Tutory', $aluno->nome);
+        $this->assertTrue($aluno->recebe_email);
+        $this->assertSame('5005', $aluno->tutory_id);
+    }
+
+    public function test_pula_sem_email(): void
+    {
+        $logs = [];
+        $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        });
+        $resultado = $sync->sincronizarLista([
+            ['id' => '6006', 'nome' => 'Sem Email', 'email' => ''],
+        ]);
+
+        $this->assertSame(1, $resultado['pulados']);
+        $this->assertSame(0, Aluno::query()->count());
+        $this->assertTrue(collect($logs)->contains(fn (string $m) => str_contains($m, 'e-mail ausente')));
+    }
+}

@@ -128,8 +128,15 @@ Em `routes/console.php`:
 
 | Job | Comando | Quando |
 |-----|---------|--------|
+| Sincronizar alunos | `tutory:sincronizar-alunos` | Dias **1** e **16**, **06:00** (antes do envio) |
 | Periodo 1 | `tutory:baixar-relatorios --periodo=1` | Dia **16** de cada mês, **10:30** |
 | Periodo 2 | `tutory:baixar-relatorios --periodo=2` | Dia **1** do mês seguinte, **10:30** (usa 16–fim do mês que acabou) |
+
+Para rodar a sincronização agora, sem esperar o agendamento:
+
+```bash
+php artisan tutory:sincronizar-alunos
+```
 
 No servidor (cron):
 

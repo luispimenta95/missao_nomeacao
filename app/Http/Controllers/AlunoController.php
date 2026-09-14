@@ -23,7 +23,7 @@ class AlunoController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'nome' => 'required|string|max:255',
+            'nome' => ['required', 'string', 'max:255', Rule::unique('alunos', 'nome')],
             'email' => 'required|email|max:255|unique:alunos,email',
             'recebe_email' => 'sometimes|boolean',
         ]);
@@ -43,7 +43,7 @@ class AlunoController extends Controller
     public function update(Request $request, Aluno $aluno)
     {
         $data = $request->validate([
-            'nome' => 'required|string|max:255',
+            'nome' => ['required', 'string', 'max:255', Rule::unique('alunos', 'nome')->ignore($aluno->id)],
             'email' => [
                 'required',
                 'email',
