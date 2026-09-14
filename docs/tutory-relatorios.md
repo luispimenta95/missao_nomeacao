@@ -8,15 +8,17 @@ No Hostinger compartilhado **não precisa de Node nem de npm**. O PDF é montado
 
 Não é a junção dos cinco PDFs oficiais. O compositor extrai os dados da Tutory **sem alterá-los** e monta um único produto visual da Missão Nomeação, em seções modulares (a quantidade de páginas é consequência do conteúdo).
 
-Ordem fixa:
+Ordem fixa do PDF final (capa + relatório + capa final). As páginas internas continuam com a paginação original (`Página X de Y` só no relatório):
 
-1. **Seu desempenho** — nome, curso e cards de métricas (`.main-header-card` + `.metrics-grid`)
-2. **Ritmo de estudos** — horas brutas × líquidas (`#chart_line_comparativo`) e horas planejadas × horas (brutas) estudadas (`#chart_horas_diarias`)
-3. **Painel de Insights** — `.insights-panel`, sem título duplicado
-4. **Desempenho em questões** — cards do panorama (`.main-numbers`) e gráfico do período (`#chart_questoes_dia`)
-5. **Performance por assunto** — `#tabela_questoes` (percentual colorido só no indicador)
-6. **Revisões no período** — `#tabela_revisoes`
-7. **Histórico completo** — `#tabela_horas_liquidas`
+1. **Capa** — PDF institucional em `resources/relatorios/capa.pdf` (página inteira, sem cabeçalho/rodapé)
+2. **Seu desempenho** — nome, curso e cards de métricas (`.main-header-card` + `.metrics-grid`)
+3. **Ritmo de estudos** — horas brutas × líquidas (`#chart_line_comparativo`) e horas planejadas × horas (brutas) estudadas (`#chart_horas_diarias`)
+4. **Painel de Insights** — `.insights-panel`, sem título duplicado
+5. **Desempenho em questões** — cards do panorama (`.main-numbers`) e gráfico do período (`#chart_questoes_dia`)
+6. **Performance por assunto** — `#tabela_questoes` (percentual colorido só no indicador)
+7. **Revisões no período** — `#tabela_revisoes`
+8. **Histórico completo** — `#tabela_horas_liquidas`
+9. **Capa final** — PDF institucional em `resources/relatorios/capa-final.pdf` (página inteira, sem cabeçalho/rodapé)
 
 | Origem | Fora do consolidado |
 |--------|---------------------|

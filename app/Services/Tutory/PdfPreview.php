@@ -111,6 +111,19 @@ HTML;
         $dompdf->render();
         RelatorioConsolidadoLayout::aplicarCabecalhoRodape($dompdf, $rotulo);
 
-        return $dompdf->output() ?? '';
+        $bytes = $dompdf->output() ?? '';
+        if ($bytes === '' || strlen($bytes) < 500) {
+            return $bytes;
+        }
+
+        $tmp = sys_get_temp_dir().'/mn-preview-'.uniqid('', true).'.pdf';
+        file_put_contents($tmp, $bytes);
+        try {
+            RelatorioPdfCapas::aplicar($tmp);
+
+            return (string) file_get_contents($tmp);
+        } finally {
+            @unlink($tmp);
+        }
     }
 }
