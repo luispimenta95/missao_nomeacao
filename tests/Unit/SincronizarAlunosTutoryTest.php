@@ -156,6 +156,29 @@ class SincronizarAlunosTutoryTest extends TestCase
         $this->assertSame('5005', $aluno->tutory_id);
     }
 
+    public function test_ignora_aluno_teste_e_nao_cadastra(): void
+    {
+        $logs = [];
+        $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        });
+
+        $resultado = $sync->sincronizarLista([
+            ['id' => '9009', 'nome' => 'Aluno teste', 'email' => 'aluno.teste@example.com'],
+            ['id' => '9010', 'nome' => 'Aluno  Teste', 'email' => 'aluno.teste2@example.com'],
+            ['id' => '1001', 'nome' => 'Maria Silva', 'email' => 'maria@example.com'],
+        ]);
+
+        $this->assertSame(1, $resultado['criados']);
+        $this->assertSame(2, $resultado['pulados']);
+        $this->assertSame(1, Aluno::query()->count());
+        $this->assertSame('Maria Silva', Aluno::query()->first()->nome);
+        $this->assertSame(0, Aluno::query()->where('email', 'aluno.teste@example.com')->count());
+        $this->assertTrue(collect($logs)->contains(
+            fn (string $m) => str_contains($m, 'Aluno teste') && str_contains($m, 'não é cadastrado')
+        ));
+    }
+
     public function test_pula_sem_email(): void
     {
         $logs = [];

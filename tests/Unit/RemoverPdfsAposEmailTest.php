@@ -108,7 +108,7 @@ class RemoverPdfsAposEmailTest extends TestCase
 
     private function downloader(): CoachReportDownloader
     {
-        $downloader = new CoachReportDownloader('1', false, static function (): void {});
+        $downloader = new CoachReportDownloader('1', static function (): void {});
         $ref = new ReflectionClass($downloader);
         $ref->getProperty('pastaDownload')->setValue($downloader, $this->pasta);
 

@@ -133,8 +133,8 @@ class CoachReportDownloader
 
     public function __construct(
         string $periodo,
-        bool $teste = false,
         ?callable $logger = null,
+        bool $teste = false,
     ) {
         $this->periodo = $periodo;
         $this->teste = $teste;
@@ -1575,7 +1575,7 @@ class CoachReportDownloader
             $pdfs = $this->encontrarPdfsAluno($aluno->nome);
             if ($pdfs === []) {
                 $this->log("[{$aluno->nome}] Nenhum PDF encontrado em {$this->pastaDownload}");
-                $this->log("[{$aluno->nome}] Dica: o nome no admin deve coincidir com o do Tutory (ex.: Giovanna).");
+                $this->log("[{$aluno->nome}] Dica: o nome no admin deve coincidir com o do Tutory.");
                 $falhas++;
 
                 continue;
