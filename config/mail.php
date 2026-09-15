@@ -115,4 +115,18 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | CCO dos relatórios do Coach
+    |--------------------------------------------------------------------------
+    |
+    | Cópia oculta em cada e-mail do job tutory:baixar-relatorios.
+    | Vários endereços: separe por vírgula. Vazio desliga o CCO.
+    |
+    */
+
+    'bcc' => [
+        'address' => env('MAIL_BCC_ADDRESS', 'nayara@missaonomeacao.com.br'),
+    ],
+
 ];

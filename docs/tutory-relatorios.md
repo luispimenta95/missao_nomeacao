@@ -95,6 +95,7 @@ TUTORY_PDF_ENGINE=dompdf
 # NODE_BINARY=
 # TUTORY_REPORT_GENERATE_URL=/intent/cadastrar-relatorio-coach
 # TUTORY_REPORT_AGRUPAMENTO=dia
+# MAIL_BCC_ADDRESS=nayara@missaonomeacao.com.br
 ```
 
 Em teste, o serviço pode usar credenciais hardcoded. Em produção, use `LOGIN_USER` / `LOGIN_PASSWORD`.
@@ -114,7 +115,7 @@ php artisan tutory:baixar-relatorios --periodo=2 --teste
 Arquivo gerado: `relatorio_consolidado_{Ymd_Hi}_{aluno}_{periodo}.pdf`  
 Exemplo: `relatorio_consolidado_20260818_2230_Giovanna_1.pdf`
 
-O envio de e-mail anexa o PDF consolidado mais recente do aluno para o `--periodo` informado. Depois do envio, **todos os PDFs da pasta são apagados**.
+O envio de e-mail anexa o PDF consolidado mais recente do aluno para o `--periodo` informado. Cada envio vai **com CCO** para `MAIL_BCC_ADDRESS` (padrão: `nayara@missaonomeacao.com.br`). Depois do envio, **todos os PDFs da pasta são apagados**.
 
 Para renderizar um modelo isolado (debug, não usado no e-mail):
 

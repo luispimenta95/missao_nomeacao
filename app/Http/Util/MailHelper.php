@@ -78,6 +78,34 @@ class MailHelper
             ],
         ];
 
-        Mail::to($mailTo)->send(new EmailRelatorioCoach($dadosEmail, $pdfPath));
+        $mailer = Mail::to($mailTo);
+        $cco = self::enderecosCco($mailTo);
+        if ($cco !== []) {
+            $mailer->bcc($cco);
+        }
+        $mailer->send(new EmailRelatorioCoach($dadosEmail, $pdfPath));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function enderecosCco(?string $exceto = null): array
+    {
+        $raw = trim((string) config('mail.bcc.address', ''));
+        if ($raw === '') {
+            return [];
+        }
+
+        $exceto = $exceto !== null ? mb_strtolower(trim($exceto)) : '';
+        $validos = [];
+        foreach (preg_split('/\s*,\s*/', $raw) ?: [] as $email) {
+            $email = mb_strtolower(trim($email));
+            if ($email === '' || $email === $exceto || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $validos[] = $email;
+        }
+
+        return array_values(array_unique($validos));
     }
 }

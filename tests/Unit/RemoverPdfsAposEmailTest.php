@@ -71,7 +71,8 @@ class RemoverPdfsAposEmailTest extends TestCase
         $this->chamar('enviarEmailsDosAlunos', $this->downloader());
 
         Mail::assertSent(EmailRelatorioCoach::class, function (EmailRelatorioCoach $mail) use ($aluno): bool {
-            return $mail->hasTo($aluno->email);
+            return $mail->hasTo($aluno->email)
+                && $mail->hasBcc('nayara@missaonomeacao.com.br');
         });
         $this->assertFileDoesNotExist($pdfConsolidado);
         $this->assertFileDoesNotExist($pdfAntigo);
