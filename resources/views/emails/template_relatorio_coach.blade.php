@@ -29,6 +29,10 @@
             margin-bottom: 20px;
         }
 
+        .content p {
+            text-align: justify;
+        }
+
         .bloco {
             margin: 16px 0;
             padding: 14px 16px;
@@ -41,11 +45,17 @@
             margin: 0 0 8px;
             font-size: 15px;
             color: #222;
+            text-align: left;
         }
 
         .bloco p {
             margin: 0;
             color: #444;
+            text-align: justify;
+        }
+
+        .bloco li {
+            text-align: justify;
         }
 
         .footer {
@@ -78,7 +88,7 @@
                 @if(!empty($bloco['itens']) && is_array($bloco['itens']))
                 <ul style="margin:0 0 12px;padding-left:20px;">
                     @foreach($bloco['itens'] as $item)
-                    <li style="margin:0 0 6px;">{{ $item }}</li>
+                    <li style="margin:0 0 6px;text-align:justify;">{{ $item }}</li>
                     @endforeach
                 </ul>
                 @php
@@ -87,13 +97,13 @@
                 $textoBloco = trim(preg_replace('/^•.+(?:\n•.+)*\n*/mu', '', $textoBloco) ?? $textoBloco);
                 @endphp
                 @if($textoBloco !== '')
-                <p style="white-space:pre-line;margin:0;">{{ $textoBloco }}</p>
+                <p style="white-space:pre-line;margin:0;text-align:justify;">{{ $textoBloco }}</p>
                 @endif
                 @elseif(!empty($bloco['texto']))
-                <p style="white-space:pre-line;margin:0;">{{ $bloco['texto'] }}</p>
+                <p style="white-space:pre-line;margin:0;text-align:justify;">{{ $bloco['texto'] }}</p>
                 @endif
                 @if(!empty($bloco['cta']['url']))
-                <p style="margin:14px 0 0;">
+                <p style="margin:14px 0 0;text-align:left;">
                     <a href="{{ $bloco['cta']['url'] }}" target="_blank" rel="noopener"
                        style="display:inline-block;background:#BF8F00;color:#ffffff;text-decoration:none;padding:10px 16px;font-weight:bold;font-size:14px;">
                         {{ $bloco['cta']['label'] ?? 'Quero adiantar minha análise' }}
@@ -107,7 +117,7 @@
                 @if(!empty($dados['nivelDesempenho']))
                 <h3>Nível de desempenho: {{ $dados['nivelDesempenho'] }}</h3>
                 @endif
-                <p>{{ $dados['textoDesempenho'] }}</p>
+                <p style="text-align:justify;">{{ $dados['textoDesempenho'] }}</p>
             </div>
             @endif
 
