@@ -5,6 +5,7 @@ namespace App\Http\Util;
 use App\Mail\EmailInscricao;
 use App\Mail\EmailLead;
 use App\Mail\EmailRelatorioCoach;
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Mail;
 
 class MailHelper
@@ -26,7 +27,7 @@ class MailHelper
             ],
         ];
 
-        Mail::to($mailTo)->send(new EmailLead($dadosEmail));
+        self::enviarComCco($mailTo, new EmailLead($dadosEmail));
     }
 
     /**
@@ -46,7 +47,7 @@ class MailHelper
             ],
         ];
 
-        Mail::to($mailTo)->send(new EmailInscricao($dadosEmail));
+        self::enviarComCco($mailTo, new EmailInscricao($dadosEmail));
     }
 
     /**
@@ -78,12 +79,17 @@ class MailHelper
             ],
         ];
 
+        self::enviarComCco($mailTo, new EmailRelatorioCoach($dadosEmail, $pdfPath));
+    }
+
+    private static function enviarComCco(string $mailTo, Mailable $mailable): void
+    {
         $mailer = Mail::to($mailTo);
         $cco = self::enderecosCco($mailTo);
         if ($cco !== []) {
             $mailer->bcc($cco);
         }
-        $mailer->send(new EmailRelatorioCoach($dadosEmail, $pdfPath));
+        $mailer->send($mailable);
     }
 
     /**

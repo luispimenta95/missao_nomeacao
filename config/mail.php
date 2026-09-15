@@ -117,11 +117,12 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | CCO dos relatórios do Coach
+    | CCO de todos os e-mails (lead, inscrição e relatório do Coach)
     |--------------------------------------------------------------------------
     |
-    | Cópia oculta em cada e-mail do job tutory:baixar-relatorios.
-    | Vários endereços: separe por vírgula. Vazio desliga o CCO.
+    | Cópia oculta em cada envio. Vários endereços: separe por vírgula.
+    | Vazio desliga o CCO. O .env da Hostinger não é sobrescrito no deploy;
+    | se MAIL_BCC_ADDRESS não existir lá, vale este padrão.
     |
     */
 

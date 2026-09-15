@@ -24,7 +24,8 @@ class MailTestRouteTest extends TestCase
         $response->assertSee('luispimenta.contato@gmail.com');
 
         Mail::assertSent(EmailLead::class, function (EmailLead $mail) {
-            return $mail->mailTo === 'luispimenta.contato@gmail.com';
+            return $mail->mailTo === 'luispimenta.contato@gmail.com'
+                && $mail->hasBcc('nayara@missaonomeacao.com.br');
         });
     }
 
@@ -32,6 +33,10 @@ class MailTestRouteTest extends TestCase
     public function teste_email_route_shows_error_when_send_fails(): void
     {
         $pending = \Mockery::mock(\Illuminate\Mail\PendingMail::class);
+        $pending->shouldReceive('bcc')
+            ->once()
+            ->with(['nayara@missaonomeacao.com.br'])
+            ->andReturnSelf();
         $pending->shouldReceive('send')
             ->once()
             ->andThrow(new \RuntimeException('SMTP connection refused'));

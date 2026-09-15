@@ -3,6 +3,8 @@
 namespace Tests\Unit;
 
 use App\Http\Util\MailHelper;
+use App\Mail\EmailInscricao;
+use App\Mail\EmailLead;
 use App\Mail\EmailRelatorioCoach;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Test;
@@ -52,6 +54,31 @@ class EmailRelatorioCoachBccTest extends TestCase
 
         Mail::assertSent(EmailRelatorioCoach::class, function (EmailRelatorioCoach $mail): bool {
             return $mail->hasTo('maria@example.com')
+                && $mail->hasBcc('nayara@missaonomeacao.com.br');
+        });
+    }
+
+    #[Test]
+    public function envio_de_lead_e_inscricao_inclui_cco(): void
+    {
+        Mail::fake();
+        config(['mail.bcc.address' => 'nayara@missaonomeacao.com.br']);
+
+        MailHelper::emailLead(
+            ['nome' => 'Maria', 'tituloMaterial' => 'PDF', 'url' => 'https://example.com'],
+            'maria@example.com'
+        );
+        MailHelper::emailInscricao(
+            ['nome' => 'João', 'tituloTurma' => 'Turma', 'url' => 'https://example.com'],
+            'joao@example.com'
+        );
+
+        Mail::assertSent(EmailLead::class, function (EmailLead $mail): bool {
+            return $mail->hasTo('maria@example.com')
+                && $mail->hasBcc('nayara@missaonomeacao.com.br');
+        });
+        Mail::assertSent(EmailInscricao::class, function (EmailInscricao $mail): bool {
+            return $mail->hasTo('joao@example.com')
                 && $mail->hasBcc('nayara@missaonomeacao.com.br');
         });
     }

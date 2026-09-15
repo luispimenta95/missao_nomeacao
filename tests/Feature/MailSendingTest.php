@@ -39,7 +39,8 @@ class MailSendingTest extends TestCase
 
         Mail::assertSent(EmailLead::class, function (EmailLead $mail) {
             return $mail->mailTo === 'fulano@example.com'
-                && $mail->subject === 'Seu material da Missão Nomeação';
+                && $mail->subject === 'Seu material da Missão Nomeação'
+                && $mail->hasBcc('nayara@missaonomeacao.com.br');
         });
     }
 
@@ -67,7 +68,8 @@ class MailSendingTest extends TestCase
 
         Mail::assertSent(EmailInscricao::class, function (EmailInscricao $mail) {
             return $mail->mailTo === 'ciclano@example.com'
-                && $mail->subject === 'Inscrição recebida — Missão Nomeação';
+                && $mail->subject === 'Inscrição recebida — Missão Nomeação'
+                && $mail->hasBcc('nayara@missaonomeacao.com.br');
         });
     }
 }
