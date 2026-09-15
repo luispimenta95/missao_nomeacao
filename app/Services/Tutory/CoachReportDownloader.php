@@ -1630,7 +1630,7 @@ class CoachReportDownloader
                     $aluno->email,
                     $pdfs
                 );
-                $this->log("[{$aluno->nome}] E-mail enviado para {$aluno->email} com ".count($pdfs).' anexo(s)');
+                $this->log("[{$aluno->nome}] E-mail enviado para {$aluno->email} com ".count($pdfs).' anexo(s)'.$this->sufixoCco($aluno->email));
                 $enviados++;
             } catch (Throwable $exc) {
                 $falhas++;
@@ -1645,6 +1645,16 @@ class CoachReportDownloader
 
         $this->log(str_repeat('=', 50));
         $this->log("E-mails enviados: {$enviados} | pulados: {$pulados} | falhas: {$falhas}");
+    }
+
+    private function sufixoCco(string $destinatario): string
+    {
+        $cco = MailHelper::enderecosCco($destinatario);
+        if ($cco === []) {
+            return '';
+        }
+
+        return ' (cco: '.implode(', ', $cco).')';
     }
 
     /**

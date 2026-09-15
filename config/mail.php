@@ -115,4 +115,19 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | CCO de todos os e-mails (lead, inscrição e relatório do Coach)
+    |--------------------------------------------------------------------------
+    |
+    | Cópia oculta em cada envio. Vários endereços: separe por vírgula.
+    | Vazio desliga o CCO. O .env da Hostinger não é sobrescrito no deploy;
+    | se MAIL_BCC_ADDRESS não existir lá, vale este padrão.
+    |
+    */
+
+    'bcc' => [
+        'address' => env('MAIL_BCC_ADDRESS', 'nayara@missaonomeacao.com.br'),
+    ],
+
 ];

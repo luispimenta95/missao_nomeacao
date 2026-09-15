@@ -5,6 +5,7 @@ namespace App\Http\Util;
 use App\Mail\EmailInscricao;
 use App\Mail\EmailLead;
 use App\Mail\EmailRelatorioCoach;
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Mail;
 
 class MailHelper
@@ -26,7 +27,7 @@ class MailHelper
             ],
         ];
 
-        Mail::to($mailTo)->send(new EmailLead($dadosEmail));
+        self::enviarComCco($mailTo, new EmailLead($dadosEmail));
     }
 
     /**
@@ -46,7 +47,7 @@ class MailHelper
             ],
         ];
 
-        Mail::to($mailTo)->send(new EmailInscricao($dadosEmail));
+        self::enviarComCco($mailTo, new EmailInscricao($dadosEmail));
     }
 
     /**
@@ -78,6 +79,39 @@ class MailHelper
             ],
         ];
 
-        Mail::to($mailTo)->send(new EmailRelatorioCoach($dadosEmail, $pdfPath));
+        self::enviarComCco($mailTo, new EmailRelatorioCoach($dadosEmail, $pdfPath));
+    }
+
+    private static function enviarComCco(string $mailTo, Mailable $mailable): void
+    {
+        $mailer = Mail::to($mailTo);
+        $cco = self::enderecosCco($mailTo);
+        if ($cco !== []) {
+            $mailer->bcc($cco);
+        }
+        $mailer->send($mailable);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function enderecosCco(?string $exceto = null): array
+    {
+        $raw = trim((string) config('mail.bcc.address', ''));
+        if ($raw === '') {
+            return [];
+        }
+
+        $exceto = $exceto !== null ? mb_strtolower(trim($exceto)) : '';
+        $validos = [];
+        foreach (preg_split('/\s*,\s*/', $raw) ?: [] as $email) {
+            $email = mb_strtolower(trim($email));
+            if ($email === '' || $email === $exceto || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $validos[] = $email;
+        }
+
+        return array_values(array_unique($validos));
     }
 }
