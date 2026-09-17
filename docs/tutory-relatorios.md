@@ -123,28 +123,40 @@ Para renderizar um modelo isolado (debug, não usado no e-mail):
 node scripts/tutory-render-pdf.mjs --url "https://admin.tutory.com.br/documentos/relatorios/questoes?key=..." --out /tmp/q.pdf --model questoes
 ```
 
-## Agendamento (Laravel Scheduler)
+## Agendamento
 
-Em `routes/console.php`:
+O Laravel **não dispara sozinho**. Só a definição em `routes/console.php` não envia PDF. Precisa de um dos dois:
 
-| Job | Comando | Quando |
+1. **GitHub Action** `.github/workflows/tutory-relatorios.yml` (disparo principal) — SSH na Hostinger no horário. Também pode ser disparada à mão em Actions → Tutory Relatorios → Run workflow.
+2. **Cron na Hostinger** chamando `php artisan schedule:run` **a cada minuto**. O deploy **não** cria esse cron. Sem ele, `monthlyOn(16, '10:30')` nunca executa.
+
+| Job | Comando | Quando (America/Sao_Paulo) |
 |-----|---------|--------|
-| Sincronizar alunos | `tutory:sincronizar-alunos` | Dias **1** e **16**, **06:00** (antes do envio) |
-| Periodo 1 | `tutory:baixar-relatorios --periodo=1` | Dia **16** de cada mês, **10:30** |
-| Periodo 2 | `tutory:baixar-relatorios --periodo=2` | Dia **1** do mês seguinte, **10:30** (usa 16–fim do mês que acabou) |
+| Sincronizar alunos | `tutory:sincronizar-alunos` | Dias **1** e **16**, **06:00** |
+| Periodo 1 | `tutory:baixar-relatorios --periodo=1 --se-pendente` | Dia **16**, **10:30** (retenta de hora em hora até 22h nos dias 16–17 se ainda não enviou) |
+| Periodo 2 | `tutory:baixar-relatorios --periodo=2 --se-pendente` | Dia **1**, **10:30** (usa 16–fim do mês que acabou; retenta nos dias 1–2) |
+
+`--se-pendente` grava em `configuracoes` e evita e-mail duplicado se Action e cron rodarem no mesmo período.
 
 A Tutory sempre envia um cadastro chamado **Aluno teste**. O job ignora esse nome (maiúsculas/minúsculas e espaços extras não importam) e **não o cadastra** na tabela local.
 
-Para rodar a sincronização agora, sem esperar o agendamento:
+Para inspecionar no servidor:
+
+```bash
+php artisan tutory:scheduler-status
+```
+
+Para rodar agora, sem esperar o agendamento:
 
 ```bash
 php artisan tutory:sincronizar-alunos
+php artisan tutory:baixar-relatorios --periodo=1
 ```
 
-No servidor (cron):
+Cron opcional no hPanel da Hostinger (caminho do deploy):
 
 ```cron
-* * * * * cd /caminho/do/projeto && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd ~/domains/missaonomeacao.com.br/public_html/server && php artisan schedule:run >> storage/logs/schedule-run.log 2>&1
 ```
 
 Conferir: `php artisan schedule:list`
