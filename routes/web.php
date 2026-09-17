@@ -85,6 +85,8 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
 
     // Contingência: PDF de um aluno em períodos já liberados (download, sem e-mail)
     Route::get('/relatorios-pdf-contingencia', [RelatorioPdfContingenciaController::class, 'index'])->name('relatorios-pdf-contingencia.index');
+    Route::put('/relatorios-pdf-contingencia', [RelatorioPdfContingenciaController::class, 'update'])->name('relatorios-pdf-contingencia.update');
+    Route::get('/relatorios-pdf-contingencia/progresso', [RelatorioPdfContingenciaController::class, 'progresso'])->name('relatorios-pdf-contingencia.progresso');
     Route::post('/relatorios-pdf-contingencia', [RelatorioPdfContingenciaController::class, 'gerar'])->name('relatorios-pdf-contingencia.gerar');
 
     // Leads routes

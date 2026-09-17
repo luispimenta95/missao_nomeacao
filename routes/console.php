@@ -17,7 +17,10 @@ Artisan::command('inspire', function () {
 | Periodo 1 (dias 01–15): todo dia 16 às 10:30 (America/Sao_Paulo)
 | Periodo 2 (dia 16–fim do mês anterior): dia 1 às 10:30
 | Sincronizar alunos ativos da Tutory: dias 1 e 16 às 06:00
-| Liberar períodos no admin (PDF de meses anteriores): todo dia às 00:05
+| Liberar períodos no admin (PDF de meses anteriores):
+|   dia 16 às 00:05 → período 1 do mês atual
+|   dia 1 às 00:05  → período 2 do mês anterior
+|   (insert + delete para manter 2 × N meses no combo)
 |
 | O Laravel NÃO dispara sozinho. Sem `php artisan schedule:run` a cada
 | minuto no cron da Hostinger, estes horários nunca executam.
@@ -75,7 +78,13 @@ Schedule::command('tutory:sincronizar-alunos')
     ->appendOutputTo($logTutory);
 
 Schedule::command('tutory:liberar-periodos-pdf')
-    ->dailyAt('00:05')
+    ->monthlyOn(1, '00:05')
     ->timezone('America/Sao_Paulo')
-    ->name('tutory-liberar-periodos-pdf')
+    ->name('tutory-liberar-periodos-pdf-dia-1')
+    ->appendOutputTo($logTutory);
+
+Schedule::command('tutory:liberar-periodos-pdf')
+    ->monthlyOn(16, '00:05')
+    ->timezone('America/Sao_Paulo')
+    ->name('tutory-liberar-periodos-pdf-dia-16')
     ->appendOutputTo($logTutory);
