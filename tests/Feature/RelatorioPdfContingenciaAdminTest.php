@@ -58,6 +58,9 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
             ->assertDontSee('OUTUBRO - PERÍODO 1')
             ->assertSee('Gerando PDF')
             ->assertSee('Meses visíveis')
+            ->assertSee('combo-aluno-lista')
+            ->assertSee('max-h-48')
+            ->assertSee('overflow-y-auto')
             ->getContent();
 
         $this->assertSame(12, substr_count($html, 'value="2026-'));

@@ -34,9 +34,9 @@
                 <p class="text-sm text-gray-500 mb-6">Um aluno por geração. Acompanhe o progresso na tela enquanto o relatório é montado.</p>
 
                 <div class="mb-6">
-                    <label class="block">
-                        <span class="text-sm font-semibold text-gray-700">Aluno *</span>
-                        <select id="campo-aluno" name="aluno_id" required class="mt-2 w-full rounded border border-gray-300 p-3 bg-white focus:ring-primary focus:border-primary @error('aluno_id') border-red-500 @enderror">
+                    <span class="block text-sm font-semibold text-gray-700">Aluno *</span>
+                    <div id="combo-aluno" class="mt-2">
+                        <select id="campo-aluno" name="aluno_id" required class="sr-only" tabindex="-1" aria-hidden="true">
                             <option value="">Selecione um aluno ativo da Tutory</option>
                             @foreach($alunos as $aluno)
                                 <option value="{{ $aluno->id }}" {{ (string) old('aluno_id') === (string) $aluno->id ? 'selected' : '' }}>
@@ -44,8 +44,29 @@
                                 </option>
                             @endforeach
                         </select>
-                    </label>
-                    <p class="text-xs text-gray-500 mt-2">Lista dos alunos sincronizados como ativos na Tutory.</p>
+                        <button type="button" id="combo-aluno-btn" class="w-full rounded border border-gray-300 p-3 bg-white text-left flex items-center justify-between gap-3 focus:ring-primary focus:border-primary @error('aluno_id') border-red-500 @enderror" aria-haspopup="listbox" aria-expanded="false" aria-controls="combo-aluno-lista" {{ $alunos->isEmpty() ? 'disabled' : '' }}>
+                            <span id="combo-aluno-label" class="truncate {{ old('aluno_id') ? 'text-gray-800' : 'text-gray-500' }}">
+                                @php
+                                    $alunoSelecionado = $alunos->firstWhere('id', (int) old('aluno_id'));
+                                @endphp
+                                {{ $alunoSelecionado->nome ?? 'Selecione um aluno ativo da Tutory' }}
+                            </span>
+                            <svg class="h-4 w-4 text-gray-500 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <ul id="combo-aluno-lista" class="hidden mt-1 max-h-48 overflow-y-auto rounded border border-gray-300 bg-white shadow-inner" role="listbox" aria-label="Alunos ativos da Tutory">
+                            <li role="option" data-value="" data-label="Selecione um aluno ativo da Tutory" class="px-3 py-2 text-sm text-gray-500 cursor-pointer hover:bg-yellow-50">
+                                Selecione um aluno ativo da Tutory
+                            </li>
+                            @foreach($alunos as $aluno)
+                                <li role="option" data-value="{{ $aluno->id }}" data-label="{{ $aluno->nome }}" class="px-3 py-2 text-sm text-gray-800 cursor-pointer hover:bg-yellow-50 {{ (string) old('aluno_id') === (string) $aluno->id ? 'bg-yellow-50 font-medium' : '' }}">
+                                    {{ $aluno->nome }}
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Lista dos alunos sincronizados como ativos na Tutory. Role a lista para ver todos, sem cobrir o período abaixo.</p>
                     @if($alunos->isEmpty())
                         <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3 mt-3">Nenhum aluno com id da Tutory. Rode a sincronização de alunos ativos e volte aqui.</p>
                     @endif
@@ -145,6 +166,62 @@
             const timerEl = document.getElementById('overlay-pdf-timer');
             const btn = document.getElementById('btn-gerar-pdf');
             const btnFechar = document.getElementById('overlay-pdf-fechar');
+            const comboAluno = document.getElementById('combo-aluno');
+            const comboAlunoBtn = document.getElementById('combo-aluno-btn');
+            const comboAlunoLista = document.getElementById('combo-aluno-lista');
+            const comboAlunoLabel = document.getElementById('combo-aluno-label');
+            const campoAluno = document.getElementById('campo-aluno');
+
+            function fecharComboAluno() {
+                if (!comboAlunoLista) return;
+                comboAlunoLista.classList.add('hidden');
+                if (comboAlunoBtn) comboAlunoBtn.setAttribute('aria-expanded', 'false');
+            }
+
+            function abrirComboAluno() {
+                if (!comboAlunoLista || !comboAlunoBtn || comboAlunoBtn.disabled) return;
+                comboAlunoLista.classList.remove('hidden');
+                comboAlunoBtn.setAttribute('aria-expanded', 'true');
+                const atual = comboAlunoLista.querySelector('[data-value="' + (campoAluno.value || '') + '"]');
+                if (atual && typeof atual.scrollIntoView === 'function') {
+                    atual.scrollIntoView({ block: 'nearest' });
+                }
+            }
+
+            if (comboAlunoBtn && comboAlunoLista) {
+                comboAlunoBtn.addEventListener('click', function (ev) {
+                    ev.preventDefault();
+                    if (comboAlunoLista.classList.contains('hidden')) {
+                        abrirComboAluno();
+                    } else {
+                        fecharComboAluno();
+                    }
+                });
+                comboAlunoLista.querySelectorAll('[data-value]').forEach(function (item) {
+                    item.addEventListener('click', function () {
+                        const valor = item.getAttribute('data-value') || '';
+                        const label = item.getAttribute('data-label') || item.textContent.trim();
+                        campoAluno.value = valor;
+                        comboAlunoLabel.textContent = label;
+                        comboAlunoLabel.classList.toggle('text-gray-500', valor === '');
+                        comboAlunoLabel.classList.toggle('text-gray-800', valor !== '');
+                        comboAlunoLista.querySelectorAll('[data-value]').forEach(function (li) {
+                            li.classList.toggle('bg-yellow-50', li === item);
+                            li.classList.toggle('font-medium', li === item);
+                        });
+                        fecharComboAluno();
+                    });
+                });
+                document.addEventListener('click', function (ev) {
+                    if (comboAluno && !comboAluno.contains(ev.target)) {
+                        fecharComboAluno();
+                    }
+                });
+                document.addEventListener('keydown', function (ev) {
+                    if (ev.key === 'Escape') fecharComboAluno();
+                });
+            }
+
             const progressoUrl = @json(route('relatorios-pdf-contingencia.progresso'));
             const etapas = [8, 28, 55, 82, 100];
             let pollId = null;
@@ -253,6 +330,11 @@
             form.addEventListener('submit', async function (ev) {
                 ev.preventDefault();
                 if (btn.disabled) return;
+                if (!campoAluno || !campoAluno.value) {
+                    if (comboAlunoBtn) comboAlunoBtn.classList.add('border-red-500');
+                    abrirComboAluno();
+                    return;
+                }
                 btn.disabled = true;
                 barra.classList.remove('bg-red-600');
                 barra.classList.add('bg-yellow-600');
