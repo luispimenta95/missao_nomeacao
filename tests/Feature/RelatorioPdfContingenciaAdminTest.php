@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Aluno;
+use App\Models\Configuracao;
 use App\Models\User;
 use App\Services\Tutory\RelatorioPdfContingencia;
+use App\Services\Tutory\RelatorioPeriodoCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
@@ -27,7 +29,7 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
         $this->post(route('relatorios-pdf-contingencia.gerar'), [])->assertRedirect(route('login'));
     }
 
-    public function test_admin_ve_alunos_ativos_e_periodos_ja_liberados(): void
+    public function test_admin_ve_alunos_ativos_e_os_12_periodos_da_janela(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-09-17 12:00:00', 'America/Sao_Paulo'));
         $user = User::factory()->create();
@@ -43,16 +45,22 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
             'recebe_email' => false,
         ]);
 
-        $this->actingAs($user)
+        $html = $this->actingAs($user)
             ->get(route('relatorios-pdf-contingencia.index'))
             ->assertOk()
             ->assertSee('PDF de meses anteriores')
             ->assertSee('Giovanna')
             ->assertDontSee('Sem Tutory')
-            ->assertSee('JANEIRO - PERÍODO 1')
+            ->assertSee('MARÇO - PERÍODO 2')
             ->assertSee('SETEMBRO - PERÍODO 1')
+            ->assertDontSee('JANEIRO - PERÍODO 1')
             ->assertDontSee('SETEMBRO - PERÍODO 2')
-            ->assertDontSee('OUTUBRO - PERÍODO 1');
+            ->assertDontSee('OUTUBRO - PERÍODO 1')
+            ->assertSee('Gerando PDF')
+            ->assertSee('Meses visíveis')
+            ->getContent();
+
+        $this->assertSame(12, substr_count($html, 'value="2026-'));
     }
 
     public function test_em_primeiro_de_outubro_o_periodo_2_de_setembro_aparece(): void
@@ -67,6 +75,27 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
             ->assertSee('2026-09|2')
             ->assertDontSee('OUTUBRO - PERÍODO 1')
             ->assertDontSee('2026-10|1');
+    }
+
+    public function test_admin_altera_a_janela_de_meses(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-17 12:00:00', 'America/Sao_Paulo'));
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->put(route('relatorios-pdf-contingencia.update'), ['meses' => 3])
+            ->assertRedirect(route('relatorios-pdf-contingencia.index'));
+
+        $this->assertSame('3', Configuracao::valor(RelatorioPeriodoCatalog::CONFIG_CHAVE));
+
+        $html = $this->actingAs($user)
+            ->get(route('relatorios-pdf-contingencia.index'))
+            ->assertOk()
+            ->assertSee('SETEMBRO - PERÍODO 1')
+            ->assertDontSee('MAIO - PERÍODO 1')
+            ->getContent();
+
+        $this->assertSame(6, substr_count($html, 'value="2026-'));
     }
 
     public function test_rejeita_periodo_ainda_nao_liberado_e_mais_de_um_aluno(): void
