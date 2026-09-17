@@ -119,6 +119,12 @@ class CoachReportDownloader
 
     private bool $teste;
 
+    /**
+     * Primeiro dia do mês civil escolhido (contingência). Quando definido,
+     * o período 2 não recua para o mês anterior.
+     */
+    private ?\DateTimeImmutable $referenciaMes;
+
     private string $cookieFile;
 
     private ?FileCookieJar $cookieJar = null;
@@ -135,12 +141,19 @@ class CoachReportDownloader
         string $periodo,
         ?callable $logger = null,
         bool $teste = false,
+        ?\DateTimeInterface $referenciaMes = null,
     ) {
         $this->periodo = $periodo;
         $this->teste = $teste;
         $this->logger = $logger ?? static function (string $message): void {
             echo $message.PHP_EOL;
         };
+        $this->referenciaMes = $referenciaMes === null
+            ? null
+            : ($referenciaMes instanceof \DateTimeImmutable
+                ? $referenciaMes
+                : \DateTimeImmutable::createFromInterface($referenciaMes)
+            )->modify('first day of this month')->setTime(0, 0, 0);
 
         $loginUrl = trim((string) env('LOGIN_URL', ''));
         $this->urlLogin = $loginUrl !== '' ? $loginUrl : 'https://admin.tutory.com.br/login';
@@ -179,9 +192,55 @@ class CoachReportDownloader
             $this->log((string) $exc);
             throw $exc;
         } finally {
-            if (is_file($this->cookieFile)) {
-                @unlink($this->cookieFile);
+            $this->limparCookie();
+        }
+    }
+
+    /**
+     * Gera o PDF consolidado de um único aluno e devolve o caminho do arquivo.
+     * Não envia e-mail e não apaga o PDF (o admin faz o download).
+     */
+    public function gerarPdfParaAluno(string $tutoryId, string $nome): string
+    {
+        $this->validarConfig();
+        $tutoryId = trim($tutoryId);
+        $nome = trim($nome);
+        if ($tutoryId === '' || $nome === '') {
+            throw new RuntimeException('Informe o aluno da Tutory (id e nome).');
+        }
+
+        try {
+            $this->login();
+            $aluno = ['id' => $tutoryId, 'nome' => $nome];
+            $relatorios = $this->relatorios();
+            $arquivo = null;
+            for ($tentativa = 1; $tentativa <= self::MAX_TENTATIVAS; $tentativa++) {
+                $this->log("Aluno {$nome} (tentativa {$tentativa}/".self::MAX_TENTATIVAS.')');
+                try {
+                    $arquivo = $this->processarAlunoConsolidado($aluno, $relatorios);
+                } catch (Throwable $exc) {
+                    $this->log("[{$nome}] ERRO: ".$exc->getMessage());
+                    $arquivo = null;
+                }
+                if ($arquivo !== null) {
+                    return $arquivo;
+                }
             }
+
+            throw new RuntimeException('Não foi possível gerar o PDF consolidado para '.$nome.'.');
+        } catch (Throwable $exc) {
+            $this->log('ERRO FATAL:');
+            $this->log((string) $exc);
+            throw $exc;
+        } finally {
+            $this->limparCookie();
+        }
+    }
+
+    private function limparCookie(): void
+    {
+        if (is_file($this->cookieFile)) {
+            @unlink($this->cookieFile);
         }
     }
 
@@ -297,6 +356,10 @@ class CoachReportDownloader
      */
     private function mesDoPeriodo(?\DateTimeInterface $ref = null): \DateTimeImmutable
     {
+        if ($this->referenciaMes !== null && $ref === null) {
+            return $this->referenciaMes;
+        }
+
         $hoje = $ref instanceof \DateTimeImmutable
             ? $ref
             : ($ref instanceof \DateTimeInterface
