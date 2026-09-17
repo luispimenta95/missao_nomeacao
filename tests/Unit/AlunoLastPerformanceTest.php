@@ -54,4 +54,60 @@ class AlunoLastPerformanceTest extends TestCase
 
         $this->assertSame('Bom', $aluno->fresh()->last_performance);
     }
+
+    public function test_grava_todas_as_faixas_do_ultimo_relatorio(): void
+    {
+        $aluno = Aluno::create([
+            'nome' => 'Lara Lacerda',
+            'email' => 'lara@example.com',
+            'recebe_email' => false,
+        ]);
+
+        $avaliacao = (new AvaliadorDesempenho)->avaliarRelatorio([
+            'nome' => $aluno->nome,
+            'dias_analisados' => 15,
+            'dias_estudados' => 6,
+            'dias_falhados' => 9,
+            'total_questoes' => 306,
+            'percentual_acertos' => 83.7,
+            'assuntos' => [
+                ['disciplina' => 'DIR CONST', 'assunto' => 'Poder Judiciário', 'percentual' => 55],
+                ['disciplina' => 'DIR ADM', 'assunto' => 'Ato administrativo', 'percentual' => 70],
+            ],
+        ]);
+
+        $aluno->aplicarAvaliacaoDesempenho($avaliacao);
+        $aluno = $aluno->fresh();
+
+        $this->assertSame('Brigando com a constância', $aluno->last_performance);
+        $this->assertSame('Volume suficiente', $aluno->last_volume_questoes);
+        $this->assertSame('Muito bom', $aluno->last_percentual_acertos);
+        $this->assertSame('Crítico · Abaixo da média', $aluno->last_assuntos);
+    }
+
+    public function test_percentual_fica_vazio_quando_amostra_e_insuficiente(): void
+    {
+        $aluno = Aluno::create([
+            'nome' => 'Ana',
+            'email' => 'ana@example.com',
+            'recebe_email' => true,
+            'last_percentual_acertos' => 'Excelente',
+        ]);
+
+        $avaliacao = (new AvaliadorDesempenho)->avaliarRelatorio([
+            'nome' => $aluno->nome,
+            'total_questoes' => 40,
+            'percentual_acertos' => 95,
+            'assuntos' => [
+                ['disciplina' => 'DIR ADM', 'assunto' => 'Licitações', 'percentual' => 90],
+            ],
+        ]);
+
+        $aluno->aplicarAvaliacaoDesempenho($avaliacao);
+        $aluno = $aluno->fresh();
+
+        $this->assertSame('Crítico e inconclusivo', $aluno->last_volume_questoes);
+        $this->assertNull($aluno->last_percentual_acertos);
+        $this->assertSame('Sem pontos de atenção', $aluno->last_assuntos);
+    }
 }

@@ -42,9 +42,30 @@
 
             <div class="mb-6">
                 <label class="block">
-                    <span class="text-sm font-semibold text-gray-700">Último desempenho</span>
+                    <span class="text-sm font-semibold text-gray-700">Constância</span>
                     <input type="text" readonly class="mt-2 w-full rounded border border-gray-200 bg-gray-50 p-3 text-gray-700" value="{{ $aluno->last_performance ?: 'Ainda não disponível' }}">
-                    <p class="text-xs text-gray-500 mt-1">Atualizado automaticamente com o nível de desempenho do último relatório gerado.</p>
+                </label>
+            </div>
+
+            <div class="mb-6">
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Quantidade total de questões</span>
+                    <input type="text" readonly class="mt-2 w-full rounded border border-gray-200 bg-gray-50 p-3 text-gray-700" value="{{ $aluno->last_volume_questoes ?: 'Ainda não disponível' }}">
+                </label>
+            </div>
+
+            <div class="mb-6">
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Percentual geral de acertos</span>
+                    <input type="text" readonly class="mt-2 w-full rounded border border-gray-200 bg-gray-50 p-3 text-gray-700" value="{{ $aluno->last_percentual_acertos ?: 'Ainda não disponível' }}">
+                </label>
+            </div>
+
+            <div class="mb-6">
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Percentual por disciplina/assunto</span>
+                    <input type="text" readonly class="mt-2 w-full rounded border border-gray-200 bg-gray-50 p-3 text-gray-700" value="{{ $aluno->last_assuntos ?: 'Ainda não disponível' }}">
+                    <p class="text-xs text-gray-500 mt-1">Atualizado automaticamente com as faixas do último relatório gerado (mesmos eixos da gestão de desempenho).</p>
                 </label>
             </div>
 

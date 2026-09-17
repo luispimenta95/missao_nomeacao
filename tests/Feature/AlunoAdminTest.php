@@ -33,6 +33,56 @@ class AlunoAdminTest extends TestCase
         $this->assertSame(1, Aluno::query()->count());
     }
 
+    public function test_lista_mostra_as_faixas_de_desempenho_do_aluno(): void
+    {
+        $user = User::factory()->create();
+        Aluno::create([
+            'nome' => 'Giovanna',
+            'email' => 'giovanna@example.com',
+            'recebe_email' => true,
+            'last_performance' => 'Brigando com a constância',
+            'last_volume_questoes' => 'Volume suficiente',
+            'last_percentual_acertos' => 'Muito bom',
+            'last_assuntos' => 'Crítico · Abaixo da média',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('alunos.index'))
+            ->assertOk()
+            ->assertSee('Constância')
+            ->assertSee('Questões')
+            ->assertSee('% acertos')
+            ->assertSee('Assuntos')
+            ->assertSee('Brigando com a constância')
+            ->assertSee('Volume suficiente')
+            ->assertSee('Muito bom')
+            ->assertSee('Crítico · Abaixo da média');
+    }
+
+    public function test_edicao_mostra_as_faixas_somente_leitura(): void
+    {
+        $user = User::factory()->create();
+        $aluno = Aluno::create([
+            'nome' => 'Giovanna',
+            'email' => 'giovanna@example.com',
+            'recebe_email' => true,
+            'last_performance' => 'Excelente',
+            'last_volume_questoes' => 'Volume alto',
+            'last_percentual_acertos' => 'Excelente',
+            'last_assuntos' => 'Sem pontos de atenção',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('alunos.edit', $aluno))
+            ->assertOk()
+            ->assertSee('Constância')
+            ->assertSee('Quantidade total de questões')
+            ->assertSee('Percentual geral de acertos')
+            ->assertSee('Percentual por disciplina/assunto')
+            ->assertSee('Volume alto')
+            ->assertSee('Sem pontos de atenção');
+    }
+
     public function test_comando_de_sincronizacao_esta_agendado_as_6h(): void
     {
         $src = (string) file_get_contents(base_path('routes/console.php'));

@@ -1596,11 +1596,14 @@ class CoachReportDownloader
                 $this->log("[{$aluno->nome}] Desempenho: sem blocos (métricas ausentes ou parâmetros não seedados)");
             }
 
-            if (is_string($resumo) && trim($resumo) !== '') {
-                $aluno->last_performance = $resumo;
-                $aluno->save();
-                $this->log("[{$aluno->nome}] last_performance atualizado: {$resumo}");
-            }
+            $aluno->aplicarAvaliacaoDesempenho($avaliacao);
+            $this->log(
+                "[{$aluno->nome}] métricas atualizadas:"
+                .' constância='.($aluno->last_performance ?: '—')
+                .' | questões='.($aluno->last_volume_questoes ?: '—')
+                .' | % acertos='.($aluno->last_percentual_acertos ?: '—')
+                .' | assuntos='.($aluno->last_assuntos ?: '—')
+            );
 
             if (! $aluno->recebe_email) {
                 $this->log("[{$aluno->nome}] E-mail não enviado (recebe_email=false)");
