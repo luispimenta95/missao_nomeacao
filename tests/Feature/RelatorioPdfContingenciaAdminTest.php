@@ -58,9 +58,13 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
             ->assertDontSee('OUTUBRO - PERÍODO 1')
             ->assertSee('Gerando PDF')
             ->assertSee('Meses visíveis')
+            ->assertSee('combo-aluno-lista')
+            ->assertSee('combo-periodo-lista')
+            ->assertSee('max-h-48')
+            ->assertSee('overflow-y-auto')
             ->getContent();
 
-        $this->assertSame(12, substr_count($html, 'value="2026-'));
+        $this->assertSame(12, substr_count($html, '<option value="2026-'));
     }
 
     public function test_em_primeiro_de_outubro_o_periodo_2_de_setembro_aparece(): void
@@ -95,7 +99,7 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
             ->assertDontSee('MAIO - PERÍODO 1')
             ->getContent();
 
-        $this->assertSame(6, substr_count($html, 'value="2026-'));
+        $this->assertSame(6, substr_count($html, '<option value="2026-'));
     }
 
     public function test_rejeita_periodo_ainda_nao_liberado_e_mais_de_um_aluno(): void
