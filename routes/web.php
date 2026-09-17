@@ -12,6 +12,7 @@ use App\Http\Controllers\LeadController;
 use App\Http\Controllers\MailTestController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\RelatorioPdfAdminController;
+use App\Http\Controllers\RelatorioPdfContingenciaController;
 use App\Http\Controllers\TurmaController;
 use App\Models\Material;
 use App\Models\Turma;
@@ -81,6 +82,10 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::get('/relatorios-pdf', [RelatorioPdfAdminController::class, 'index'])->name('relatorios-pdf.index');
     Route::put('/relatorios-pdf', [RelatorioPdfAdminController::class, 'update'])->name('relatorios-pdf.update');
     Route::get('/relatorios-pdf/preview', [RelatorioPdfAdminController::class, 'preview'])->name('relatorios-pdf.preview');
+
+    // Contingência: PDF de um aluno em períodos já liberados (download, sem e-mail)
+    Route::get('/relatorios-pdf-contingencia', [RelatorioPdfContingenciaController::class, 'index'])->name('relatorios-pdf-contingencia.index');
+    Route::post('/relatorios-pdf-contingencia', [RelatorioPdfContingenciaController::class, 'gerar'])->name('relatorios-pdf-contingencia.gerar');
 
     // Leads routes
     Route::get('/leads', [LeadAdminController::class, 'index'])->name('leads.index');

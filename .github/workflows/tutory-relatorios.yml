@@ -5,11 +5,13 @@ name: Tutory Relatorios
 # tutory:baixar-relatorios nunca roda sozinho.
 #
 # Horários em UTC (Brasília = UTC-3, sem horário de verão):
+#   00:05 BRT = 03:05 UTC  → libera períodos de PDF no admin (todo dia)
 #   06:00 BRT = 09:00 UTC  → sincronizar alunos (dias 1 e 16)
 #   10:30 BRT = 13:30 UTC  → PDF + e-mail (dia 16 = período 1; dia 1 = período 2)
 
 on:
   schedule:
+    - cron: "5 3 * * *"
     - cron: "0 9 1,16 * *"
     - cron: "30 13 16 * *"
     - cron: "30 13 1 * *"
@@ -26,6 +28,7 @@ on:
           - tutory:baixar-relatorios --periodo=2 --se-pendente
           - tutory:baixar-relatorios --periodo=1
           - tutory:baixar-relatorios --periodo=2
+          - tutory:liberar-periodos-pdf
           - tutory:scheduler-status
 
 concurrency:
@@ -47,6 +50,8 @@ jobs:
           set -euo pipefail
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             CMD="$INPUT_CMD"
+          elif [ "$SCHEDULE" = "5 3 * * *" ]; then
+            CMD="tutory:liberar-periodos-pdf"
           elif [ "$SCHEDULE" = "0 9 1,16 * *" ]; then
             CMD="tutory:sincronizar-alunos"
           elif [ "$SCHEDULE" = "30 13 16 * *" ]; then

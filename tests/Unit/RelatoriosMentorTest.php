@@ -202,6 +202,26 @@ class RelatoriosMentorTest extends TestCase
         );
     }
 
+    public function test_referencia_mes_fixa_o_periodo_2_sem_recuar(): void
+    {
+        $downloader = new CoachReportDownloader(
+            '2',
+            static function (): void {},
+            false,
+            new \DateTimeImmutable('2026-09-01'),
+        );
+        $ref = new ReflectionClass($downloader);
+        $iso = $ref->getMethod('datasPeriodoIso');
+        $mes = $ref->getMethod('mesDoPeriodo');
+
+        $this->assertSame(['2026-09-16', '2026-09-30'], $iso->invoke($downloader));
+        $this->assertSame('2026-09-01', $mes->invoke($downloader)->format('Y-m-d'));
+        $this->assertSame(
+            'SETEMBRO - PERÍODO 2',
+            RelatorioConsolidadoLayout::rotuloPeriodo('2', $mes->invoke($downloader))
+        );
+    }
+
     public function test_periodo_1_nao_recua_o_mes_antes_do_dia_16(): void
     {
         $downloader = new CoachReportDownloader('1', static function (): void {});
