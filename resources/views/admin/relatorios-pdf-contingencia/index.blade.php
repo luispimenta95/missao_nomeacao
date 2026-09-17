@@ -73,18 +73,41 @@
                 </div>
 
                 <div class="mb-8">
-                    <label class="block">
-                        <span class="text-sm font-semibold text-gray-700">Mês / período *</span>
-                        <select id="campo-periodo" name="periodo" required class="mt-2 w-full rounded border border-gray-300 p-3 bg-white focus:ring-primary focus:border-primary @error('periodo') border-red-500 @enderror">
+                    <span class="block text-sm font-semibold text-gray-700">Mês / período *</span>
+                    @php
+                        $periodoPadrao = old('periodo', $periodos === [] ? '' : ($periodos[array_key_last($periodos)]['chave'] ?? ''));
+                        $periodoSelecionado = collect($periodos)->firstWhere('chave', $periodoPadrao);
+                    @endphp
+                    <div id="combo-periodo" class="mt-2">
+                        <select id="campo-periodo" name="periodo" required class="sr-only" tabindex="-1" aria-hidden="true">
                             @forelse($periodos as $periodo)
-                                <option value="{{ $periodo['chave'] }}" {{ (string) old('periodo', $periodos[array_key_last($periodos)]['chave'] ?? '') === (string) $periodo['chave'] ? 'selected' : '' }}>
+                                <option value="{{ $periodo['chave'] }}" {{ (string) $periodoPadrao === (string) $periodo['chave'] ? 'selected' : '' }}>
                                     {{ $periodo['label'] }}
                                 </option>
                             @empty
                                 <option value="">Nenhum período liberado</option>
                             @endforelse
                         </select>
-                    </label>
+                        <button type="button" id="combo-periodo-btn" class="w-full rounded border border-gray-300 p-3 bg-white text-left flex items-center justify-between gap-3 focus:ring-primary focus:border-primary @error('periodo') border-red-500 @enderror" aria-haspopup="listbox" aria-expanded="false" aria-controls="combo-periodo-lista" {{ $periodos === [] ? 'disabled' : '' }}>
+                            <span id="combo-periodo-label" class="truncate {{ $periodoSelecionado ? 'text-gray-800' : 'text-gray-500' }}">
+                                {{ $periodoSelecionado['label'] ?? 'Selecione o período' }}
+                            </span>
+                            <svg class="h-4 w-4 text-gray-500 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <ul id="combo-periodo-lista" class="hidden mt-1 max-h-48 overflow-y-auto rounded border border-gray-300 bg-white shadow-inner" role="listbox" aria-label="Meses e períodos">
+                            @forelse($periodos as $periodo)
+                                <li role="option" data-value="{{ $periodo['chave'] }}" data-label="{{ $periodo['label'] }}" class="px-3 py-2 text-sm text-gray-800 cursor-pointer hover:bg-yellow-50 {{ (string) $periodoPadrao === (string) $periodo['chave'] ? 'bg-yellow-50 font-medium' : '' }}">
+                                    {{ $periodo['label'] }}
+                                </li>
+                            @empty
+                                <li role="option" data-value="" data-label="Nenhum período liberado" class="px-3 py-2 text-sm text-gray-500">
+                                    Nenhum período liberado
+                                </li>
+                            @endforelse
+                        </ul>
+                    </div>
                     <p class="text-xs text-gray-500 mt-2">{{ count($periodos) }} de até {{ $limiteLinhas }} linhas (2 períodos × {{ $mesesVisiveis }} meses). Período 1 libera no dia 16; período 2 no dia 1 do mês seguinte.</p>
                 </div>
 
@@ -171,56 +194,69 @@
             const comboAlunoLista = document.getElementById('combo-aluno-lista');
             const comboAlunoLabel = document.getElementById('combo-aluno-label');
             const campoAluno = document.getElementById('campo-aluno');
+            const comboPeriodo = document.getElementById('combo-periodo');
+            const comboPeriodoBtn = document.getElementById('combo-periodo-btn');
+            const comboPeriodoLista = document.getElementById('combo-periodo-lista');
+            const comboPeriodoLabel = document.getElementById('combo-periodo-label');
+            const campoPeriodo = document.getElementById('campo-periodo');
 
-            function fecharComboAluno() {
-                if (!comboAlunoLista) return;
-                comboAlunoLista.classList.add('hidden');
-                if (comboAlunoBtn) comboAlunoBtn.setAttribute('aria-expanded', 'false');
-            }
-
-            function abrirComboAluno() {
-                if (!comboAlunoLista || !comboAlunoBtn || comboAlunoBtn.disabled) return;
-                comboAlunoLista.classList.remove('hidden');
-                comboAlunoBtn.setAttribute('aria-expanded', 'true');
-                const atual = comboAlunoLista.querySelector('[data-value="' + (campoAluno.value || '') + '"]');
-                if (atual && typeof atual.scrollIntoView === 'function') {
-                    atual.scrollIntoView({ block: 'nearest' });
+            function ligarCombo(raiz, botao, lista, rotulo, campo) {
+                if (!botao || !lista || !campo || !rotulo) {
+                    return { abrir: function () {}, fechar: function () {} };
                 }
-            }
 
-            if (comboAlunoBtn && comboAlunoLista) {
-                comboAlunoBtn.addEventListener('click', function (ev) {
+                function fechar() {
+                    lista.classList.add('hidden');
+                    botao.setAttribute('aria-expanded', 'false');
+                }
+
+                function abrir() {
+                    if (botao.disabled) return;
+                    lista.classList.remove('hidden');
+                    botao.setAttribute('aria-expanded', 'true');
+                    const atual = lista.querySelector('[data-value="' + CSS.escape(campo.value || '') + '"]');
+                    if (atual && typeof atual.scrollIntoView === 'function') {
+                        atual.scrollIntoView({ block: 'nearest' });
+                    }
+                }
+
+                botao.addEventListener('click', function (ev) {
                     ev.preventDefault();
-                    if (comboAlunoLista.classList.contains('hidden')) {
-                        abrirComboAluno();
+                    if (lista.classList.contains('hidden')) {
+                        abrir();
                     } else {
-                        fecharComboAluno();
+                        fechar();
                     }
                 });
-                comboAlunoLista.querySelectorAll('[data-value]').forEach(function (item) {
+                lista.querySelectorAll('[data-value]').forEach(function (item) {
                     item.addEventListener('click', function () {
                         const valor = item.getAttribute('data-value') || '';
                         const label = item.getAttribute('data-label') || item.textContent.trim();
-                        campoAluno.value = valor;
-                        comboAlunoLabel.textContent = label;
-                        comboAlunoLabel.classList.toggle('text-gray-500', valor === '');
-                        comboAlunoLabel.classList.toggle('text-gray-800', valor !== '');
-                        comboAlunoLista.querySelectorAll('[data-value]').forEach(function (li) {
+                        campo.value = valor;
+                        rotulo.textContent = label;
+                        rotulo.classList.toggle('text-gray-500', valor === '');
+                        rotulo.classList.toggle('text-gray-800', valor !== '');
+                        lista.querySelectorAll('[data-value]').forEach(function (li) {
                             li.classList.toggle('bg-yellow-50', li === item);
                             li.classList.toggle('font-medium', li === item);
                         });
-                        fecharComboAluno();
+                        fechar();
                     });
                 });
                 document.addEventListener('click', function (ev) {
-                    if (comboAluno && !comboAluno.contains(ev.target)) {
-                        fecharComboAluno();
+                    if (raiz && !raiz.contains(ev.target)) {
+                        fechar();
                     }
                 });
                 document.addEventListener('keydown', function (ev) {
-                    if (ev.key === 'Escape') fecharComboAluno();
+                    if (ev.key === 'Escape') fechar();
                 });
+
+                return { abrir: abrir, fechar: fechar };
             }
+
+            const alunoCombo = ligarCombo(comboAluno, comboAlunoBtn, comboAlunoLista, comboAlunoLabel, campoAluno);
+            const periodoCombo = ligarCombo(comboPeriodo, comboPeriodoBtn, comboPeriodoLista, comboPeriodoLabel, campoPeriodo);
 
             const progressoUrl = @json(route('relatorios-pdf-contingencia.progresso'));
             const etapas = [8, 28, 55, 82, 100];
@@ -332,7 +368,12 @@
                 if (btn.disabled) return;
                 if (!campoAluno || !campoAluno.value) {
                     if (comboAlunoBtn) comboAlunoBtn.classList.add('border-red-500');
-                    abrirComboAluno();
+                    alunoCombo.abrir();
+                    return;
+                }
+                if (!campoPeriodo || !campoPeriodo.value) {
+                    if (comboPeriodoBtn) comboPeriodoBtn.classList.add('border-red-500');
+                    periodoCombo.abrir();
                     return;
                 }
                 btn.disabled = true;
