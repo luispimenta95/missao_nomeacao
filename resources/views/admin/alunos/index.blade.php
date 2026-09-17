@@ -13,13 +13,16 @@
     <div class="p-4 bg-green-100 text-green-800 rounded mb-4">{{ session('success') }}</div>
     @endif
 
-    <div class="bg-white rounded shadow overflow-hidden">
+    <div class="bg-white rounded shadow overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Nome</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">E-mail</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Último desempenho</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Constância</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Questões</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">% acertos</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Assuntos</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Recebe e-mail</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Ações</th>
                 </tr>
@@ -27,15 +30,12 @@
             <tbody class="divide-y divide-gray-100">
                 @forelse($alunos as $aluno)
                 <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 text-sm font-medium text-gray-800">{{ $aluno->nome }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600">{{ $aluno->email }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-700">
-                        @if($aluno->last_performance)
-                        <span class="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">{{ $aluno->last_performance }}</span>
-                        @else
-                        <span class="text-gray-400">—</span>
-                        @endif
-                    </td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">{{ $aluno->nome }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{{ $aluno->email }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_performance" /></td>
+                    <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_question_volume" /></td>
+                    <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_accuracy_rate" /></td>
+                    <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_subjects" /></td>
                     <td class="px-4 py-3 text-sm">
                         @if($aluno->recebe_email)
                         <span class="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">Sim</span>
@@ -49,7 +49,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" class="px-4 py-8 text-center text-gray-600">Nenhum aluno cadastrado.</td>
+                    <td colspan="8" class="px-4 py-8 text-center text-gray-600">Nenhum aluno cadastrado.</td>
                 </tr>
                 @endforelse
             </tbody>

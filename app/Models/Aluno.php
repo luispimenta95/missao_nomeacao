@@ -17,6 +17,9 @@ class Aluno extends Model
         'email',
         'recebe_email',
         'last_performance',
+        'last_question_volume',
+        'last_accuracy_rate',
+        'last_subjects',
     ];
 
     protected $casts = [
@@ -60,5 +63,53 @@ class Aluno extends Model
         return self::query()->get()->first(
             static fn (self $aluno): bool => self::normalizarNome($aluno->nome) === $chave
         );
+    }
+
+    /**
+     * Grava as faixas do último relatório (constância, volume, % acertos, assuntos).
+     *
+     * @param  array{blocos?: list<array<string, mixed>>, metricas?: array<string, mixed>, resumo?: string|null}  $avaliacao
+     */
+    public function aplicarAvaliacaoDesempenho(array $avaliacao): void
+    {
+        $porEixo = [];
+        foreach ($avaliacao['blocos'] ?? [] as $bloco) {
+            if (! is_array($bloco)) {
+                continue;
+            }
+            $eixo = (string) ($bloco['eixo'] ?? '');
+            $nome = trim((string) ($bloco['faixa_nome'] ?? ''));
+            if ($eixo === '' || $nome === '') {
+                continue;
+            }
+            $porEixo[$eixo][] = $nome;
+        }
+
+        $metricas = is_array($avaliacao['metricas'] ?? null) ? $avaliacao['metricas'] : [];
+
+        if (isset($porEixo[EixoDesempenho::CONSTANCIA][0])) {
+            $this->last_performance = $porEixo[EixoDesempenho::CONSTANCIA][0];
+        }
+
+        if (isset($porEixo[EixoDesempenho::VOLUME_QUESTOES][0])) {
+            $this->last_question_volume = $porEixo[EixoDesempenho::VOLUME_QUESTOES][0];
+        }
+
+        if (isset($porEixo[EixoDesempenho::PERCENTUAL_ACERTOS][0])) {
+            $this->last_accuracy_rate = $porEixo[EixoDesempenho::PERCENTUAL_ACERTOS][0];
+        } else {
+            $totalQuestoes = $metricas['total_questoes'] ?? null;
+            if (is_numeric($totalQuestoes) && (float) $totalQuestoes < 100) {
+                $this->last_accuracy_rate = null;
+            }
+        }
+
+        if (isset($porEixo[EixoDesempenho::ASSUNTO])) {
+            $this->last_subjects = implode(' · ', array_values(array_unique($porEixo[EixoDesempenho::ASSUNTO])));
+        } elseif ((int) ($metricas['assuntos_avaliados'] ?? 0) > 0) {
+            $this->last_subjects = 'Sem pontos de atenção';
+        }
+
+        $this->save();
     }
 }

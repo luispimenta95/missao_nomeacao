@@ -33,6 +33,63 @@ class AlunoAdminTest extends TestCase
         $this->assertSame(1, Aluno::query()->count());
     }
 
+    public function test_lista_mostra_as_faixas_de_desempenho_do_aluno(): void
+    {
+        $user = User::factory()->create();
+        Aluno::create([
+            'nome' => 'Giovanna',
+            'email' => 'giovanna@example.com',
+            'recebe_email' => true,
+            'last_performance' => 'Brigando com a constância',
+            'last_question_volume' => 'Volume suficiente',
+            'last_accuracy_rate' => 'Muito bom',
+            'last_subjects' => 'Crítico · Abaixo da média',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('alunos.index'))
+            ->assertOk()
+            ->assertSee('Constância')
+            ->assertSee('Questões')
+            ->assertSee('% acertos')
+            ->assertSee('Assuntos')
+            ->assertSee('Brigando com a constância')
+            ->assertSee('Volume suficiente')
+            ->assertSee('Muito bom')
+            ->assertSee('Crítico · Abaixo da média');
+    }
+
+    public function test_edicao_mostra_as_faixas_somente_leitura(): void
+    {
+        $user = User::factory()->create();
+        $aluno = Aluno::create([
+            'nome' => 'Giovanna',
+            'email' => 'giovanna@example.com',
+            'recebe_email' => true,
+            'last_performance' => 'Excelente',
+            'last_question_volume' => 'Volume alto',
+            'last_accuracy_rate' => 'Excelente',
+            'last_subjects' => 'Sem pontos de atenção',
+        ]);
+
+        $html = $this->actingAs($user)
+            ->get(route('alunos.edit', $aluno))
+            ->assertOk()
+            ->assertSee('Constância')
+            ->assertSee('Quantidade total de questões')
+            ->assertSee('Percentual geral de acertos')
+            ->assertSee('Percentual por disciplina/assunto')
+            ->assertSee('Volume alto')
+            ->assertSee('Sem pontos de atenção')
+            ->getContent();
+
+        $this->assertStringNotContainsString('name="last_performance"', $html);
+        $this->assertStringNotContainsString('name="last_question_volume"', $html);
+        $this->assertStringNotContainsString('name="last_accuracy_rate"', $html);
+        $this->assertStringNotContainsString('name="last_subjects"', $html);
+        $this->assertDoesNotMatchRegularExpression('/<input[^>]*(readonly|last_question_volume|Volume alto)/i', $html);
+    }
+
     public function test_comando_de_sincronizacao_esta_agendado_as_6h(): void
     {
         $src = (string) file_get_contents(base_path('routes/console.php'));
