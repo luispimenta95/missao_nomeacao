@@ -80,9 +80,9 @@ class AlunoLastPerformanceTest extends TestCase
         $aluno = $aluno->fresh();
 
         $this->assertSame('Brigando com a constância', $aluno->last_performance);
-        $this->assertSame('Volume suficiente', $aluno->last_volume_questoes);
-        $this->assertSame('Muito bom', $aluno->last_percentual_acertos);
-        $this->assertSame('Crítico · Abaixo da média', $aluno->last_assuntos);
+        $this->assertSame('Volume suficiente', $aluno->last_question_volume);
+        $this->assertSame('Muito bom', $aluno->last_accuracy_rate);
+        $this->assertSame('Crítico · Abaixo da média', $aluno->last_subjects);
     }
 
     public function test_percentual_fica_vazio_quando_amostra_e_insuficiente(): void
@@ -91,7 +91,7 @@ class AlunoLastPerformanceTest extends TestCase
             'nome' => 'Ana',
             'email' => 'ana@example.com',
             'recebe_email' => true,
-            'last_percentual_acertos' => 'Excelente',
+            'last_accuracy_rate' => 'Excelente',
         ]);
 
         $avaliacao = (new AvaliadorDesempenho)->avaliarRelatorio([
@@ -106,8 +106,8 @@ class AlunoLastPerformanceTest extends TestCase
         $aluno->aplicarAvaliacaoDesempenho($avaliacao);
         $aluno = $aluno->fresh();
 
-        $this->assertSame('Crítico e inconclusivo', $aluno->last_volume_questoes);
-        $this->assertNull($aluno->last_percentual_acertos);
-        $this->assertSame('Sem pontos de atenção', $aluno->last_assuntos);
+        $this->assertSame('Crítico e inconclusivo', $aluno->last_question_volume);
+        $this->assertNull($aluno->last_accuracy_rate);
+        $this->assertSame('Sem pontos de atenção', $aluno->last_subjects);
     }
 }

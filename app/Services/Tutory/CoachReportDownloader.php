@@ -1600,9 +1600,9 @@ class CoachReportDownloader
             $this->log(
                 "[{$aluno->nome}] métricas atualizadas:"
                 .' constância='.($aluno->last_performance ?: '—')
-                .' | questões='.($aluno->last_volume_questoes ?: '—')
-                .' | % acertos='.($aluno->last_percentual_acertos ?: '—')
-                .' | assuntos='.($aluno->last_assuntos ?: '—')
+                .' | questions='.($aluno->last_question_volume ?: '—')
+                .' | accuracy='.($aluno->last_accuracy_rate ?: '—')
+                .' | subjects='.($aluno->last_subjects ?: '—')
             );
 
             if (! $aluno->recebe_email) {

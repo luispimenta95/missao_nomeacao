@@ -33,9 +33,9 @@
                     <td class="px-4 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">{{ $aluno->nome }}</td>
                     <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{{ $aluno->email }}</td>
                     <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_performance" /></td>
-                    <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_volume_questoes" /></td>
-                    <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_percentual_acertos" /></td>
-                    <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_assuntos" /></td>
+                    <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_question_volume" /></td>
+                    <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_accuracy_rate" /></td>
+                    <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_subjects" /></td>
                     <td class="px-4 py-3 text-sm">
                         @if($aluno->recebe_email)
                         <span class="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">Sim</span>

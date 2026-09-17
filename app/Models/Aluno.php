@@ -17,9 +17,9 @@ class Aluno extends Model
         'email',
         'recebe_email',
         'last_performance',
-        'last_volume_questoes',
-        'last_percentual_acertos',
-        'last_assuntos',
+        'last_question_volume',
+        'last_accuracy_rate',
+        'last_subjects',
     ];
 
     protected $casts = [
@@ -92,22 +92,22 @@ class Aluno extends Model
         }
 
         if (isset($porEixo[EixoDesempenho::VOLUME_QUESTOES][0])) {
-            $this->last_volume_questoes = $porEixo[EixoDesempenho::VOLUME_QUESTOES][0];
+            $this->last_question_volume = $porEixo[EixoDesempenho::VOLUME_QUESTOES][0];
         }
 
         if (isset($porEixo[EixoDesempenho::PERCENTUAL_ACERTOS][0])) {
-            $this->last_percentual_acertos = $porEixo[EixoDesempenho::PERCENTUAL_ACERTOS][0];
+            $this->last_accuracy_rate = $porEixo[EixoDesempenho::PERCENTUAL_ACERTOS][0];
         } else {
             $totalQuestoes = $metricas['total_questoes'] ?? null;
             if (is_numeric($totalQuestoes) && (float) $totalQuestoes < 100) {
-                $this->last_percentual_acertos = null;
+                $this->last_accuracy_rate = null;
             }
         }
 
         if (isset($porEixo[EixoDesempenho::ASSUNTO])) {
-            $this->last_assuntos = implode(' · ', array_values(array_unique($porEixo[EixoDesempenho::ASSUNTO])));
+            $this->last_subjects = implode(' · ', array_values(array_unique($porEixo[EixoDesempenho::ASSUNTO])));
         } elseif ((int) ($metricas['assuntos_avaliados'] ?? 0) > 0) {
-            $this->last_assuntos = 'Sem pontos de atenção';
+            $this->last_subjects = 'Sem pontos de atenção';
         }
 
         $this->save();

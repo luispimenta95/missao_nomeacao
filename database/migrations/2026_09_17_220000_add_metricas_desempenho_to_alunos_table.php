@@ -9,9 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('alunos', function (Blueprint $table) {
-            $table->string('last_volume_questoes')->nullable()->after('last_performance');
-            $table->string('last_percentual_acertos')->nullable()->after('last_volume_questoes');
-            $table->string('last_assuntos')->nullable()->after('last_percentual_acertos');
+            $table->string('last_question_volume')->nullable()->after('last_performance');
+            $table->string('last_accuracy_rate')->nullable()->after('last_question_volume');
+            $table->string('last_subjects')->nullable()->after('last_accuracy_rate');
         });
     }
 
@@ -19,9 +19,9 @@ return new class extends Migration
     {
         Schema::table('alunos', function (Blueprint $table) {
             $table->dropColumn([
-                'last_volume_questoes',
-                'last_percentual_acertos',
-                'last_assuntos',
+                'last_question_volume',
+                'last_accuracy_rate',
+                'last_subjects',
             ]);
         });
     }

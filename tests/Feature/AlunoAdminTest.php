@@ -41,9 +41,9 @@ class AlunoAdminTest extends TestCase
             'email' => 'giovanna@example.com',
             'recebe_email' => true,
             'last_performance' => 'Brigando com a constância',
-            'last_volume_questoes' => 'Volume suficiente',
-            'last_percentual_acertos' => 'Muito bom',
-            'last_assuntos' => 'Crítico · Abaixo da média',
+            'last_question_volume' => 'Volume suficiente',
+            'last_accuracy_rate' => 'Muito bom',
+            'last_subjects' => 'Crítico · Abaixo da média',
         ]);
 
         $this->actingAs($user)
@@ -67,12 +67,12 @@ class AlunoAdminTest extends TestCase
             'email' => 'giovanna@example.com',
             'recebe_email' => true,
             'last_performance' => 'Excelente',
-            'last_volume_questoes' => 'Volume alto',
-            'last_percentual_acertos' => 'Excelente',
-            'last_assuntos' => 'Sem pontos de atenção',
+            'last_question_volume' => 'Volume alto',
+            'last_accuracy_rate' => 'Excelente',
+            'last_subjects' => 'Sem pontos de atenção',
         ]);
 
-        $this->actingAs($user)
+        $html = $this->actingAs($user)
             ->get(route('alunos.edit', $aluno))
             ->assertOk()
             ->assertSee('Constância')
@@ -80,7 +80,14 @@ class AlunoAdminTest extends TestCase
             ->assertSee('Percentual geral de acertos')
             ->assertSee('Percentual por disciplina/assunto')
             ->assertSee('Volume alto')
-            ->assertSee('Sem pontos de atenção');
+            ->assertSee('Sem pontos de atenção')
+            ->getContent();
+
+        $this->assertStringNotContainsString('name="last_performance"', $html);
+        $this->assertStringNotContainsString('name="last_question_volume"', $html);
+        $this->assertStringNotContainsString('name="last_accuracy_rate"', $html);
+        $this->assertStringNotContainsString('name="last_subjects"', $html);
+        $this->assertDoesNotMatchRegularExpression('/<input[^>]*(readonly|last_question_volume|Volume alto)/i', $html);
     }
 
     public function test_comando_de_sincronizacao_esta_agendado_as_6h(): void

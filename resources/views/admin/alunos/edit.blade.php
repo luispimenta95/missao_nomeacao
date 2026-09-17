@@ -40,34 +40,11 @@
                 </label>
             </div>
 
-            <div class="mb-6">
-                <label class="block">
-                    <span class="text-sm font-semibold text-gray-700">Constância</span>
-                    <input type="text" readonly class="mt-2 w-full rounded border border-gray-200 bg-gray-50 p-3 text-gray-700" value="{{ $aluno->last_performance ?: 'Ainda não disponível' }}">
-                </label>
-            </div>
-
-            <div class="mb-6">
-                <label class="block">
-                    <span class="text-sm font-semibold text-gray-700">Quantidade total de questões</span>
-                    <input type="text" readonly class="mt-2 w-full rounded border border-gray-200 bg-gray-50 p-3 text-gray-700" value="{{ $aluno->last_volume_questoes ?: 'Ainda não disponível' }}">
-                </label>
-            </div>
-
-            <div class="mb-6">
-                <label class="block">
-                    <span class="text-sm font-semibold text-gray-700">Percentual geral de acertos</span>
-                    <input type="text" readonly class="mt-2 w-full rounded border border-gray-200 bg-gray-50 p-3 text-gray-700" value="{{ $aluno->last_percentual_acertos ?: 'Ainda não disponível' }}">
-                </label>
-            </div>
-
-            <div class="mb-6">
-                <label class="block">
-                    <span class="text-sm font-semibold text-gray-700">Percentual por disciplina/assunto</span>
-                    <input type="text" readonly class="mt-2 w-full rounded border border-gray-200 bg-gray-50 p-3 text-gray-700" value="{{ $aluno->last_assuntos ?: 'Ainda não disponível' }}">
-                    <p class="text-xs text-gray-500 mt-1">Atualizado automaticamente com as faixas do último relatório gerado (mesmos eixos da gestão de desempenho).</p>
-                </label>
-            </div>
+            <x-desempenho-readonly label="Constância" :valor="$aluno->last_performance" />
+            <x-desempenho-readonly label="Quantidade total de questões" :valor="$aluno->last_question_volume" />
+            <x-desempenho-readonly label="Percentual geral de acertos" :valor="$aluno->last_accuracy_rate" />
+            <x-desempenho-readonly label="Percentual por disciplina/assunto" :valor="$aluno->last_subjects" />
+            <p class="text-xs text-gray-500 -mt-4 mb-6">Atualizado automaticamente com as faixas do último relatório gerado (mesmos eixos da gestão de desempenho).</p>
 
             <div class="mb-8">
                 <label class="inline-flex items-center gap-3 cursor-pointer">
