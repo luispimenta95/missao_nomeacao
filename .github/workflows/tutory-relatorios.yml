@@ -1,0 +1,75 @@
+name: Tutory Relatorios
+
+# Disparo principal dos jobs da Tutory. O cron da Hostinger NÃO é
+# instalado no deploy; sem este workflow (ou um cron manual no hPanel)
+# tutory:baixar-relatorios nunca roda sozinho.
+#
+# Horários em UTC (Brasília = UTC-3, sem horário de verão):
+#   06:00 BRT = 09:00 UTC  → sincronizar alunos (dias 1 e 16)
+#   10:30 BRT = 13:30 UTC  → PDF + e-mail (dia 16 = período 1; dia 1 = período 2)
+
+on:
+  schedule:
+    - cron: "0 9 1,16 * *"
+    - cron: "30 13 16 * *"
+    - cron: "30 13 1 * *"
+  workflow_dispatch:
+    inputs:
+      comando:
+        description: Comando artisan a executar na Hostinger
+        type: choice
+        required: true
+        default: tutory:baixar-relatorios --periodo=1 --se-pendente
+        options:
+          - tutory:sincronizar-alunos
+          - tutory:baixar-relatorios --periodo=1 --se-pendente
+          - tutory:baixar-relatorios --periodo=2 --se-pendente
+          - tutory:baixar-relatorios --periodo=1
+          - tutory:baixar-relatorios --periodo=2
+          - tutory:scheduler-status
+
+concurrency:
+  group: tutory-relatorios
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Escolher comando
+        id: pick
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_CMD: ${{ github.event.inputs.comando }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            CMD="$INPUT_CMD"
+          elif [ "$SCHEDULE" = "0 9 1,16 * *" ]; then
+            CMD="tutory:sincronizar-alunos"
+          elif [ "$SCHEDULE" = "30 13 16 * *" ]; then
+            CMD="tutory:baixar-relatorios --periodo=1 --se-pendente"
+          else
+            CMD="tutory:baixar-relatorios --periodo=2 --se-pendente"
+          fi
+          echo "cmd=$CMD" >> "$GITHUB_OUTPUT"
+          echo "Vai executar: php artisan $CMD"
+
+      - name: SSH na Hostinger
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.HOSTINGER_HOST }}
+          username: ${{ secrets.HOSTINGER_USER }}
+          key: ${{ secrets.HOSTINGER_KEY }}
+          port: ${{ secrets.HOSTINGER_PORT }}
+          command_timeout: 3h
+          script_stop: true
+          envs: ARTISAN_CMD
+          script: |
+            set -euo pipefail
+            cd domains/missaonomeacao.com.br/public_html/server
+            php -d max_execution_time=0 -d memory_limit=512M artisan ${ARTISAN_CMD}
+        env:
+          ARTISAN_CMD: ${{ steps.pick.outputs.cmd }}

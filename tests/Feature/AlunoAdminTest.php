@@ -39,7 +39,9 @@ class AlunoAdminTest extends TestCase
         $this->assertStringContainsString("Schedule::command('tutory:sincronizar-alunos')", $src);
         $this->assertStringContainsString("->monthlyOn(1, '06:00')", $src);
         $this->assertStringContainsString("->monthlyOn(16, '06:00')", $src);
-        $this->assertStringContainsString("->monthlyOn(01, '10:30')", $src);
+        $this->assertStringContainsString("->monthlyOn(1, '10:30')", $src);
         $this->assertStringContainsString("->monthlyOn(16, '10:30')", $src);
+        $this->assertStringContainsString('--se-pendente', $src);
+        $this->assertStringContainsString("->timezone('America/Sao_Paulo')", $src);
     }
 }

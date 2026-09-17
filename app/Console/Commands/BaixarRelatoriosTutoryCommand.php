@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\Tutory\CoachReportDownloader;
+use App\Services\Tutory\TutoryRelatorioAgenda;
 use Illuminate\Console\Command;
 use Throwable;
 
@@ -10,7 +11,8 @@ class BaixarRelatoriosTutoryCommand extends Command
 {
     protected $signature = 'tutory:baixar-relatorios
                             {--periodo= : 1 = dias 01–15; 2 = dia 16 até o último dia do mês}
-                            {--teste : Baixa só o relatório da aluna Giovanna}';
+                            {--teste : Baixa só o relatório da aluna Giovanna}
+                            {--se-pendente : Não envia de novo se este período do mês já foi concluído}';
 
     protected $description = 'Gera o relatório consolidado do Coach com PHP/Dompdf (sem npm/Node) e envia por e-mail';
 
@@ -26,10 +28,27 @@ class BaixarRelatoriosTutoryCommand extends Command
         }
 
         $teste = (bool) $this->option('teste');
+        $sePendente = (bool) $this->option('se-pendente');
+        $agenda = new TutoryRelatorioAgenda;
+        $chave = TutoryRelatorioAgenda::chaveEnvio($periodo);
+
+        $this->line('Agora: '.now()->timezone(config('app.timezone'))->toDateTimeString().' ('.config('app.timezone').')');
+        $this->line('Chave de envio: '.$chave);
+
+        if ($sePendente && ! $teste && ! $agenda->deveExecutar($periodo)) {
+            $this->warn('Período já enviado ou em andamento ('.$chave.'). Use sem --se-pendente para forçar.');
+
+            return self::SUCCESS;
+        }
+
         if ($teste) {
             $this->warn('Modo --teste ativo: processa apenas Giovanna.');
         }
         $this->line('PDF com PHP/Dompdf — não usa npm/Node. Ignore "npm: command not found".');
+
+        if ($sePendente && ! $teste) {
+            $agenda->marcarInicio($periodo);
+        }
 
         try {
             $downloader = new CoachReportDownloader(
@@ -40,7 +59,12 @@ class BaixarRelatoriosTutoryCommand extends Command
                 },
             );
 
-            return $downloader->run();
+            $codigo = $downloader->run();
+            if ($codigo === 0 && $sePendente && ! $teste) {
+                $agenda->marcarConcluido($periodo);
+            }
+
+            return $codigo;
         } catch (Throwable $exc) {
             $this->error($exc->getMessage());
 
