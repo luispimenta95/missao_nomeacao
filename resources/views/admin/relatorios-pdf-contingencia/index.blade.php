@@ -5,8 +5,8 @@
 @section('content')
     <div>
         <div class="mb-6">
-            <h1 class="text-3xl font-bold text-white">PDF de meses anteriores</h1>
-            <p class="text-gray-300 mt-2">Contingência: gera o mesmo PDF de desempenho de um aluno e disponibiliza para download (sem envio por e-mail).</p>
+            <h1 class="text-3xl font-bold text-gray-800">PDF de meses anteriores</h1>
+            <p class="text-gray-600 mt-2">Contingência: gera o mesmo PDF de desempenho de um aluno e disponibiliza para download (sem envio por e-mail).</p>
         </div>
 
         @if($errors->any())

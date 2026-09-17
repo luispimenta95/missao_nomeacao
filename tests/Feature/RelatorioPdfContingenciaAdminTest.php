@@ -64,7 +64,9 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
             ->get(route('relatorios-pdf-contingencia.index'))
             ->assertOk()
             ->assertSee('SETEMBRO - PERÍODO 2')
-            ->assertDontSee('OUTUBRO - PERÍODO 1');
+            ->assertSee('2026-09|2')
+            ->assertDontSee('OUTUBRO - PERÍODO 1')
+            ->assertDontSee('2026-10|1');
     }
 
     public function test_rejeita_periodo_ainda_nao_liberado_e_mais_de_um_aluno(): void

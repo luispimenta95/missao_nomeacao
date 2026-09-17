@@ -166,7 +166,9 @@ class RelatorioPeriodoCatalog
     {
         $tz = new DateTimeZone((string) config('app.timezone'));
         if ($ref === null) {
-            return new DateTimeImmutable('now', $tz);
+            $now = now()->timezone($tz);
+
+            return new DateTimeImmutable($now->toDateTimeString(), $tz);
         }
 
         return new DateTimeImmutable($ref->format('Y-m-d H:i:s'), $tz);
