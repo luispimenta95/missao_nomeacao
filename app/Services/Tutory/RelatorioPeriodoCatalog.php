@@ -30,24 +30,46 @@ class RelatorioPeriodoCatalog
 
     public const MESES_MIN = 1;
 
-    public const MESES_MAX = 24;
+    /**
+     * Meses desde janeiro/2026 até o mês corrente.
+     * Em setembro/2026 = 8; em outubro/2026 = 9; e assim por diante.
+     */
+    public static function mesesMaximos(?DateTimeInterface $agora = null): int
+    {
+        $tz = new DateTimeZone((string) config('app.timezone'));
+        if ($agora === null) {
+            $now = now()->timezone($tz);
+            $agora = new DateTimeImmutable($now->toDateTimeString(), $tz);
+        } elseif (! $agora instanceof DateTimeImmutable) {
+            $agora = DateTimeImmutable::createFromInterface($agora);
+        }
+        $agora = $agora->setTimezone($tz)->modify('first day of this month')->setTime(0, 0, 0);
+        $inicio = new DateTimeImmutable(self::INICIO, $tz);
+        if ($agora <= $inicio) {
+            return self::MESES_MIN;
+        }
+        $diff = $inicio->diff($agora);
+
+        return max(self::MESES_MIN, $diff->y * 12 + $diff->m);
+    }
 
     public static function mesesVisiveis(): int
     {
+        $padrao = max(self::MESES_MIN, min(self::mesesMaximos(), self::MESES_PADRAO));
         try {
             if (! class_exists(Configuracao::class) || ! Schema::hasTable('configuracoes')) {
-                return self::MESES_PADRAO;
+                return $padrao;
             }
             $valor = Configuracao::valor(self::CONFIG_CHAVE);
         } catch (Throwable) {
-            return self::MESES_PADRAO;
+            return $padrao;
         }
 
         if ($valor === null || $valor === '' || ! is_numeric($valor)) {
-            return self::MESES_PADRAO;
+            return $padrao;
         }
 
-        return max(self::MESES_MIN, min(self::MESES_MAX, (int) $valor));
+        return max(self::MESES_MIN, min(self::mesesMaximos(), (int) $valor));
     }
 
     public static function limiteLinhas(?int $meses = null): int

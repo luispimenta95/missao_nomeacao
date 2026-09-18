@@ -7,11 +7,18 @@ use App\Models\RelatorioPdfPeriodo;
 use App\Services\Tutory\RelatorioPeriodoCatalog;
 use DateTimeImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class RelatorioPeriodoCatalogTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
 
     public function test_em_17_de_setembro_o_combo_tem_12_periodos_sem_p2_do_mes(): void
     {
@@ -65,6 +72,23 @@ class RelatorioPeriodoCatalogTest extends TestCase
         $this->assertCount(6, $chaves);
         $this->assertSame('2026-06|2', $chaves[0]);
         $this->assertSame('2026-09|1', $chaves[array_key_last($chaves)]);
+    }
+
+    public function test_meses_maximos_crescem_a_partir_de_janeiro_de_2026(): void
+    {
+        $this->assertSame(1, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2026-01-16 12:00:00')));
+        $this->assertSame(8, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2026-09-18 12:00:00')));
+        $this->assertSame(9, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2026-10-01 00:00:00')));
+        $this->assertSame(12, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2027-01-15 12:00:00')));
+    }
+
+    public function test_meses_visiveis_nao_passa_do_maximo_ate_janeiro_de_2026(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-18 12:00:00', 'America/Sao_Paulo'));
+        Configuracao::definir(RelatorioPeriodoCatalog::CONFIG_CHAVE, '24');
+
+        $this->assertSame(8, RelatorioPeriodoCatalog::mesesVisiveis());
+        $this->assertSame(16, RelatorioPeriodoCatalog::limiteLinhas());
     }
 
     public function test_datas_do_periodo_batem_com_o_job_oficial(): void

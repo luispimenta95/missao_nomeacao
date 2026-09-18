@@ -48,7 +48,7 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
         $html = $this->actingAs($user)
             ->get(route('relatorios-pdf-contingencia.index'))
             ->assertOk()
-            ->assertSee('PDF de meses anteriores')
+            ->assertSee('Contingência de relatórios')
             ->assertSee('Giovanna')
             ->assertDontSee('Sem Tutory')
             ->assertSee('MARÇO - PERÍODO 2')
@@ -100,6 +100,37 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
             ->getContent();
 
         $this->assertSame(6, substr_count($html, '<option value="2026-'));
+    }
+
+    public function test_rejeita_janela_que_passa_de_janeiro_de_2026(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-18 12:00:00', 'America/Sao_Paulo'));
+        $user = User::factory()->create();
+
+        $html = $this->actingAs($user)
+            ->from(route('relatorios-pdf-contingencia.index'))
+            ->followingRedirects()
+            ->put(route('relatorios-pdf-contingencia.update'), ['meses' => 9])
+            ->assertOk()
+            ->assertSee('A busca só alcança janeiro de 2026. Hoje o máximo é 8 meses.')
+            ->getContent();
+
+        $this->assertNull(Configuracao::valor(RelatorioPeriodoCatalog::CONFIG_CHAVE));
+        $this->assertStringContainsString('max="8"', $html);
+        $this->assertStringContainsString('Agora o máximo é 8 meses.', $html);
+    }
+
+    public function test_em_outubro_o_maximo_passa_a_ser_9_meses(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-01 00:05:00', 'America/Sao_Paulo'));
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->put(route('relatorios-pdf-contingencia.update'), ['meses' => 9])
+            ->assertRedirect(route('relatorios-pdf-contingencia.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('9', Configuracao::valor(RelatorioPeriodoCatalog::CONFIG_CHAVE));
     }
 
     public function test_rejeita_periodo_ainda_nao_liberado_e_mais_de_um_aluno(): void
