@@ -450,7 +450,7 @@
         const input = document.querySelector('#form-janela-meses input[name="meses"]');
         if (!input) return;
         const max = parseInt(input.getAttribute('data-max-meses') || input.getAttribute('max') || '0', 10);
-        const mensagem = 'A busca só alcança janeiro de 2026. Hoje o máximo é ' + max + ' meses.';
+        const mensagem = 'A busca só alcança janeiro de 2026.';
 
         function validar() {
             const valor = Number(input.value);
