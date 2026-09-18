@@ -18,6 +18,7 @@ class RelatorioPdfContingenciaController extends Controller
     {
         $catalog->sincronizar();
         $meses = RelatorioPeriodoCatalog::mesesVisiveis();
+        $mesesMaximos = RelatorioPeriodoCatalog::mesesMaximos();
 
         $alunos = Aluno::query()
             ->whereNotNull('tutory_id')
@@ -29,6 +30,7 @@ class RelatorioPdfContingenciaController extends Controller
             'alunos' => $alunos,
             'periodos' => $catalog->listar(),
             'mesesVisiveis' => $meses,
+            'mesesMaximos' => $mesesMaximos,
             'limiteLinhas' => RelatorioPeriodoCatalog::limiteLinhas($meses),
             'progressToken' => (string) Str::uuid(),
         ]);
@@ -36,17 +38,18 @@ class RelatorioPdfContingenciaController extends Controller
 
     public function update(Request $request, RelatorioPeriodoCatalog $catalog)
     {
+        $max = RelatorioPeriodoCatalog::mesesMaximos();
         $data = $request->validate([
             'meses' => [
                 'required',
                 'integer',
                 'min:'.RelatorioPeriodoCatalog::MESES_MIN,
-                'max:'.RelatorioPeriodoCatalog::MESES_MAX,
+                'max:'.$max,
             ],
         ], [
             'meses.required' => 'Informe a quantidade de meses.',
             'meses.min' => 'Use pelo menos 1 mês.',
-            'meses.max' => 'Use no máximo 24 meses.',
+            'meses.max' => 'A busca só alcança janeiro de 2026. Hoje o máximo é '.$max.' meses.',
         ]);
 
         Configuracao::definir(RelatorioPeriodoCatalog::CONFIG_CHAVE, (string) $data['meses']);
