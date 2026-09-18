@@ -113,15 +113,16 @@
             </div>
         </form>
 
-        <form action="{{ route('relatorios-pdf-contingencia.update') }}" method="POST" class="bg-white p-8 rounded shadow-lg h-fit">
+        <form id="form-janela-meses" action="{{ route('relatorios-pdf-contingencia.update') }}" method="POST" class="bg-white p-8 rounded shadow-lg h-fit">
             @csrf
             @method('PUT')
             <h2 class="text-lg font-bold text-gray-800 mb-1">Período de busca</h2>
-            <p class="text-sm text-gray-500 mb-6">Só é possível buscar relatórios de Janeiro de 2026 em diante.</p>
+            <p class="text-sm text-gray-500 mb-6">Só é possível buscar relatórios de janeiro de 2026 em diante. Agora o máximo é {{ $mesesMaximos }} {{ $mesesMaximos === 1 ? 'mês' : 'meses' }}.</p>
 
             <label class="block mb-6">
                 <span class="text-sm font-semibold text-gray-700">Meses visíveis *</span>
-                <input type="number" name="meses" min="{{ \App\Services\Tutory\RelatorioPeriodoCatalog::MESES_MIN }}" max="{{ \App\Services\Tutory\RelatorioPeriodoCatalog::MESES_MAX }}" value="{{ old('meses', $mesesVisiveis) }}" required class="mt-2 w-full rounded border border-gray-300 p-3 focus:ring-primary focus:border-primary @error('meses') border-red-500 @enderror">
+                <input type="number" name="meses" min="{{ \App\Services\Tutory\RelatorioPeriodoCatalog::MESES_MIN }}" max="{{ $mesesMaximos }}" value="{{ old('meses', $mesesVisiveis) }}" required class="mt-2 w-full rounded border border-gray-300 p-3 focus:ring-primary focus:border-primary @error('meses') border-red-500 @enderror" data-max-meses="{{ $mesesMaximos }}">
+                @error('meses') <p class="text-red-600 text-sm mt-2">{{ $message }}</p> @enderror
             </label>
 
             <div class="flex justify-end">
@@ -443,6 +444,30 @@
                 mostrarErro(err && err.message ? err.message : 'Falha de rede ao gerar o PDF.');
             }
         });
+    })();
+
+    (function() {
+        const input = document.querySelector('#form-janela-meses input[name="meses"]');
+        if (!input) return;
+        const max = parseInt(input.getAttribute('data-max-meses') || input.getAttribute('max') || '0', 10);
+        const mensagem = 'A busca só alcança janeiro de 2026. Hoje o máximo é ' + max + ' meses.';
+
+        function validar() {
+            const valor = Number(input.value);
+            if (input.value !== '' && !Number.isNaN(valor) && valor > max) {
+                input.setCustomValidity(mensagem);
+            } else {
+                input.setCustomValidity('');
+            }
+        }
+
+        input.addEventListener('input', validar);
+        input.addEventListener('invalid', function() {
+            if (input.validity.rangeOverflow || (input.value !== '' && Number(input.value) > max)) {
+                input.setCustomValidity(mensagem);
+            }
+        });
+        validar();
     })();
 </script>
 @endsection
