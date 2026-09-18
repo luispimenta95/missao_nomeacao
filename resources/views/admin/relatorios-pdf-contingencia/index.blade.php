@@ -117,7 +117,7 @@
             @csrf
             @method('PUT')
             <h2 class="text-lg font-bold text-gray-800 mb-1">Período de busca</h2>
-            <p class="text-sm text-gray-500 mb-6">Só é possível buscar relatórios de janeiro de 2026 em diante. Agora o máximo é {{ $mesesMaximos }} {{ $mesesMaximos === 1 ? 'mês' : 'meses' }}.</p>
+            <p class="text-sm text-gray-500 mb-6">Só é possível buscar relatórios de janeiro de 2026 em diante.</p>
 
             <label class="block mb-6">
                 <span class="text-sm font-semibold text-gray-700">Meses visíveis *</span>
