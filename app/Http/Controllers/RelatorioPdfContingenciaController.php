@@ -54,11 +54,10 @@ class RelatorioPdfContingenciaController extends Controller
 
         Configuracao::definir(RelatorioPeriodoCatalog::CONFIG_CHAVE, (string) $data['meses']);
         $catalog->sincronizar();
-        $linhas = RelatorioPeriodoCatalog::limiteLinhas((int) $data['meses']);
 
         return redirect()
             ->route('relatorios-pdf-contingencia.index')
-            ->with('success', 'Janela atualizada: o combo mostra até ' . $linhas . ' períodos (2 × ' . $data['meses'] . ' meses).');
+            ->with('success', 'Configuração atualizada com sucesso.');
     }
 
     public function progresso(Request $request)
