@@ -66,6 +66,22 @@ class Aluno extends Model
     }
 
     /**
+     * @param  \Illuminate\Database\Eloquent\Builder<self>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<self>
+     */
+    public function scopeComNomeParecido($query, ?string $busca)
+    {
+        $busca = trim((string) $busca);
+        if ($busca === '') {
+            return $query;
+        }
+
+        $like = '%'.addcslashes($busca, '%_\\').'%';
+
+        return $query->whereRaw('nome LIKE ? ESCAPE ?', [$like, '\\']);
+    }
+
+    /**
      * Grava as faixas do último relatório (constância, volume, % acertos, assuntos).
      *
      * @param  array{blocos?: list<array<string, mixed>>, metricas?: array<string, mixed>, resumo?: string|null}  $avaliacao
