@@ -77,9 +77,21 @@ class RelatorioPeriodoCatalogTest extends TestCase
     public function test_meses_maximos_crescem_a_partir_de_janeiro_de_2026(): void
     {
         $this->assertSame(1, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2026-01-16 12:00:00')));
-        $this->assertSame(8, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2026-09-18 12:00:00')));
-        $this->assertSame(9, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2026-10-01 00:00:00')));
-        $this->assertSame(12, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2027-01-15 12:00:00')));
+        $this->assertSame(9, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2026-09-18 12:00:00')));
+        $this->assertSame(10, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2026-10-01 00:00:00')));
+        $this->assertSame(13, RelatorioPeriodoCatalog::mesesMaximos(new DateTimeImmutable('2027-01-15 12:00:00')));
+    }
+
+    public function test_nove_meses_em_setembro_inclui_janeiro_periodo_1(): void
+    {
+        Configuracao::definir(RelatorioPeriodoCatalog::CONFIG_CHAVE, '9');
+        $catalog = new RelatorioPeriodoCatalog;
+        $chaves = $catalog->chaves(new DateTimeImmutable('2026-09-17 12:00:00'));
+
+        $this->assertSame('2026-01|1', $chaves[0]);
+        $this->assertSame('2026-09|1', $chaves[array_key_last($chaves)]);
+        $this->assertContains('2026-01|2', $chaves);
+        $this->assertNotContains('2026-09|2', $chaves);
     }
 
     public function test_meses_visiveis_nao_passa_do_maximo_ate_janeiro_de_2026(): void
@@ -87,8 +99,8 @@ class RelatorioPeriodoCatalogTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-09-18 12:00:00', 'America/Sao_Paulo'));
         Configuracao::definir(RelatorioPeriodoCatalog::CONFIG_CHAVE, '24');
 
-        $this->assertSame(8, RelatorioPeriodoCatalog::mesesVisiveis());
-        $this->assertSame(16, RelatorioPeriodoCatalog::limiteLinhas());
+        $this->assertSame(9, RelatorioPeriodoCatalog::mesesVisiveis());
+        $this->assertSame(18, RelatorioPeriodoCatalog::limiteLinhas());
     }
 
     public function test_datas_do_periodo_batem_com_o_job_oficial(): void

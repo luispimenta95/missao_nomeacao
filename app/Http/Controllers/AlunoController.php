@@ -8,11 +8,19 @@ use Illuminate\Validation\Rule;
 
 class AlunoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $alunos = Aluno::orderBy('nome')->get();
+        $busca = trim((string) $request->query('busca', ''));
+        $alunos = Aluno::query()
+            ->comNomeParecido($busca)
+            ->orderBy('nome')
+            ->get();
 
-        return view('admin.alunos.index', compact('alunos'));
+        if ($request->ajax()) {
+            return response()->view('admin.alunos._linhas', compact('alunos', 'busca'));
+        }
+
+        return view('admin.alunos.index', compact('alunos', 'busca'));
     }
 
     public function create()
