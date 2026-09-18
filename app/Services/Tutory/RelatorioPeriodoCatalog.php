@@ -31,8 +31,8 @@ class RelatorioPeriodoCatalog
     public const MESES_MIN = 1;
 
     /**
-     * Meses desde janeiro/2026 até o mês corrente.
-     * Em setembro/2026 = 8; em outubro/2026 = 9; e assim por diante.
+     * Meses de janeiro/2026 até o mês corrente, inclusive.
+     * Em setembro/2026 = 9 (janeiro/1 → setembro/1); em outubro/2026 = 10.
      */
     public static function mesesMaximos(?DateTimeInterface $agora = null): int
     {
@@ -45,12 +45,12 @@ class RelatorioPeriodoCatalog
         }
         $agora = $agora->setTimezone($tz)->modify('first day of this month')->setTime(0, 0, 0);
         $inicio = new DateTimeImmutable(self::INICIO, $tz);
-        if ($agora <= $inicio) {
+        if ($agora < $inicio) {
             return self::MESES_MIN;
         }
         $diff = $inicio->diff($agora);
 
-        return max(self::MESES_MIN, $diff->y * 12 + $diff->m);
+        return max(self::MESES_MIN, $diff->y * 12 + $diff->m + 1);
     }
 
     public static function mesesVisiveis(): int

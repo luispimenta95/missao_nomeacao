@@ -110,19 +110,18 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
         $html = $this->actingAs($user)
             ->from(route('relatorios-pdf-contingencia.index'))
             ->followingRedirects()
-            ->put(route('relatorios-pdf-contingencia.update'), ['meses' => 9])
+            ->put(route('relatorios-pdf-contingencia.update'), ['meses' => 10])
             ->assertOk()
-            ->assertSee('A busca só alcança janeiro de 2026. Hoje o máximo é 8 meses.')
+            ->assertSee('A busca só alcança janeiro de 2026.')
             ->getContent();
 
         $this->assertNull(Configuracao::valor(RelatorioPeriodoCatalog::CONFIG_CHAVE));
-        $this->assertStringContainsString('max="8"', $html);
-        $this->assertStringContainsString('Agora o máximo é 8 meses.', $html);
+        $this->assertStringContainsString('max="9"', $html);
     }
 
-    public function test_em_outubro_o_maximo_passa_a_ser_9_meses(): void
+    public function test_nove_meses_em_setembro_mostra_janeiro_periodo_1(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-10-01 00:05:00', 'America/Sao_Paulo'));
+        Carbon::setTestNow(Carbon::parse('2026-09-18 12:00:00', 'America/Sao_Paulo'));
         $user = User::factory()->create();
 
         $this->actingAs($user)
@@ -131,6 +130,27 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame('9', Configuracao::valor(RelatorioPeriodoCatalog::CONFIG_CHAVE));
+
+        $this->actingAs($user)
+            ->get(route('relatorios-pdf-contingencia.index'))
+            ->assertOk()
+            ->assertSee('JANEIRO - PERÍODO 1')
+            ->assertSee('2026-01|1')
+            ->assertSee('SETEMBRO - PERÍODO 1')
+            ->assertDontSee('SETEMBRO - PERÍODO 2');
+    }
+
+    public function test_em_outubro_o_maximo_passa_a_ser_10_meses(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-01 00:05:00', 'America/Sao_Paulo'));
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->put(route('relatorios-pdf-contingencia.update'), ['meses' => 10])
+            ->assertRedirect(route('relatorios-pdf-contingencia.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('10', Configuracao::valor(RelatorioPeriodoCatalog::CONFIG_CHAVE));
     }
 
     public function test_rejeita_periodo_ainda_nao_liberado_e_mais_de_um_aluno(): void
