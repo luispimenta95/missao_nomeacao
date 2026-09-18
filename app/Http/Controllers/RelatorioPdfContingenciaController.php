@@ -43,13 +43,13 @@ class RelatorioPdfContingenciaController extends Controller
             'meses' => [
                 'required',
                 'integer',
-                'min:'.RelatorioPeriodoCatalog::MESES_MIN,
-                'max:'.$max,
+                'min:' . RelatorioPeriodoCatalog::MESES_MIN,
+                'max:' . $max,
             ],
         ], [
             'meses.required' => 'Informe a quantidade de meses.',
             'meses.min' => 'Use pelo menos 1 mês.',
-            'meses.max' => 'A busca só alcança janeiro de 2026. Hoje o máximo é '.$max.' meses.',
+            'meses.max' => 'A busca só alcança janeiro de 2026.',
         ]);
 
         Configuracao::definir(RelatorioPeriodoCatalog::CONFIG_CHAVE, (string) $data['meses']);
@@ -58,7 +58,7 @@ class RelatorioPdfContingenciaController extends Controller
 
         return redirect()
             ->route('relatorios-pdf-contingencia.index')
-            ->with('success', 'Janela atualizada: o combo mostra até '.$linhas.' períodos (2 × '.$data['meses'].' meses).');
+            ->with('success', 'Janela atualizada: o combo mostra até ' . $linhas . ' períodos (2 × ' . $data['meses'] . ' meses).');
     }
 
     public function progresso(Request $request)
@@ -118,7 +118,7 @@ class RelatorioPdfContingenciaController extends Controller
         } catch (Throwable $exc) {
             $this->gravarProgresso($token, 0, $exc->getMessage(), 'error');
 
-            return $this->falha($request, ['gerar' => 'Não foi possível gerar o PDF: '.$exc->getMessage()]);
+            return $this->falha($request, ['gerar' => 'Não foi possível gerar o PDF: ' . $exc->getMessage()]);
         }
 
         if (! is_string($caminho) || ! is_file($caminho)) {
@@ -168,7 +168,7 @@ class RelatorioPdfContingenciaController extends Controller
 
     private function chaveProgresso(string $token): string
     {
-        return 'pdf-contingencia-progress.'.$token;
+        return 'pdf-contingencia-progress.' . $token;
     }
 
     /**
