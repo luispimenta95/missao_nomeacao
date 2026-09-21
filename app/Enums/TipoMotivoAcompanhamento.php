@@ -12,12 +12,14 @@ enum TipoMotivoAcompanhamento: string
     case ContatoProgramado = 'contato_programado';
     case ContatoAgendado = 'contato_agendado';
     case Evolucao = 'evolucao';
+    case Panorama = 'panorama';
 
     public function acao(): AcaoAcompanhamento
     {
         return match ($this) {
             self::ConstanciaCritica, self::VolumeCritico => AcaoAcompanhamento::Intervir,
             self::Evolucao => AcaoAcompanhamento::Parabenizar,
+            self::Panorama => AcaoAcompanhamento::EmDia,
             default => AcaoAcompanhamento::MarcarPresenca,
         };
     }

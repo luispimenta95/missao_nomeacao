@@ -288,6 +288,55 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertSame('Bom', $aluno->last_performance);
     }
 
+    public function test_alunos_sem_acao_prioritaria_aparecem_em_dia(): void
+    {
+        $user = User::factory()->create();
+        $this->aluno([
+            'nome' => 'Andreza Crítica',
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
+        $this->aluno([
+            'nome' => 'Helena Em Dia',
+            'last_performance' => 'Bom',
+            'last_performance_codigo' => 'bom',
+            'last_question_volume' => 'Volume suficiente',
+            'last_question_volume_codigo' => 'volume_suficiente',
+            'last_accuracy_rate' => 'Mediano',
+            'last_accuracy_rate_codigo' => 'mediano',
+        ]);
+        $this->aluno([
+            'nome' => 'Caio Presença',
+            'last_accuracy_rate' => 'Alerta',
+            'last_accuracy_rate_codigo' => 'alerta',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertSee('Andreza Crítica')
+            ->assertSee('Helena Em Dia')
+            ->assertSee('Caio Presença')
+            ->assertSee('Em dia (1)')
+            ->assertSee('Marcar presença (1)')
+            ->assertSee('Intervir (1)')
+            ->assertSee('Constância: Bom');
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['acao' => 'em_dia']))
+            ->assertOk()
+            ->assertSee('Helena Em Dia')
+            ->assertDontSee('Andreza Crítica')
+            ->assertDontSee('Caio Presença');
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['acao' => 'marcar_presenca']))
+            ->assertOk()
+            ->assertSee('Caio Presença')
+            ->assertDontSee('Andreza Crítica')
+            ->assertDontSee('Helena Em Dia');
+    }
+
     /**
      * @param  array<string, mixed>  $dados
      */

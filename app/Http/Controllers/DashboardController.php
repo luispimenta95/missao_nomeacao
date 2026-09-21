@@ -237,9 +237,19 @@ class DashboardController extends Controller
             'todas' => $base->count(),
         ];
 
-        $visiveis = $base
+        $naSituacao = $base
             ->filter(fn (LinhaPainel $linha) => $consulta->situacao->aceita($linha->situacao))
             ->values();
+
+        foreach (AcaoAcompanhamento::cases() as $acao) {
+            $contagens[$acao->value] = $naSituacao
+                ->filter(fn (LinhaPainel $linha) => $linha->ficha->acao === $acao)
+                ->count();
+        }
+
+        $visiveis = $consulta->acao === null
+            ? $naSituacao
+            : $naSituacao->filter(fn (LinhaPainel $linha) => $linha->ficha->acao === $consulta->acao)->values();
 
         return [$visiveis, $contagens];
     }

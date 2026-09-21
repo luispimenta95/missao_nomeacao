@@ -2,6 +2,7 @@
 
 namespace App\Services\Acompanhamento;
 
+use App\Enums\AcaoAcompanhamento;
 use App\Enums\FiltroParametroAcompanhamento;
 use App\Enums\FiltroSituacaoAcompanhamento;
 use App\Enums\FocoAcompanhamento;
@@ -13,6 +14,7 @@ final class ConsultaDashboard
         public FiltroSituacaoAcompanhamento $situacao,
         public ?FiltroParametroAcompanhamento $parametro,
         public ?FocoAcompanhamento $foco,
+        public ?AcaoAcompanhamento $acao,
         public string $busca,
         public ?int $alunoId,
         public int $pagina,
@@ -27,6 +29,7 @@ final class ConsultaDashboard
                 ?? FiltroSituacaoAcompanhamento::Pendentes,
             parametro: FiltroParametroAcompanhamento::tryFrom((string) $request->query('parametro', '')),
             foco: FocoAcompanhamento::tryFrom((string) $request->query('foco', '')),
+            acao: AcaoAcompanhamento::tryFrom((string) $request->query('acao', '')),
             busca: trim((string) $request->query('busca', '')),
             alunoId: is_numeric($aluno) ? (int) $aluno : null,
             pagina: max(1, (int) $request->query('page', 1)),
@@ -43,6 +46,7 @@ final class ConsultaDashboard
             'situacao' => $this->situacao->value,
             'parametro' => $this->parametro?->value,
             'foco' => $this->foco?->value,
+            'acao' => $this->acao?->value,
             'busca' => $this->busca !== '' ? $this->busca : null,
             'aluno' => $this->alunoId,
             'page' => $this->pagina > 1 ? $this->pagina : null,
