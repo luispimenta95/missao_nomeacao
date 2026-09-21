@@ -82,7 +82,7 @@ final class MontadorPainelAcompanhamento
 
         $motivo = new MotivoAcompanhamento(
             TipoMotivoAcompanhamento::Panorama,
-            AcaoAcompanhamento::EmDia,
+            AcaoAcompanhamento::Ok,
             $partes === [] ? 'Sem faixa registrada no último relatório' : implode(' · ', $partes),
             false,
             null,
@@ -90,7 +90,7 @@ final class MontadorPainelAcompanhamento
         );
 
         return new FichaAcompanhamento(
-            AcaoAcompanhamento::EmDia,
+            AcaoAcompanhamento::Ok,
             [$motivo],
             $this->classificador->evolucoes($ctx),
         );

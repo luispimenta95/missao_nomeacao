@@ -152,7 +152,7 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertDontSee('data-aluno="' . $aluno->id . '"', false);
+            ->assertDontSee('data-aluno="'.$aluno->id.'"', false);
 
         $this->actingAs($user)
             ->get(route('admin.dashboard', ['situacao' => 'concluidas', 'aluno' => $aluno->id]))
@@ -288,6 +288,45 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertSame('Bom', $aluno->last_performance);
     }
 
+    public function test_limpar_filtros_volta_a_lista_completa(): void
+    {
+        $user = User::factory()->create();
+        $this->aluno([
+            'nome' => 'Andreza Crítica',
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
+        $this->aluno([
+            'nome' => 'Helena Em Dia',
+            'last_performance' => 'Bom',
+            'last_performance_codigo' => 'bom',
+            'last_question_volume' => 'Volume suficiente',
+            'last_question_volume_codigo' => 'volume_suficiente',
+            'last_accuracy_rate' => 'Mediano',
+            'last_accuracy_rate_codigo' => 'mediano',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', [
+                'foco' => 'intervir',
+                'acao' => 'intervir',
+                'parametro' => 'constancia',
+                'busca' => 'Andreza',
+                'situacao' => 'todas',
+            ]))
+            ->assertOk()
+            ->assertSee('Limpar filtros')
+            ->assertSee('Andreza Crítica')
+            ->assertDontSee('Helena Em Dia');
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertDontSee('Limpar filtros')
+            ->assertSee('Andreza Crítica')
+            ->assertSee('Helena Em Dia');
+    }
+
     public function test_alunos_sem_acao_prioritaria_aparecem_ok(): void
     {
         $user = User::factory()->create();
@@ -317,10 +356,18 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertSee('Andreza Crítica')
             ->assertSee('Helena Em Dia')
             ->assertSee('Caio Presença')
-            ->assertSee('Em dia (1)')
+            ->assertSee('Ok (1)')
             ->assertSee('Marcar presença (1)')
             ->assertSee('Intervir (1)')
             ->assertSee('Constância: Bom');
+
+        $legado = $this->aluno([
+            'nome' => 'Legado Em Dia',
+            'last_performance' => 'Bom',
+            'last_performance_codigo' => 'bom',
+        ]);
+        Aluno::query()->whereKey($legado->id)->update(['acao_resolvida' => 'em_dia']);
+        $this->assertSame(AcaoAcompanhamento::Ok, $legado->fresh()->acao_resolvida);
 
         $this->actingAs($user)
             ->get(route('admin.dashboard', ['acao' => 'ok']))

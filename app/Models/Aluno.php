@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AcaoAcompanhamento;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -45,7 +46,6 @@ class Aluno extends Model
         'assuntos_detalhe' => 'array',
         'ultimo_contato_em' => 'datetime',
         'proximo_contato_em' => 'date',
-        'acao_resolvida' => AcaoAcompanhamento::class,
     ];
 
     public static function normalizarNome(string $nome): string
@@ -106,6 +106,32 @@ class Aluno extends Model
     public function contatos(): HasMany
     {
         return $this->hasMany(ContatoAluno::class)->orderByDesc('ocorrido_em');
+    }
+
+    protected function acaoResolvida(): Attribute
+    {
+        return Attribute::make(
+            get: function (mixed $value): ?AcaoAcompanhamento {
+                if (! is_string($value) || $value === '') {
+                    return null;
+                }
+                if ($value === 'em_dia') {
+                    $value = AcaoAcompanhamento::Ok->value;
+                }
+
+                return AcaoAcompanhamento::tryFrom($value);
+            },
+            set: function (mixed $value): ?string {
+                if ($value instanceof AcaoAcompanhamento) {
+                    return $value->value;
+                }
+                if (! is_string($value) || $value === '') {
+                    return null;
+                }
+
+                return $value === 'em_dia' ? AcaoAcompanhamento::Ok->value : $value;
+            },
+        );
     }
 
     /**
