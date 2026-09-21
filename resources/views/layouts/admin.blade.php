@@ -124,7 +124,7 @@
 
         <!-- Main Content -->
         <div class="flex min-w-0 flex-1 flex-col overflow-auto bg-site">
-            <div class="flex items-center gap-3 bg-[#001d3d] px-4 py-3 text-white md:hidden">
+            <div class="flex items-center gap-3 bg-primary px-4 py-3 text-white md:hidden">
                 <button type="button" id="admin-menu" class="rounded-lg p-2 hover:bg-white/10" aria-label="Abrir menu">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
