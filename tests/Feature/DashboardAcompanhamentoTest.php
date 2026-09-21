@@ -152,7 +152,7 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertDontSee('data-aluno="'.$aluno->id.'"', false);
+            ->assertDontSee('data-aluno="' . $aluno->id . '"', false);
 
         $this->actingAs($user)
             ->get(route('admin.dashboard', ['situacao' => 'concluidas', 'aluno' => $aluno->id]))
@@ -288,7 +288,7 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertSame('Bom', $aluno->last_performance);
     }
 
-    public function test_alunos_sem_acao_prioritaria_aparecem_em_dia(): void
+    public function test_alunos_sem_acao_prioritaria_aparecem_ok(): void
     {
         $user = User::factory()->create();
         $this->aluno([
@@ -323,7 +323,7 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertSee('Constância: Bom');
 
         $this->actingAs($user)
-            ->get(route('admin.dashboard', ['acao' => 'em_dia']))
+            ->get(route('admin.dashboard', ['acao' => 'ok']))
             ->assertOk()
             ->assertSee('Helena Em Dia')
             ->assertDontSee('Andreza Crítica')

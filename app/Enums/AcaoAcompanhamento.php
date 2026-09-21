@@ -7,7 +7,7 @@ enum AcaoAcompanhamento: string
     case Intervir = 'intervir';
     case MarcarPresenca = 'marcar_presenca';
     case Parabenizar = 'parabenizar';
-    case EmDia = 'em_dia';
+    case Ok = 'ok';
 
     public function rotulo(): string
     {
@@ -15,12 +15,12 @@ enum AcaoAcompanhamento: string
             self::Intervir => 'Intervir',
             self::MarcarPresenca => 'Marcar presença',
             self::Parabenizar => 'Parabenizar',
-            self::EmDia => 'Em dia',
+            self::Ok => 'Ok',
         };
     }
 
     /**
-     * Intervir > Marcar presença > Parabenizar > Em dia.
+     * Intervir > Marcar presença > Parabenizar > Ok.
      */
     public function prioridade(): int
     {
@@ -28,7 +28,7 @@ enum AcaoAcompanhamento: string
             self::Intervir => 3,
             self::MarcarPresenca => 2,
             self::Parabenizar => 1,
-            self::EmDia => 0,
+            self::Ok => 0,
         };
     }
 }
