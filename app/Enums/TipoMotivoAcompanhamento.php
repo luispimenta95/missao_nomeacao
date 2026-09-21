@@ -19,7 +19,7 @@ enum TipoMotivoAcompanhamento: string
         return match ($this) {
             self::ConstanciaCritica, self::VolumeCritico => AcaoAcompanhamento::Intervir,
             self::Evolucao => AcaoAcompanhamento::Parabenizar,
-            self::Panorama => AcaoAcompanhamento::EmDia,
+            self::Panorama => AcaoAcompanhamento::Ok,
             default => AcaoAcompanhamento::MarcarPresenca,
         };
     }

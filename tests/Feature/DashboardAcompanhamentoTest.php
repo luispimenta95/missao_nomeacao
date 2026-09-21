@@ -327,7 +327,7 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertSee('Helena Em Dia');
     }
 
-    public function test_alunos_sem_acao_prioritaria_aparecem_em_dia(): void
+    public function test_alunos_sem_acao_prioritaria_aparecem_ok(): void
     {
         $user = User::factory()->create();
         $this->aluno([
@@ -356,13 +356,21 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertSee('Andreza Crítica')
             ->assertSee('Helena Em Dia')
             ->assertSee('Caio Presença')
-            ->assertSee('Em dia (1)')
+            ->assertSee('Ok (1)')
             ->assertSee('Marcar presença (1)')
             ->assertSee('Intervir (1)')
             ->assertSee('Constância: Bom');
 
+        $legado = $this->aluno([
+            'nome' => 'Legado Em Dia',
+            'last_performance' => 'Bom',
+            'last_performance_codigo' => 'bom',
+        ]);
+        Aluno::query()->whereKey($legado->id)->update(['acao_resolvida' => 'em_dia']);
+        $this->assertSame(AcaoAcompanhamento::Ok, $legado->fresh()->acao_resolvida);
+
         $this->actingAs($user)
-            ->get(route('admin.dashboard', ['acao' => 'em_dia']))
+            ->get(route('admin.dashboard', ['acao' => 'ok']))
             ->assertOk()
             ->assertSee('Helena Em Dia')
             ->assertDontSee('Andreza Crítica')
