@@ -73,4 +73,13 @@ final class ConsultaDashboard
     {
         return route('admin.dashboard', $this->parametros($override));
     }
+
+    public function temFiltro(): bool
+    {
+        return $this->situacao !== FiltroSituacaoAcompanhamento::Pendentes
+            || $this->parametro !== null
+            || $this->foco !== null
+            || $this->acao !== null
+            || $this->busca !== '';
+    }
 }

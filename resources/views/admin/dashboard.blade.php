@@ -92,6 +92,9 @@
                 <h2 class="text-lg font-bold text-gray-800">Ações de acompanhamento</h2>
                 <p class="mt-1 max-w-2xl text-sm text-gray-600">Cada aluno entra em uma única ação: Intervir, Marcar presença ou Parabenizar. Quem não se enquadra aparece em Em dia. A ficha reúne todos os motivos.</p>
             </div>
+            @if($consulta->temFiltro())
+                <a href="{{ route('admin.dashboard') }}" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 transition hover:bg-gray-300">Limpar filtros</a>
+            @endif
         </div>
 
         <div class="flex flex-wrap items-center gap-2 px-5 pt-4">
