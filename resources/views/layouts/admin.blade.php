@@ -25,12 +25,12 @@
 <body class="bg-site">
     <div class="flex h-screen">
         <!-- Sidebar -->
-        <div class="w-64 bg-primary shadow-lg">
-            <div class="p-6 border-b border-primary-light">
-                <h1 class="text-white text-2xl font-bold">Missão<br>Nomeação</h1>
+        <div id="admin-sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 -translate-x-full flex-col bg-primary shadow-lg transition-transform md:static md:translate-x-0">
+            <div class="border-b border-primary-light p-6">
+                <h1 class="text-2xl font-bold text-white">Missão<br>Nomeação</h1>
             </div>
 
-            <nav class="mt-8">
+            <nav class="mt-4 flex-1 overflow-y-auto pb-6">
                 <a href="{{ route('admin.dashboard') }}" class="flex items-center px-6 py-3 text-white hover:bg-primary-light transition @if(request()->routeIs('admin.dashboard')) bg-primary-light @endif">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-3m0 0l7-4 7 4M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9m-9 11l4-4m0 0l4 4m-4-4V3" />
@@ -120,13 +120,56 @@
             </nav>
         </div>
 
+        <button type="button" id="admin-sidebar-backdrop" class="fixed inset-0 z-30 hidden bg-black/40 md:hidden" aria-label="Fechar menu"></button>
+
         <!-- Main Content -->
-        <div class="flex-1 overflow-auto bg-site">
-            <div class="p-8">
+        <div class="flex min-w-0 flex-1 flex-col overflow-auto bg-site">
+            <div class="flex items-center gap-3 bg-[#001d3d] px-4 py-3 text-white md:hidden">
+                <button type="button" id="admin-menu" class="rounded-lg p-2 hover:bg-white/10" aria-label="Abrir menu">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+                <span class="font-semibold">Missão Nomeação</span>
+            </div>
+            @hasSection('bare')
+                @yield('bare')
+            @else
+            <div class="p-4 md:p-8">
                 @yield('content')
             </div>
+            @endif
         </div>
     </div>
+    <script>
+        (function () {
+            const sidebar = document.getElementById('admin-sidebar');
+            const backdrop = document.getElementById('admin-sidebar-backdrop');
+            const menu = document.getElementById('admin-menu');
+            if (!sidebar || !backdrop || !menu) {
+                return;
+            }
+
+            function abrir(aberto) {
+                sidebar.classList.toggle('-translate-x-full', !aberto);
+                backdrop.classList.toggle('hidden', !aberto);
+            }
+
+            menu.addEventListener('click', function () {
+                abrir(sidebar.classList.contains('-translate-x-full'));
+            });
+            backdrop.addEventListener('click', function () {
+                abrir(false);
+            });
+            sidebar.querySelectorAll('a').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    if (window.matchMedia('(max-width: 767px)').matches) {
+                        abrir(false);
+                    }
+                });
+            });
+        })();
+    </script>
 </body>
 
 </html>

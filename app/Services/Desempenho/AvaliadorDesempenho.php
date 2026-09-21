@@ -217,6 +217,14 @@ class AvaliadorDesempenho
             static fn (array $i): string => $i['linha'],
             $itens
         ));
+        $bloco['assuntos'] = array_values(array_map(
+            static fn (array $i): array => [
+                'disciplina' => $i['disciplina'],
+                'assunto' => $i['assunto'],
+                'percentual' => $i['percentual'],
+            ],
+            $itens
+        ));
         $bloco['meta'] = [
             'quantidade' => count($itens),
             'pior_percentual' => $piorPct,

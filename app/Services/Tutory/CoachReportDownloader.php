@@ -1659,7 +1659,8 @@ class CoachReportDownloader
                 $this->log("[{$aluno->nome}] Desempenho: sem blocos (métricas ausentes ou parâmetros não seedados)");
             }
 
-            $aluno->aplicarAvaliacaoDesempenho($avaliacao);
+            $chavePeriodo = $this->mesDoPeriodo()->format('Y-m').'-'.$this->periodo;
+            $aluno->aplicarAvaliacaoDesempenho($avaliacao, $chavePeriodo);
             $this->log(
                 "[{$aluno->nome}] métricas atualizadas:"
                 .' constância='.($aluno->last_performance ?: '—')
