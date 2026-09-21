@@ -45,6 +45,8 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     // Dashboard de acompanhamento
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
     Route::post('/dashboard/alunos/{aluno}/contatos', [DashboardController::class, 'storeContato'])->name('admin.dashboard.contatos.store');
+    Route::get('/dashboard/alunos/{aluno}/proximo-contato', [DashboardController::class, 'agendarProximo'])->name('admin.dashboard.contatos.agendar');
+    Route::post('/dashboard/alunos/{aluno}/proximo-contato', [DashboardController::class, 'storeAgendarProximo'])->name('admin.dashboard.contatos.agendar.store');
     Route::post('/dashboard/alunos/{aluno}/agenda', [DashboardController::class, 'storeAgenda'])->name('admin.dashboard.agenda.store');
 
     // Material routes

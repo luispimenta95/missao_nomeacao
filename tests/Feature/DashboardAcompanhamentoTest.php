@@ -31,6 +31,9 @@ class DashboardAcompanhamentoTest extends TestCase
     public function test_visitante_nao_acessa_o_dashboard(): void
     {
         $this->get(route('admin.dashboard'))->assertRedirect(route('login'));
+
+        $aluno = $this->aluno(['nome' => 'Visitante Bloqueado']);
+        $this->get(route('admin.dashboard.contatos.agendar', $aluno))->assertRedirect(route('login'));
     }
 
     public function test_hierarquia_deixa_o_aluno_somente_em_intervir_com_todos_os_motivos(): void
@@ -122,18 +125,34 @@ class DashboardAcompanhamentoTest extends TestCase
             ->post(route('admin.dashboard.contatos.store', $aluno), [
                 'observacao' => 'Combinamos uma revisão de questões.',
             ])
-            ->assertRedirect();
+            ->assertRedirect(route('admin.dashboard.contatos.agendar', $aluno));
 
         $aluno->refresh();
         $this->assertSame(AcaoAcompanhamento::MarcarPresenca, $aluno->acao_resolvida);
         $this->assertNotNull($aluno->ultimo_contato_em);
+        $this->assertNull($aluno->proximo_contato_em);
         $this->assertSame('Combinamos uma revisão de questões.', $aluno->ultima_observacao);
         $this->assertSame(1, ContatoAluno::query()->count());
 
         $this->actingAs($user)
+            ->get(route('admin.dashboard.contatos.agendar', $aluno))
+            ->assertOk()
+            ->assertSee('Deseja agendar um contato para Ana Souza?')
+            ->assertSee('Não, agendar para 06/10/2026')
+            ->assertSee('15 dias corridos contando hoje');
+
+        $this->actingAs($user)
+            ->post(route('admin.dashboard.contatos.agendar.store', $aluno), [
+                'decisao' => 'nao',
+            ])
+            ->assertRedirect(route('admin.dashboard', ['aluno' => $aluno->id]));
+
+        $this->assertSame('2026-10-06', $aluno->fresh()->proximo_contato_em?->toDateString());
+
+        $this->actingAs($user)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertDontSee('Ana Souza');
+            ->assertDontSee('data-aluno="'.$aluno->id.'"', false);
 
         $this->actingAs($user)
             ->get(route('admin.dashboard', ['situacao' => 'concluidas', 'aluno' => $aluno->id]))
@@ -141,6 +160,38 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertSee('Ana Souza')
             ->assertSee('Combinamos uma revisão de questões.')
             ->assertSee('Concluída');
+    }
+
+    public function test_sim_agenda_a_data_informada_pelo_mentor(): void
+    {
+        $user = User::factory()->create();
+        $aluno = $this->aluno([
+            'nome' => 'Bruno Silva',
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.dashboard.contatos.store', $aluno), [])
+            ->assertRedirect(route('admin.dashboard.contatos.agendar', $aluno));
+
+        $this->actingAs($user)
+            ->from(route('admin.dashboard.contatos.agendar', $aluno))
+            ->post(route('admin.dashboard.contatos.agendar.store', $aluno), [
+                'decisao' => 'sim',
+            ])
+            ->assertRedirect(route('admin.dashboard.contatos.agendar', $aluno))
+            ->assertSessionHasErrors('proximo_contato_em');
+
+        $this->actingAs($user)
+            ->post(route('admin.dashboard.contatos.agendar.store', $aluno), [
+                'decisao' => 'sim',
+                'proximo_contato_em' => '2026-10-01',
+            ])
+            ->assertRedirect(route('admin.dashboard', ['aluno' => $aluno->id]))
+            ->assertSessionHas('success', 'Próximo contato de Bruno Silva agendado para 01/10/2026.');
+
+        $this->assertSame('2026-10-01', $aluno->fresh()->proximo_contato_em?->toDateString());
     }
 
     public function test_mais_de_quinze_dias_sem_contato_entra_em_marcar_presenca(): void

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\AcaoAcompanhamento;
+use App\Enums\DecisaoAgendamento;
 use App\Enums\FocoAcompanhamento;
 use App\Enums\LimiteAcompanhamento;
 use App\Enums\SituacaoAcompanhamento;
@@ -13,8 +14,10 @@ use App\Services\Acompanhamento\ContextoAcompanhamento;
 use App\Services\Acompanhamento\LinhaPainel;
 use App\Services\Acompanhamento\MontadorPainelAcompanhamento;
 use App\Services\Acompanhamento\TextoAcompanhamento;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
 {
@@ -84,15 +87,46 @@ class DashboardController extends Controller
             'ocorrido_em' => $agora,
         ]);
 
-        $consulta = ConsultaDashboard::fromRequest($request);
+        return redirect()
+            ->route('admin.dashboard.contatos.agendar', $aluno)
+            ->with('success', 'Contato registrado.');
+    }
+
+    public function agendarProximo(Aluno $aluno)
+    {
+        $hoje = now();
+        $dataPadrao = LimiteAcompanhamento::DiasSemContato->dataContandoHoje($hoje);
+
+        return view('admin.dashboard.agendar-proximo', [
+            'aluno' => $aluno,
+            'iniciais' => TextoAcompanhamento::iniciais($aluno->nome),
+            'dataPadraoTexto' => $dataPadrao->format('d/m/Y'),
+            'minData' => $hoje->toDateString(),
+        ]);
+    }
+
+    public function storeAgendarProximo(Request $request, Aluno $aluno)
+    {
+        $dados = $request->validate([
+            'decisao' => ['required', Rule::enum(DecisaoAgendamento::class)],
+            'proximo_contato_em' => ['exclude_unless:decisao,sim', 'required', 'date', 'after_or_equal:today'],
+        ], [
+            'decisao.required' => 'Escolha se deseja informar a data do próximo contato.',
+            'proximo_contato_em.required' => 'Informe a data do próximo contato.',
+            'proximo_contato_em.after_or_equal' => 'A data do próximo contato precisa ser hoje ou uma data futura.',
+        ]);
+
+        $decisao = DecisaoAgendamento::from($dados['decisao']);
+        $data = $decisao === DecisaoAgendamento::Sim
+            ? Carbon::parse($dados['proximo_contato_em'])->toDateString()
+            : LimiteAcompanhamento::DiasSemContato->dataContandoHoje(now())->toDateString();
+
+        $aluno->proximo_contato_em = $data;
+        $aluno->save();
 
         return redirect()
-            ->to($consulta->url([
-                'aluno' => $aluno->id,
-                'situacao' => $linha !== null && ! $linha->somenteAgenda ? 'concluidas' : $consulta->situacao->value,
-                'page' => null,
-            ]))
-            ->with('success', 'Contato registrado.');
+            ->route('admin.dashboard', ['aluno' => $aluno->id])
+            ->with('success', 'Próximo contato de '.$aluno->nome.' agendado para '.Carbon::parse($data)->format('d/m/Y').'.');
     }
 
     public function storeAgenda(Request $request, Aluno $aluno)
