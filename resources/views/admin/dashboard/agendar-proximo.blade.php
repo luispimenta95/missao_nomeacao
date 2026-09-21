@@ -4,35 +4,40 @@
 
 @section('content')
 <div class="mx-auto max-w-xl">
-    <div class="rounded-3xl border border-[#e6ebf2] bg-white p-6 shadow-sm sm:p-8">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">Agendar próximo contato</h1>
+        <a href="{{ route('admin.dashboard') }}" class="text-sm text-primary hover:text-primary-light">← Voltar para o dashboard</a>
+    </div>
+
+    <div class="rounded bg-white p-8 shadow-lg">
         <div class="flex items-center gap-4">
-            <span class="flex h-14 w-14 items-center justify-center rounded-full bg-[#001d3d] text-base font-semibold text-white">{{ $iniciais }}</span>
+            <span class="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-base font-semibold text-white">{{ $iniciais }}</span>
             <div>
-                <p class="text-sm font-medium text-[#15803d]">Contato registrado</p>
-                <h1 class="text-2xl font-semibold text-[#12263f]">Deseja agendar um contato para {{ $aluno->nome }}?</h1>
+                <p class="text-sm font-medium text-green-800">Contato registrado</p>
+                <p class="text-lg font-semibold text-gray-800">Deseja agendar um contato para {{ $aluno->nome }}?</p>
             </div>
         </div>
 
-        <p class="mt-4 text-sm leading-6 text-[#64748b]">
+        <p class="mt-4 text-sm leading-6 text-gray-600">
             Se preferir não escolher a data, o próximo contato fica em {{ $dataPadraoTexto }}, 15 dias corridos contando hoje.
         </p>
 
         @if($errors->any())
-            <div class="mt-4 rounded-xl bg-[#fff1f2] px-4 py-3 text-sm text-[#be123c]">
+            <div class="mt-4 rounded border border-red-300 bg-red-100 p-4 text-sm text-red-800">
                 {{ $errors->first() }}
             </div>
         @endif
 
         <form method="POST" action="{{ route('admin.dashboard.contatos.agendar.store', $aluno) }}" class="mt-6 space-y-4">
             @csrf
-            <label class="block text-sm font-medium text-[#12263f]">
-                Nova data
-                <input type="date" name="proximo_contato_em" min="{{ $minData }}" value="{{ old('proximo_contato_em') }}" class="mt-2 w-full rounded-xl border border-[#d7dee8] px-3 py-3 text-sm text-[#12263f] focus:border-[#001d3d] focus:outline-none">
+            <label class="block">
+                <span class="text-sm font-semibold text-gray-700">Nova data</span>
+                <input type="date" name="proximo_contato_em" min="{{ $minData }}" value="{{ old('proximo_contato_em') }}" class="mt-2 w-full rounded border border-gray-300 p-3 text-sm text-gray-800 focus:border-primary focus:ring-primary">
             </label>
-            <button type="submit" name="decisao" value="sim" class="flex w-full items-center justify-center rounded-xl bg-[#001d3d] px-4 py-3 text-sm font-semibold text-white hover:bg-[#03284f]">
+            <button type="submit" name="decisao" value="sim" class="flex w-full items-center justify-center rounded bg-primary px-6 py-3 text-sm font-medium text-white transition hover:bg-primary-light">
                 Sim, agendar nesta data
             </button>
-            <button type="submit" name="decisao" value="nao" class="flex w-full items-center justify-center rounded-xl border border-[#d7dee8] px-4 py-3 text-sm font-semibold text-[#12263f] hover:bg-[#f8fafc]">
+            <button type="submit" name="decisao" value="nao" class="flex w-full items-center justify-center rounded bg-gray-200 px-6 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-300">
                 Não, agendar para {{ $dataPadraoTexto }}
             </button>
         </form>
