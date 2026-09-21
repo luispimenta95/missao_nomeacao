@@ -7,6 +7,7 @@
         AcaoAcompanhamento::Intervir => 'bg-[#fff1f2] text-[#be123c]',
         AcaoAcompanhamento::MarcarPresenca => 'bg-[#fff7ed] text-[#c2410c]',
         AcaoAcompanhamento::Parabenizar => 'bg-[#ecfdf3] text-[#15803d]',
+        AcaoAcompanhamento::EmDia => 'bg-[#f4f7fb] text-[#334155]',
     };
     $temPonte = collect($linha->ficha->motivos)->contains(fn ($motivo) => $motivo->ponteProtocoloResgate);
 @endphp

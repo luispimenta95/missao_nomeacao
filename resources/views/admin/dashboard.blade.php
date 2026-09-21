@@ -91,7 +91,7 @@
             <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#eef2f6] px-5 py-5">
                 <div>
                     <h2 class="text-lg font-semibold text-[#12263f]">Ações de acompanhamento</h2>
-                    <p class="mt-1 max-w-2xl text-sm text-[#64748b]">Cada aluno aparece em uma única ação. A ordem é Intervir, Marcar presença e Parabenizar. A ficha reúne todos os motivos.</p>
+                    <p class="mt-1 max-w-2xl text-sm text-[#64748b]">Cada aluno entra em uma única ação: Intervir, Marcar presença ou Parabenizar. Quem não se enquadra aparece em Em dia. A ficha reúne todos os motivos.</p>
                 </div>
             </div>
 
@@ -108,10 +108,32 @@
                 @endif
             </div>
 
+            <div class="flex flex-wrap items-center gap-2 px-5 pt-3">
+                <a href="{{ $consulta->url(['acao' => null, 'page' => null, 'aluno' => null]) }}" class="rounded-full px-4 py-2 text-sm font-semibold {{ $consulta->acao === null ? 'bg-[#12263f] text-white' : 'bg-[#f4f7fb] text-[#475569] hover:bg-[#e8eef6]' }}">
+                    Todas as ações ({{ $contagens[$consulta->situacao->value] }})
+                </a>
+                @foreach(AcaoAcompanhamento::cases() as $acao)
+                    @php
+                        $chip = match ($acao) {
+                            AcaoAcompanhamento::Intervir => 'bg-[#fff1f2] text-[#be123c]',
+                            AcaoAcompanhamento::MarcarPresenca => 'bg-[#fff7ed] text-[#c2410c]',
+                            AcaoAcompanhamento::Parabenizar => 'bg-[#ecfdf3] text-[#15803d]',
+                            AcaoAcompanhamento::EmDia => 'bg-[#f4f7fb] text-[#334155]',
+                        };
+                    @endphp
+                    <a href="{{ $consulta->url(['acao' => $acao->value, 'page' => null, 'aluno' => null]) }}" class="rounded-full px-4 py-2 text-sm font-semibold {{ $consulta->acao === $acao ? 'ring-2 ring-[#001d3d] '.$chip : $chip.' hover:opacity-80' }}">
+                        {{ $acao->rotulo() }} ({{ $contagens[$acao->value] }})
+                    </a>
+                @endforeach
+            </div>
+
             <form method="GET" action="{{ route('admin.dashboard') }}" class="grid gap-3 px-5 py-4 md:grid-cols-[240px_1fr]">
                 <input type="hidden" name="situacao" value="{{ $consulta->situacao->value }}">
                 @if($consulta->foco)
                     <input type="hidden" name="foco" value="{{ $consulta->foco->value }}">
+                @endif
+                @if($consulta->acao)
+                    <input type="hidden" name="acao" value="{{ $consulta->acao->value }}">
                 @endif
                 <select name="parametro" onchange="this.form.submit()" class="rounded-xl border border-[#d7dee8] bg-white px-3 py-2.5 text-sm text-[#12263f]">
                     <option value="">Todos os parâmetros</option>
@@ -144,6 +166,7 @@
                                     AcaoAcompanhamento::Intervir => 'bg-[#fff1f2] text-[#be123c]',
                                     AcaoAcompanhamento::MarcarPresenca => 'bg-[#fff7ed] text-[#c2410c]',
                                     AcaoAcompanhamento::Parabenizar => 'bg-[#ecfdf3] text-[#15803d]',
+                                    AcaoAcompanhamento::EmDia => 'bg-[#f4f7fb] text-[#334155]',
                                 };
                                 $urlLinha = $consulta->url(['aluno' => $linha->aluno->id, 'page' => $paginacao['pagina']]);
                             @endphp
@@ -169,7 +192,7 @@
                         @empty
                             <tr>
                                 <td colspan="5" class="px-5 py-12 text-center text-sm text-[#64748b]">
-                                    Nenhum aluno nesta lista. A ação aparece quando a constância ou o volume ficam críticos, o desempenho fica baixo, ou o contato passa de 15 dias.
+                                    Nenhum aluno nesta lista.
                                 </td>
                             </tr>
                         @endforelse
