@@ -4,6 +4,7 @@ use App\Http\Controllers\AlunoController;
 use App\Http\Controllers\AnonymousVisitAdminController;
 use App\Http\Controllers\AnonymousVisitController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DesempenhoAdminController;
 use App\Http\Controllers\InscricaoAdminController;
 use App\Http\Controllers\InscricaoController;
@@ -41,10 +42,10 @@ Route::post('/anonymous-visits/exit', [AnonymousVisitController::class, 'update'
 
 // Admin routes - protected by auth middleware
 Route::middleware(['auth'])->prefix('admin')->group(function () {
-    // Dashboard
-    Route::get('/dashboard', function () {
-        return view('admin.dashboard');
-    })->name('admin.dashboard');
+    // Dashboard de acompanhamento
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    Route::post('/dashboard/alunos/{aluno}/contatos', [DashboardController::class, 'storeContato'])->name('admin.dashboard.contatos.store');
+    Route::post('/dashboard/alunos/{aluno}/agenda', [DashboardController::class, 'storeAgenda'])->name('admin.dashboard.agenda.store');
 
     // Material routes
     Route::get('/materiais', [MaterialController::class, 'index'])->name('materiais.index');

@@ -2,165 +2,199 @@
 
 @section('title', 'Dashboard')
 
-@section('content')
-    <div>
-        <h1 class="text-3xl font-bold text-white mb-8">Dashboard</h1>
-        <p class="text-gray-300 mb-8">Bem-vindo ao painel administrativo da Missão Nomeação!</p>
+@section('bare')
+@php
+    use App\Enums\AcaoAcompanhamento;
+    use App\Enums\FiltroParametroAcompanhamento;
+    use App\Enums\FiltroSituacaoAcompanhamento;
+    use App\Enums\FocoAcompanhamento;
+@endphp
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Turmas Card -->
-                <a href="{{ route('turmas.index') }}" class="block bg-gray-900 overflow-hidden shadow-sm sm:rounded-lg hover:shadow-lg transition border border-yellow-600">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0 bg-yellow-600 rounded-md p-3">
-                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                                </svg>
-                            </div>
-                            <div class="ml-5 w-0 flex-1">
-                                <dl>
-                                    <dt class="text-sm font-medium text-gray-400 truncate">Turmas</dt>
-                                    <dd class="text-lg font-medium text-white">{{ \App\Models\Turma::count() }}</dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- Alunos Card -->
-                <a href="{{ route('alunos.index') }}" class="block bg-gray-900 overflow-hidden shadow-sm sm:rounded-lg hover:shadow-lg transition border border-yellow-600">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0 bg-yellow-600 rounded-md p-3">
-                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                                </svg>
-                            </div>
-                            <div class="ml-5 w-0 flex-1">
-                                <dl>
-                                    <dt class="text-sm font-medium text-gray-400 truncate">Alunos</dt>
-                                    <dd class="text-lg font-medium text-white">{{ \App\Models\Aluno::count() }}</dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- PDF do relatório -->
-                <a href="{{ route('relatorios-pdf.index') }}" class="block bg-gray-900 overflow-hidden shadow-sm sm:rounded-lg hover:shadow-lg transition border border-yellow-600">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0 bg-yellow-600 rounded-md p-3">
-                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                                </svg>
-                            </div>
-                            <div class="ml-5 w-0 flex-1">
-                                <dl>
-                                    <dt class="text-sm font-medium text-gray-400 truncate">PDF do relatório</dt>
-                                    <dd class="text-lg font-medium text-white">Fonte e preview</dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- Desempenho Card -->
-                <a href="{{ route('desempenho.index') }}" class="block bg-gray-900 overflow-hidden shadow-sm sm:rounded-lg hover:shadow-lg transition border border-yellow-600">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0 bg-yellow-600 rounded-md p-3">
-                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                </svg>
-                            </div>
-                            <div class="ml-5 w-0 flex-1">
-                                <dl>
-                                    <dt class="text-sm font-medium text-gray-400 truncate">Desempenho</dt>
-                                    <dd class="text-lg font-medium text-white">{{ \App\Models\EixoDesempenho::count() }} eixos</dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- Materiais Card -->
-                <a href="{{ route('materiais.index') }}" class="block bg-gray-900 overflow-hidden shadow-sm sm:rounded-lg hover:shadow-lg transition border border-yellow-600">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0 bg-yellow-600 rounded-md p-3">
-                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                            </div>
-                            <div class="ml-5 w-0 flex-1">
-                                <dl>
-                                    <dt class="text-sm font-medium text-gray-400 truncate">Materiais</dt>
-                                    <dd class="text-lg font-medium text-white">{{ \App\Models\Material::count() }}</dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- Inscrições Card -->
-                <a href="{{ route('inscricoes.index') }}" class="block bg-gray-900 overflow-hidden shadow-sm sm:rounded-lg hover:shadow-lg transition border border-yellow-600">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0 bg-yellow-600 rounded-md p-3">
-                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                </svg>
-                            </div>
-                            <div class="ml-5 w-0 flex-1">
-                                <dl>
-                                    <dt class="text-sm font-medium text-gray-400 truncate">Inscrições</dt>
-                                    <dd class="text-lg font-medium text-white">{{ \App\Models\Inscricao::count() }}</dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- Leads Card -->
-                <a href="{{ route('leads.index') }}" class="block bg-gray-900 overflow-hidden shadow-sm sm:rounded-lg hover:shadow-lg transition border border-yellow-600">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0 bg-yellow-600 rounded-md p-3">
-                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                            </div>
-                            <div class="ml-5 w-0 flex-1">
-                                <dl>
-                                    <dt class="text-sm font-medium text-gray-400 truncate">Leads</dt>
-                                    <dd class="text-lg font-medium text-white">{{ \App\Models\Lead::count() }}</dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- Visitas Card -->
-                <a href="{{ route('anonymous-visits.index') }}" class="block bg-gray-900 overflow-hidden shadow-sm sm:rounded-lg hover:shadow-lg transition border border-yellow-600">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0 bg-yellow-600 rounded-md p-3">
-                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                </svg>
-                            </div>
-                            <div class="ml-5 w-0 flex-1">
-                                <dl>
-                                    <dt class="text-sm font-medium text-gray-400 truncate">Visitas anonimas</dt>
-                                    <dd class="text-lg font-medium text-white">{{ \App\Models\AnonymousVisit::count() }}</dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </div>
-                </a>
+<div class="min-h-full bg-[#f3f6fb] {{ $aberta ? 'lg:pr-[420px]' : '' }}">
+    <div class="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+        <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-semibold tracking-tight text-[#12263f]">Olá, {{ $primeiroNome }}!</h1>
+                <p class="mt-1 text-sm text-[#64748b]">Aqui está o seu panorama de acompanhamento dos alunos.</p>
             </div>
-        </div>
+            <div class="flex items-center gap-4">
+                <p class="hidden text-sm text-[#64748b] sm:block">{{ $dataExtenso }}</p>
+                <a href="{{ $consulta->url(['foco' => FocoAcompanhamento::Intervir->value, 'situacao' => 'pendentes', 'page' => null, 'aluno' => null]) }}" class="relative rounded-full p-2 text-[#12263f] hover:bg-white" aria-label="Intervenções pendentes">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0a3 3 0 11-6 0"/></svg>
+                    @if($resumo['intervencoes'] > 0)
+                        <span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#e11d48]"></span>
+                    @endif
+                </a>
+                <div class="flex items-center gap-2 rounded-full bg-white px-2 py-1 shadow-sm">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-[#001d3d] text-xs font-semibold text-white">{{ $iniciaisUsuario }}</span>
+                    <span class="pr-2 text-sm font-medium text-[#12263f]">{{ auth()->user()->name }}</span>
+                </div>
+            </div>
+        </header>
+
+        @if(session('success'))
+            <div class="mb-4 rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 text-sm text-[#166534]">{{ session('success') }}</div>
+        @endif
+
+        <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            @foreach([
+                ['valor' => $resumo['ativos'], 'legenda' => 'alunos ativos', 'href' => null, 'icone' => 'users'],
+                ['valor' => $resumo['contatados'], 'legenda' => 'contatados nos últimos 15 dias', 'href' => null, 'icone' => 'check'],
+                ['valor' => $resumo['sem_contato'], 'legenda' => 'sem contato há mais de 15 dias', 'href' => $consulta->url(['foco' => FocoAcompanhamento::SemContato->value, 'situacao' => 'pendentes', 'page' => null, 'aluno' => null]), 'icone' => 'clock'],
+                ['valor' => $resumo['programados'], 'legenda' => 'acompanhamentos programados', 'href' => $consulta->url(['foco' => FocoAcompanhamento::Agenda->value, 'situacao' => 'todas', 'page' => null, 'aluno' => null]), 'icone' => 'calendar'],
+            ] as $card)
+                @php $tag = $card['href'] ? 'a' : 'div'; @endphp
+                <{{ $tag }} @if($card['href']) href="{{ $card['href'] }}" @endif class="flex items-center gap-4 rounded-2xl border border-[#e6ebf2] bg-white px-4 py-4 shadow-sm {{ $card['href'] ? 'hover:border-[#cbd5e1]' : '' }}">
+                    <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f4f7fb] text-[#001d3d]">
+                        @if($card['icone'] === 'users')
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H2v-2a4 4 0 014-4h3m6-4a4 4 0 11-8 0 4 4 0 018 0zm6 0a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        @elseif($card['icone'] === 'check')
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        @elseif($card['icone'] === 'clock')
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        @else
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        @endif
+                    </span>
+                    <span>
+                        <span class="block text-2xl font-semibold text-[#12263f]">{{ $card['valor'] }}</span>
+                        <span class="block text-sm text-[#64748b]">{{ $card['legenda'] }}</span>
+                    </span>
+                </{{ $tag }}>
+            @endforeach
+        </section>
+
+        <section class="mt-6 rounded-3xl border border-[#e6ebf2] bg-white p-5 shadow-sm">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold text-[#12263f]">Para hoje</h2>
+                    <p class="text-sm text-[#64748b]">O que merece a sua atenção hoje?</p>
+                </div>
+                <a href="{{ $consulta->url(['foco' => FocoAcompanhamento::Agenda->value, 'situacao' => 'todas', 'page' => null, 'aluno' => null]) }}" class="text-sm font-medium text-[#1d4ed8] hover:underline">Ver agenda completa</a>
+            </div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                @foreach([
+                    ['foco' => FocoAcompanhamento::Intervir, 'valor' => $resumo['intervencoes'], 'legenda' => 'intervenções pendentes', 'classes' => 'bg-[#fff1f2] text-[#be123c]', 'situacao' => 'pendentes'],
+                    ['foco' => FocoAcompanhamento::AgendaHoje, 'valor' => $resumo['agenda_hoje'], 'legenda' => 'acompanhamento programado para hoje', 'classes' => 'bg-[#fff7ed] text-[#c2410c]', 'situacao' => 'todas'],
+                    ['foco' => FocoAcompanhamento::SemContato, 'valor' => $resumo['sem_contato_acao'], 'legenda' => 'alunos sem contato', 'classes' => 'bg-[#eff6ff] text-[#1d4ed8]', 'situacao' => 'pendentes'],
+                    ['foco' => FocoAcompanhamento::Parabenizar, 'valor' => $resumo['evolucoes'], 'legenda' => 'evoluções ainda não reconhecidas', 'classes' => 'bg-[#ecfdf3] text-[#15803d]', 'situacao' => 'pendentes'],
+                ] as $hojeCard)
+                    <a href="{{ $consulta->url(['foco' => $hojeCard['foco']->value, 'situacao' => $hojeCard['situacao'], 'page' => null, 'aluno' => null]) }}" class="rounded-2xl px-4 py-4 {{ $hojeCard['classes'] }} {{ $consulta->foco === $hojeCard['foco'] ? 'ring-2 ring-[#001d3d]' : '' }}">
+                        <span class="block text-2xl font-semibold">{{ $hojeCard['valor'] }}</span>
+                        <span class="mt-1 block text-sm leading-5">{{ $hojeCard['legenda'] }}</span>
+                    </a>
+                @endforeach
+            </div>
+        </section>
+
+        <section class="mt-6 rounded-3xl border border-[#e6ebf2] bg-white shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#eef2f6] px-5 py-5">
+                <div>
+                    <h2 class="text-lg font-semibold text-[#12263f]">Ações de acompanhamento</h2>
+                    <p class="mt-1 max-w-2xl text-sm text-[#64748b]">Cada aluno aparece em uma única ação. A ordem é Intervir, Marcar presença e Parabenizar. A ficha reúne todos os motivos.</p>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 px-5 pt-4">
+                @foreach(FiltroSituacaoAcompanhamento::cases() as $situacao)
+                    <a href="{{ $consulta->url(['situacao' => $situacao->value, 'page' => null, 'aluno' => null]) }}" class="rounded-full px-4 py-2 text-sm font-semibold {{ $consulta->situacao === $situacao ? 'bg-[#001d3d] text-white' : 'bg-[#f4f7fb] text-[#475569] hover:bg-[#e8eef6]' }}">
+                        {{ $situacao->rotulo() }} ({{ $contagens[$situacao->value] }})
+                    </a>
+                @endforeach
+                @if($consulta->foco)
+                    <a href="{{ $consulta->url(['foco' => null, 'page' => null, 'aluno' => null]) }}" class="rounded-full bg-[#fff7ed] px-4 py-2 text-sm font-medium text-[#c2410c]">
+                        {{ $consulta->foco->rotulo() }} · limpar
+                    </a>
+                @endif
+            </div>
+
+            <form method="GET" action="{{ route('admin.dashboard') }}" class="grid gap-3 px-5 py-4 md:grid-cols-[240px_1fr]">
+                <input type="hidden" name="situacao" value="{{ $consulta->situacao->value }}">
+                @if($consulta->foco)
+                    <input type="hidden" name="foco" value="{{ $consulta->foco->value }}">
+                @endif
+                <select name="parametro" onchange="this.form.submit()" class="rounded-xl border border-[#d7dee8] bg-white px-3 py-2.5 text-sm text-[#12263f]">
+                    <option value="">Todos os parâmetros</option>
+                    @foreach(FiltroParametroAcompanhamento::cases() as $parametro)
+                        <option value="{{ $parametro->value }}" @selected($consulta->parametro === $parametro)>{{ $parametro->rotulo() }}</option>
+                    @endforeach
+                </select>
+                <label class="relative block">
+                    <span class="sr-only">Buscar aluno</span>
+                    <input type="search" name="busca" value="{{ $consulta->busca }}" placeholder="Buscar aluno..." class="w-full rounded-xl border border-[#d7dee8] px-3 py-2.5 pl-10 text-sm text-[#12263f] focus:border-[#001d3d] focus:outline-none">
+                    <svg class="pointer-events-none absolute left-3 top-3 h-4 w-4 text-[#94a3b8]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.3-4.3M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+                </label>
+            </form>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-left">
+                    <thead class="bg-[#f8fafc] text-xs font-semibold uppercase tracking-wide text-[#7b8ba0]">
+                        <tr>
+                            <th class="px-5 py-3">Aluno</th>
+                            <th class="px-4 py-3">Ação</th>
+                            <th class="px-4 py-3">Motivo principal</th>
+                            <th class="px-4 py-3">Último contato</th>
+                            <th class="px-4 py-3">Próximo contato</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#eef2f6]">
+                        @forelse($linhas as $linha)
+                            @php
+                                $estilo = match ($linha->ficha->acao) {
+                                    AcaoAcompanhamento::Intervir => 'bg-[#fff1f2] text-[#be123c]',
+                                    AcaoAcompanhamento::MarcarPresenca => 'bg-[#fff7ed] text-[#c2410c]',
+                                    AcaoAcompanhamento::Parabenizar => 'bg-[#ecfdf3] text-[#15803d]',
+                                };
+                                $urlLinha = $consulta->url(['aluno' => $linha->aluno->id, 'page' => $paginacao['pagina']]);
+                            @endphp
+                            <tr data-acao="{{ $linha->ficha->acao->value }}" data-aluno="{{ $linha->aluno->id }}" class="cursor-pointer {{ $aberta && $aberta->aluno->id === $linha->aluno->id ? 'bg-[#f4f7fb]' : 'hover:bg-[#f8fafc]' }}" onclick="window.location='{{ $urlLinha }}'">
+                                <td class="px-5 py-4">
+                                    <a href="{{ $urlLinha }}" class="flex items-center gap-3">
+                                        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8eef6] text-xs font-semibold text-[#001d3d]">{{ $linha->iniciais }}</span>
+                                        <span class="font-medium text-[#12263f]">{{ $linha->aluno->nome }}</span>
+                                    </a>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $estilo }}">{{ $linha->ficha->acao->rotulo() }}</span>
+                                </td>
+                                <td class="max-w-xs px-4 py-4 text-sm text-[#334155]">
+                                    {{ $linha->ficha->motivoPrincipal()?->texto }}
+                                    @if(count($linha->ficha->motivos) > 1)
+                                        <span class="ml-1 text-xs text-[#94a3b8]">+{{ count($linha->ficha->motivos) - 1 }}</span>
+                                    @endif
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-4 text-sm text-[#475569]">{{ $linha->ultimoContato }}</td>
+                                <td class="whitespace-nowrap px-4 py-4 text-sm {{ $linha->proximoEhHoje ? 'font-semibold text-[#c2410c]' : 'text-[#475569]' }}">{{ $linha->proximoContato }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="px-5 py-12 text-center text-sm text-[#64748b]">
+                                    Nenhum aluno nesta lista. A ação aparece quando a constância ou o volume ficam críticos, o desempenho fica baixo, ou o contato passa de 15 dias.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex items-center justify-between gap-3 border-t border-[#eef2f6] px-5 py-4 text-sm text-[#64748b]">
+                <p>Mostrando {{ $paginacao['de'] }}–{{ $paginacao['ate'] }} de {{ $paginacao['total'] }} alunos</p>
+                <div class="flex items-center gap-2">
+                    @if($paginacao['pagina'] > 1)
+                        <a href="{{ $consulta->url(['page' => $paginacao['pagina'] - 1, 'aluno' => null]) }}" class="rounded-lg border border-[#d7dee8] px-3 py-1.5 hover:bg-[#f8fafc]">Anterior</a>
+                    @endif
+                    <span class="rounded-lg bg-[#001d3d] px-3 py-1.5 font-semibold text-white">{{ $paginacao['pagina'] }}</span>
+                    @if($paginacao['pagina'] < $paginacao['paginas'])
+                        <a href="{{ $consulta->url(['page' => $paginacao['pagina'] + 1, 'aluno' => null]) }}" class="rounded-lg border border-[#d7dee8] px-3 py-1.5 hover:bg-[#f8fafc]">Próxima</a>
+                    @endif
+                </div>
+            </div>
+        </section>
     </div>
+</div>
+
+@if($aberta)
+    <a href="{{ $consulta->url(['aluno' => null]) }}" class="fixed inset-0 z-30 bg-[#0f172a]/30 lg:hidden" aria-label="Fechar ficha"></a>
+    @include('admin.dashboard.ficha', ['linha' => $aberta, 'consulta' => $consulta, 'contatos' => $contatos])
+@endif
 @endsection
