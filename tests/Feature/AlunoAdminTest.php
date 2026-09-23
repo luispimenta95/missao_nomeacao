@@ -193,6 +193,91 @@ class AlunoAdminTest extends TestCase
             ->assertSee('Nenhum aluno encontrado para essa busca.');
     }
 
+    public function test_exporta_alunos_em_csv(): void
+    {
+        $user = User::factory()->create();
+        Aluno::create([
+            'nome' => 'Giovanna "Silva", Jr.',
+            'email' => 'giovanna@example.com',
+            'recebe_email' => true,
+            'last_performance' => 'Brigando com a constância',
+            'last_question_volume' => 'Volume suficiente',
+            'last_accuracy_rate' => 'Muito bom',
+            'last_subjects' => 'Crítico · Abaixo da média',
+        ]);
+        Aluno::create([
+            'nome' => 'Maria Souza',
+            'email' => 'maria@example.com',
+            'recebe_email' => false,
+        ]);
+
+        $this->get(route('alunos.export'))->assertRedirect(route('login'));
+
+        $resposta = $this->actingAs($user)
+            ->get(route('alunos.export'))
+            ->assertOk()
+            ->assertHeader('content-type', 'text/csv; charset=utf-8');
+
+        $disposicao = (string) $resposta->headers->get('content-disposition');
+        $this->assertMatchesRegularExpression('/filename=alunos_\d{4}-\d{2}-\d{2}_\d{6}\.csv/', $disposicao);
+
+        $linhas = $this->linhasCsv((string) $resposta->getContent());
+        $this->assertSame(
+            ['Nome', 'E-mail', 'Recebe e-mail', 'Constância', 'Questões', '% acertos', 'Assuntos'],
+            $linhas[0]
+        );
+        $this->assertSame([
+            'Giovanna "Silva", Jr.',
+            'giovanna@example.com',
+            'Sim',
+            'Brigando com a constância',
+            'Volume suficiente',
+            'Muito bom',
+            'Crítico · Abaixo da média',
+        ], $linhas[1]);
+        $this->assertSame([
+            'Maria Souza',
+            'maria@example.com',
+            'Não',
+            '',
+            '',
+            '',
+            '',
+        ], $linhas[2]);
+    }
+
+    public function test_exportacao_csv_respeita_a_busca_por_nome(): void
+    {
+        $user = User::factory()->create();
+        Aluno::create([
+            'nome' => 'Giovanna Silva',
+            'email' => 'giovanna@example.com',
+            'recebe_email' => true,
+        ]);
+        Aluno::create([
+            'nome' => 'Maria Souza',
+            'email' => 'maria@example.com',
+            'recebe_email' => false,
+        ]);
+
+        $resposta = $this->actingAs($user)
+            ->get(route('alunos.export', ['busca' => 'vann']))
+            ->assertOk();
+
+        $linhas = $this->linhasCsv((string) $resposta->getContent());
+        $this->assertCount(2, $linhas);
+        $this->assertSame('Giovanna Silva', $linhas[1][0]);
+
+        $html = $this->actingAs($user)
+            ->get(route('alunos.index', ['busca' => 'vann']))
+            ->assertOk()
+            ->assertSee('Exportar CSV')
+            ->getContent();
+
+        $this->assertStringContainsString(route('alunos.export', ['busca' => 'vann']), $html);
+        $this->assertStringContainsString('exportar-alunos-csv', $html);
+    }
+
     public function test_comando_de_sincronizacao_esta_agendado_as_6h(): void
     {
         $src = (string) file_get_contents(base_path('routes/console.php'));
@@ -203,5 +288,23 @@ class AlunoAdminTest extends TestCase
         $this->assertStringContainsString("->monthlyOn(16, '10:30')", $src);
         $this->assertStringContainsString('--se-pendente', $src);
         $this->assertStringContainsString("->timezone('America/Sao_Paulo')", $src);
+    }
+
+    /**
+     * @return list<list<string|null>>
+     */
+    private function linhasCsv(string $csv): array
+    {
+        $handle = fopen('php://temp', 'r+');
+        fwrite($handle, $csv);
+        rewind($handle);
+
+        $linhas = [];
+        while (($linha = fgetcsv($handle)) !== false) {
+            $linhas[] = $linha;
+        }
+        fclose($handle);
+
+        return $linhas;
     }
 }

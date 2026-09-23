@@ -23,6 +23,41 @@ class AlunoController extends Controller
         return view('admin.alunos.index', compact('alunos', 'busca'));
     }
 
+    public function export(Request $request)
+    {
+        $busca = trim((string) $request->query('busca', ''));
+        $alunos = Aluno::query()
+            ->comNomeParecido($busca)
+            ->orderBy('nome')
+            ->get();
+
+        $handle = fopen('php://temp', 'r+');
+        fputcsv($handle, ['Nome', 'E-mail', 'Recebe e-mail', 'Constância', 'Questões', '% acertos', 'Assuntos']);
+
+        foreach ($alunos as $aluno) {
+            fputcsv($handle, [
+                $aluno->nome,
+                $aluno->email,
+                $aluno->recebe_email ? 'Sim' : 'Não',
+                $aluno->last_performance ?? '',
+                $aluno->last_question_volume ?? '',
+                $aluno->last_accuracy_rate ?? '',
+                $aluno->last_subjects ?? '',
+            ]);
+        }
+
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        $nomeArquivo = 'alunos_'.now()->format('Y-m-d_His').'.csv';
+
+        return response($csv === false ? '' : $csv, 200, [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename='.$nomeArquivo,
+        ]);
+    }
+
     public function create()
     {
         return view('admin.alunos.create');
