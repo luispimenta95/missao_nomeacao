@@ -6,7 +6,10 @@
 <div>
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-3xl font-bold text-gray-800">Gerenciar Alunos</h1>
-        <a href="{{ route('alunos.create') }}" class="px-4 py-2 bg-primary hover:bg-primary-light text-white rounded transition">+ Novo Aluno</a>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('alunos.export', array_filter(['busca' => $busca])) }}" id="exportar-alunos-csv" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition">↓ Exportar CSV</a>
+            <a href="{{ route('alunos.create') }}" class="px-4 py-2 bg-primary hover:bg-primary-light text-white rounded transition">+ Novo Aluno</a>
+        </div>
     </div>
 
     @if(session('success'))
@@ -50,17 +53,26 @@
         }
 
         const urlBase = @json(route('alunos.index'));
+        const urlExportar = @json(route('alunos.export'));
+        const exportar = document.getElementById('exportar-alunos-csv');
         let timer = null;
         let pedido = 0;
         let abortar = null;
 
-        function urlComBusca(valor) {
-            const url = new URL(urlBase, window.location.origin);
+        function urlComBusca(valor, base) {
+            const url = new URL(base || urlBase, window.location.origin);
             const termo = valor.trim();
             if (termo !== '') {
                 url.searchParams.set('busca', termo);
             }
             return url;
+        }
+
+        function sincronizarExportacao(valor) {
+            if (!exportar) {
+                return;
+            }
+            exportar.href = urlComBusca(valor, urlExportar).toString();
         }
 
         async function filtrar(valor) {
@@ -97,11 +109,13 @@
         }
 
         campo.addEventListener('input', function() {
+            sincronizarExportacao(campo.value);
             clearTimeout(timer);
             timer = setTimeout(function() {
                 filtrar(campo.value);
             }, 200);
         });
+        sincronizarExportacao(campo.value);
     })();
 </script>
 @endsection
