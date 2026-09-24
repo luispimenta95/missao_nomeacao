@@ -46,6 +46,14 @@
             <x-desempenho-readonly label="Percentual por disciplina/assunto" :valor="$aluno->last_subjects" />
             <p class="text-xs text-gray-500 -mt-4 mb-6">Atualizado automaticamente com as faixas do último relatório gerado (mesmos eixos da gestão de desempenho).</p>
 
+            <div class="mb-6">
+                <label class="inline-flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" name="ativo" value="1" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {{ old('ativo', $aluno->ativo) ? 'checked' : '' }}>
+                    <span class="text-sm font-semibold text-gray-700">Ativo</span>
+                </label>
+                <p class="text-xs text-gray-500 mt-1">O padrão é ativo. A sincronização da Tutory volta a marcar o aluno como ativo.</p>
+            </div>
+
             <div class="mb-8">
                 <label class="inline-flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" name="recebe_email" value="1" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {{ old('recebe_email', $aluno->recebe_email) ? 'checked' : '' }}>
