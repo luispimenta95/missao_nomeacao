@@ -1,4 +1,5 @@
-import { aplicarDatasBrasileiras, labelHoursOnChartVertices } from './pagina-datas-horas.mjs';
+import { funcoesDatasCompose, funcoesHorasCompose } from './pagina-datas-horas.mjs';
+import { avaliarNaPagina } from '../avaliar-pagina.mjs';
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -12,8 +13,8 @@ export async function gotoReport(page, url) {
 }
 
 export async function prepareCharts(page) {
-  await page.evaluate(aplicarDatasBrasileiras);
-  await page.evaluate(labelHoursOnChartVertices);
+  await avaliarNaPagina(page, funcoesDatasCompose);
+  await avaliarNaPagina(page, funcoesHorasCompose);
   await page.evaluate(() => {
     if (!window.Chart || !Chart.instances) return;
     for (const k of Object.keys(Chart.instances)) {
@@ -23,7 +24,7 @@ export async function prepareCharts(page) {
         if (chart.options) chart.options.animation = false;
         if (typeof chart.stop === 'function') chart.stop();
         if (typeof chart.update === 'function') chart.update(0);
-      } catch (e) {}
+      } catch {}
     }
   });
   await sleep(800);
@@ -78,7 +79,7 @@ export async function extractAluno(page, urls) {
           img.style.maxWidth = '100%';
           img.style.width = '100%';
           canvas.replaceWith(img);
-        } catch (e) {}
+        } catch {}
       }
     }
     function htmlFromHeading(selector) {
@@ -123,7 +124,7 @@ export async function extractHoras(page, urls) {
           img.style.maxWidth = '100%';
           img.style.width = '100%';
           canvas.replaceWith(img);
-        } catch (e) {}
+        } catch {}
       }
     }
     function htmlFromHeading(selector) {
@@ -180,7 +181,7 @@ export async function extractQuestoes(page, urls) {
           img.style.maxWidth = '100%';
           img.style.width = '100%';
           canvas.replaceWith(img);
-        } catch (e) {}
+        } catch {}
       }
     }
     function htmlFromHeading(selector) {
@@ -231,7 +232,7 @@ export async function extractProgresso(page, urls) {
           img.style.maxWidth = '100%';
           img.style.width = '100%';
           canvas.replaceWith(img);
-        } catch (e) {}
+        } catch {}
       }
     }
     const h = document.querySelector('h2.section-3');

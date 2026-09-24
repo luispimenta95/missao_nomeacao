@@ -1,4 +1,5 @@
-import { aplicarDatasBrasileiras } from './datas-pagina.mjs';
+import { funcoesDatasPagina } from './datas-pagina.mjs';
+import { avaliarNaPagina } from '../avaliar-pagina.mjs';
 import { labelHoursOnChartVertices, stripPercentFromHoursCharts } from './graficos-pagina.mjs';
 
 function sleep(ms) {
@@ -89,24 +90,26 @@ async function esperarModelo(page, model) {
         return ch.data.labels.length >= minLabels;
       }
 
+      function graficosDoPanorama() {
+        return chartReady('chart_progresso_principal', 1)
+          && chartReady('chart_progresso_modalidades', 4)
+          && chartReady('chart_top_disciplinas', 1)
+          && chartReady('chart_pizza_modalidades', 1)
+          && chartReady('chart_horas_diarias', 7)
+          && chartReady('chart_tx_acerto', 2);
+      }
+      function graficosDasQuestoes() {
+        return chartReady('chart_bar_questoes_disciplina', 1)
+          && chartReady('chart_pizza_questoes', 1)
+          && chartReady('chart_linha_evolucao_questoes', 2)
+          && chartReady('chart_progresso_estudo', 1)
+          && chartReady('chart_progresso_resumo', 1)
+          && chartReady('chart_progresso_revisao', 1)
+          && chartReady('chart_progresso_exercicio', 1);
+      }
       const nums = document.querySelectorAll('.row-numbers h5').length;
       const questions = document.querySelectorAll('.row-questions .col-6, .row-questions [class*="col-"]').length;
-
-      return nums >= 3
-        && questions >= 2
-        && chartReady('chart_progresso_principal', 1)
-        && chartReady('chart_progresso_modalidades', 4)
-        && chartReady('chart_top_disciplinas', 1) // pág 2
-        && chartReady('chart_pizza_modalidades', 1) // pág 2
-        && chartReady('chart_horas_diarias', 7) // pág 3 diário
-        && chartReady('chart_tx_acerto', 2) // pág 4
-        && chartReady('chart_bar_questoes_disciplina', 1) // pág 4
-        && chartReady('chart_pizza_questoes', 1) // pág 5
-        && chartReady('chart_linha_evolucao_questoes', 2) // pág 5
-        && chartReady('chart_progresso_estudo', 1)
-        && chartReady('chart_progresso_resumo', 1)
-        && chartReady('chart_progresso_revisao', 1)
-        && chartReady('chart_progresso_exercicio', 1);
+      return nums >= 3 && questions >= 2 && graficosDoPanorama() && graficosDasQuestoes();
     }, { timeout: 120000 });
   } else if (model === 'aluno') {
     await page.waitForFunction(() => {
@@ -200,7 +203,7 @@ async function esperarModelo(page, model) {
 
 async function fotografarGraficos(page, model) {
   // Datas no padrão brasileiro (DD/MM) antes de congelar os gráficos
-  await page.evaluate(aplicarDatasBrasileiras);
+  await avaliarNaPagina(page, funcoesDatasPagina);
 
   // Sem % em pizza/barras de horas; horas nos vértices do gráfico diário
   await page.evaluate(stripPercentFromHoursCharts);
@@ -218,7 +221,7 @@ async function fotografarGraficos(page, model) {
         if (typeof chart.stop === 'function') chart.stop();
         if (typeof chart.update === 'function') chart.update(0);
         n++;
-      } catch (e) {}
+      } catch {}
     }
     return n;
   });
@@ -233,7 +236,7 @@ async function fotografarGraficos(page, model) {
       try {
         if (chart.options) chart.options.animation = false;
         if (typeof chart.update === 'function') chart.update(0);
-      } catch (e) {}
+      } catch {}
     }
   });
 

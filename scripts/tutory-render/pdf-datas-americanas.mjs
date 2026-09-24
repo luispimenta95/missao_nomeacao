@@ -1,9 +1,9 @@
-export function swapAmericanDatesInPdf(buf) {
-  const original = buf.toString('latin1');
-  const pdfLiteral = () => /\((?:\\.|[^\\)])*\)/g;
-  const mmdd = () => /(?<!\d[/\-.])\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+const pdfLiteral = () => /\((?:\\.|[^\\)])*\)/g;
+const mmdd = () => /(?<!\d[/\-.])\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+
+function reservarIso(original) {
   const locked = [];
-  let s = original.replace(pdfLiteral(), (lit) => {
+  const s = original.replace(pdfLiteral(), (lit) => {
     const inner = lit.slice(1, -1).replace(/\b(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})\b/g, (full, y, m, d) => {
       const ano = parseInt(y, 10);
       const mes = parseInt(m, 10);
@@ -15,7 +15,10 @@ export function swapAmericanDatesInPdf(buf) {
     });
     return `(${inner})`;
   });
+  return { s, locked };
+}
 
+function datasDoPdf(s) {
   const matches = [];
   s.replace(pdfLiteral(), (lit) => {
     const inner = lit.slice(1, -1);
@@ -24,9 +27,10 @@ export function swapAmericanDatesInPdf(buf) {
     while ((m = re.exec(inner))) matches.push(m);
     return lit;
   });
+  return matches;
+}
 
-  if (matches.length === 0 && locked.length === 0) return buf;
-
+function acumularDatas(matches) {
   let americanos = 0;
   let brasileiros = 0;
   const primeiros = [];
@@ -39,13 +43,32 @@ export function swapAmericanDatesInPdf(buf) {
     if (n1 <= 12 && n2 > 12) americanos += 1;
     if (n1 > 12 && n2 <= 12) brasileiros += 1;
   }
-  const varPrimeiro = new Set(primeiros).size > 1;
-  const varSegundo = new Set(segundos).size > 1;
-  const forcar = primeiros.length > 0 && (
-    americanos > brasileiros
-    || (americanos === brasileiros && !varPrimeiro && varSegundo && Math.max(...primeiros) <= 12)
-    || (americanos === brasileiros && varPrimeiro && varSegundo && primeiros.length > 1)
-  );
+  return { americanos, brasileiros, primeiros, segundos };
+}
+
+function decidirFormato(c) {
+  const varPrimeiro = new Set(c.primeiros).size > 1;
+  const varSegundo = new Set(c.segundos).size > 1;
+  if (c.primeiros.length === 0) return false;
+  if (c.americanos > c.brasileiros) return true;
+  if (c.americanos !== c.brasileiros) return false;
+  if (!varPrimeiro && varSegundo && Math.max(...c.primeiros) <= 12) return true;
+  return varPrimeiro && varSegundo && c.primeiros.length > 1;
+}
+
+function deveForcarAmericano(matches) {
+  return decidirFormato(acumularDatas(matches));
+}
+
+export function swapAmericanDatesInPdf(buf) {
+  const original = buf.toString('latin1');
+  const { s: reservado, locked } = reservarIso(original);
+  let s = reservado;
+  const matches = datasDoPdf(s);
+
+  if (matches.length === 0 && locked.length === 0) return buf;
+
+  const forcar = deveForcarAmericano(matches);
 
   if (forcar) {
     s = s.replace(pdfLiteral(), (lit) => {

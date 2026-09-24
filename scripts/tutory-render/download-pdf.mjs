@@ -11,7 +11,7 @@ export function cleanupDownloadDir(downloadDir) {
       fs.unlinkSync(path.join(downloadDir, f));
     }
     fs.rmdirSync(downloadDir);
-  } catch (_) {}
+  } catch {}
 }
 
 export async function waitForDownload(dir, timeoutMs = 120000) {

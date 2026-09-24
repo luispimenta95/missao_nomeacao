@@ -24,16 +24,24 @@ export function normalizeHeader(text) {
     .replace(/[^a-z0-9]+/g, '');
 }
 
-export function columnRole(header) {
-  const h = normalizeHeader(header);
+function papelPorNome(h) {
   if (h.includes('taxa') || (h.includes('acerto') && h.includes('percent'))) return 'pct';
   if (h.includes('assunto')) return 'assunto';
   if (h.includes('modalidade')) return 'modalidade';
   if (h.includes('disciplina')) return 'disciplina';
   if (h.includes('hora')) return 'horas';
+  return null;
+}
+
+function papelPorDataOuNumero(h, header) {
   if (h === 'data' || h === 'dia' || h.startsWith('data')) return 'data';
   if (h.includes('revis') || /^[\d.,:%h\s:]+$/i.test(String(header || ''))) return 'num';
   return 'texto';
+}
+
+export function columnRole(header) {
+  const h = normalizeHeader(header);
+  return papelPorNome(h) || papelPorDataOuNumero(h, header);
 }
 
 export function columnWidths(roles) {
@@ -52,7 +60,7 @@ export function columnWidths(roles) {
       used += w[i];
     });
   }
-  let rest = 100 - used;
+  const rest = 100 - used;
   if (assuntoIdx.length) {
     const base = Math.floor(rest / assuntoIdx.length);
     assuntoIdx.forEach((i, k) => {
@@ -194,9 +202,7 @@ export function kpiCellHtml(label, value, span, cols) {
   return `<td class="kpi kpi-text"${span}><div class="kpi-stack"><div class="kpi-label">${labelHtml}</div><div class="kpi-value kpi-long">${valueHtml}</div></div></td>`;
 }
 
-export function formatInsightsHtml(html) {
-  if (!html) return '';
-  if (/mn-kpis/.test(html) && /kpi-value/.test(html)) return html;
+function textosDeInsight(html) {
   const texts = [];
   const re = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
   let m;
@@ -204,10 +210,13 @@ export function formatInsightsHtml(html) {
     const t = m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     if (t && !/painel de insights/i.test(t)) texts.push(t);
   }
-  if (!texts.length) {
-    const plain = String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    if (plain && !/painel de insights/i.test(plain)) texts.push(plain);
-  }
+  if (texts.length) return texts;
+  const plain = String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (plain && !/painel de insights/i.test(plain)) texts.push(plain);
+  return texts;
+}
+
+function itensDeInsight(texts) {
   const items = [];
   texts.forEach((text) => {
     const parts = /[|•]/.test(text)
@@ -215,11 +224,13 @@ export function formatInsightsHtml(html) {
       : [text];
     parts.forEach((part) => {
       const par = parseInsightPart(part);
-      if (!par) return;
-      items.push(par);
+      if (par) items.push(par);
     });
   });
-  if (!items.length) return html;
+  return items;
+}
+
+function tabelaDeInsights(items) {
   const cols = items.length <= 3 ? Math.max(items.length, 1) : 3;
   let out = '<table class="mn-kpis"><tbody>';
   for (let i = 0; i < items.length; i += cols) {
@@ -233,6 +244,14 @@ export function formatInsightsHtml(html) {
   }
   out += '</tbody></table>';
   return out;
+}
+
+export function formatInsightsHtml(html) {
+  if (!html) return '';
+  if (/mn-kpis/.test(html) && /kpi-value/.test(html)) return html;
+  const items = itensDeInsight(textosDeInsight(html));
+  if (!items.length) return html;
+  return tabelaDeInsights(items);
 }
 
 export function block(title, inner, extraClass = 'mn-legacy', intro = '') {
@@ -251,7 +270,7 @@ export function chartBlock(subtitle, inner, note = '') {
   return `<div class="mn-chart">${title}${noteHtml}${inner}</div>`;
 }
 
-export function buildHtml(extracted) {
+function secoesDoRelatorio(extracted) {
   const parts = [];
   const nome = extracted.desempenho.nome
     ? `<p class="mn-aluno-nome">${escapeHtml(extracted.desempenho.nome)}</p>`
@@ -272,19 +291,27 @@ export function buildHtml(extracted) {
   parts.push(block('Painel de Insights', formatInsightsHtml(extracted.progresso.insights || ''), 'mn-sec-insights'));
   parts.push(block('Desempenho em questões', extracted.questoes.panorama || ''));
   parts.push(block('Performance por assunto', injectTableColgroups(extracted.questoes.assuntos || ''), 'mn-sec-table'));
-  if (extracted.aluno.revisoes && extracted.aluno.revisoes.trim()) {
-    let revisoesHtml = extracted.aluno.revisoes;
-    if (extracted.aluno.revisoesRows === 0 && !/mn-empty/.test(revisoesHtml)) {
-      revisoesHtml += '<p class="mn-empty">Nenhuma revisão registrada neste período.</p>';
-    }
-    parts.push(block('Revisões no período', injectTableColgroups(revisoesHtml), 'mn-sec-table'));
-  }
+  parts.push(secaoRevisoes(extracted));
   parts.push(block(
     'Histórico completo',
     injectTableColgroups(extracted.horas.historico || ''),
     'mn-sec-table',
     'Confira o histórico completo de horas cronometradas no período.',
   ));
+  return parts.filter(Boolean);
+}
+
+function secaoRevisoes(extracted) {
+  if (!extracted.aluno.revisoes || !extracted.aluno.revisoes.trim()) return '';
+  let revisoesHtml = extracted.aluno.revisoes;
+  if (extracted.aluno.revisoesRows === 0 && !/mn-empty/.test(revisoesHtml)) {
+    revisoesHtml += '<p class="mn-empty">Nenhuma revisão registrada neste período.</p>';
+  }
+  return block('Revisões no período', injectTableColgroups(revisoesHtml), 'mn-sec-table');
+}
+
+export function buildHtml(extracted) {
+  const parts = secoesDoRelatorio(extracted);
 
   return `<!DOCTYPE html>
 <html lang="pt-BR" data-theme="light">

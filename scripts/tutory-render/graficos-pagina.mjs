@@ -23,7 +23,7 @@ export const browserChartUtils = () => {
         // Chart.js v2: update(0) redesenha sem animação
         if (typeof chart.update === 'function') chart.update(0);
         n++;
-      } catch (e) {}
+      } catch {}
     }
     return n;
   }
@@ -38,47 +38,40 @@ export const browserChartUtils = () => {
 
 /** Remove rótulos de % em gráficos de horas (pizza/barras). O diário ganha horas nos vértices. */
 export function stripPercentFromHoursCharts() {
-  const hideIds = new Set([
-    'chart_top_disciplinas',
-    'chart_pizza_modalidades',
-  ]);
-  if (!window.Chart || !Chart.instances) return 0;
-  let n = 0;
-  for (const k of Object.keys(Chart.instances)) {
-    const inst = Chart.instances[k];
-    const chart = inst.chart || inst;
-    const canvas = inst.canvas || (chart && chart.canvas) || (inst.ctx && inst.ctx.canvas);
-    const id = canvas && canvas.id ? canvas.id : '';
-    if (!hideIds.has(id) || !chart || !chart.options) continue;
-
+  function ocultarRotuloDePercentual(chart) {
+    const vazio = { display: false, formatter() { return ''; } };
     chart.options.plugins = chart.options.plugins || {};
-    chart.options.plugins.datalabels = Object.assign({}, chart.options.plugins.datalabels || {}, {
-      display: false,
-      formatter: function () {
-        return '';
-      },
-    });
-    // Plugin datalabels no Chart.js v2 também lê options.datalabels
-    chart.options.datalabels = Object.assign({}, chart.options.datalabels || {}, {
-      display: false,
-      formatter: function () {
-        return '';
-      },
-    });
+    chart.options.plugins.datalabels = Object.assign({}, chart.options.plugins.datalabels || {}, vazio);
+    chart.options.datalabels = Object.assign({}, chart.options.datalabels || {}, vazio);
+  }
 
+  function limparEixoDeHoras(chart) {
     const scales = chart.options.scales || {};
     for (const key of ['xAxes', 'yAxes']) {
       const axes = scales[key];
       if (!Array.isArray(axes)) continue;
       for (const axis of axes) {
-        if (!axis || !axis.ticks) continue;
-        if (typeof axis.ticks.callback === 'function') {
-          axis.ticks.callback = function (value) {
-            return value;
-          };
-        }
+        if (!axis || !axis.ticks || typeof axis.ticks.callback !== 'function') continue;
+        axis.ticks.callback = function (value) { return value; };
       }
     }
+  }
+
+  function idDoCanvas(inst, chart) {
+    const canvas = inst.canvas || (chart && chart.canvas) || (inst.ctx && inst.ctx.canvas);
+    return canvas && canvas.id ? canvas.id : '';
+  }
+
+  const hideIds = new Set(['chart_top_disciplinas', 'chart_pizza_modalidades']);
+  if (!window.Chart || !Chart.instances) return 0;
+  let n = 0;
+  for (const k of Object.keys(Chart.instances)) {
+    const inst = Chart.instances[k];
+    const chart = inst.chart || inst;
+    const id = idDoCanvas(inst, chart);
+    if (!hideIds.has(id) || !chart || !chart.options) continue;
+    ocultarRotuloDePercentual(chart);
+    limparEixoDeHoras(chart);
     n += 1;
   }
   return n;
@@ -100,14 +93,7 @@ export function labelHoursOnChartVertices() {
     return `${txt}h`;
   }
 
-  let n = 0;
-  for (const k of Object.keys(Chart.instances)) {
-    const inst = Chart.instances[k];
-    const chart = inst.chart || inst;
-    const canvas = inst.canvas || (chart && chart.canvas) || (inst.ctx && inst.ctx.canvas);
-    const id = canvas && canvas.id ? canvas.id : '';
-    if (!hoursIds.has(id) || !chart || !chart.options) continue;
-
+  function rotularGrafico(chart) {
     const labels = {
       display: true,
       clamp: true,
@@ -147,6 +133,20 @@ export function labelHoursOnChartVertices() {
         bottom: Math.max(Number(base.bottom) || 0, 18),
       });
     }
+  }
+
+  function idDoCanvas(inst, chart) {
+    const canvas = inst.canvas || (chart && chart.canvas) || (inst.ctx && inst.ctx.canvas);
+    return canvas && canvas.id ? canvas.id : '';
+  }
+
+  let n = 0;
+  for (const k of Object.keys(Chart.instances)) {
+    const inst = Chart.instances[k];
+    const chart = inst.chart || inst;
+    const id = idDoCanvas(inst, chart);
+    if (!hoursIds.has(id) || !chart || !chart.options) continue;
+    rotularGrafico(chart);
     n += 1;
   }
   return n;
