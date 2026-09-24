@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import puppeteer from 'puppeteer';
+import { logError, logInfo } from './cli-log.mjs';
 import { buildHtml, headerPeriodoHtml } from './tutory-compose/montar-html.mjs';
 import {
   extractAluno,
@@ -54,7 +55,7 @@ const cookieHeader = arg('cookie', '');
 const token = arg('token', '');
 
 if (!out || Object.values(urls).some((u) => !u)) {
-  console.error(
+  logError(
     'Uso: node scripts/tutory-compose-pdf.mjs --out FILE'
     + ' --url-desempenho URL --url-aluno URL --url-horas-liquidas URL'
     + ' --url-questoes URL --url-progresso URL [--cookie PHPSESSID=..] [--token TOKEN] [--rotulo-periodo TEXTO]',
@@ -86,7 +87,7 @@ async function preparePage(browser) {
     Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt'] });
     try {
       localStorage.setItem('theme', 'light');
-    } catch (e) {}
+    } catch {}
   });
 
   if (cookieHeader) {
@@ -164,14 +165,14 @@ try {
     </div>`,
     margin: { top: '34mm', right: '16mm', bottom: '18mm', left: '16mm' },
   });
-  try { fs.unlinkSync(tmpHtml); } catch (_) {}
+  try { fs.unlinkSync(tmpHtml); } catch {}
 
   const bytes = fs.statSync(outAbs).size;
   if (bytes < 2000) {
     throw new Error(`PDF consolidado vazio (${bytes} bytes)`);
   }
 
-  console.log(JSON.stringify({
+  logInfo(JSON.stringify({
     ok: true,
     out: outAbs,
     bytes,
@@ -190,7 +191,7 @@ try {
     },
   }));
 } catch (err) {
-  console.error(JSON.stringify({
+  logError(JSON.stringify({
     ok: false,
     error: String(err && err.message ? err.message : err),
     model: 'consolidado',

@@ -18,11 +18,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import puppeteer from 'puppeteer';
+import { logError, logInfo } from './cli-log.mjs';
 import { swapAmericanDatesInPdf } from './tutory-render/pdf-datas-americanas.mjs';
 import { prepararPagina } from './tutory-render/preparar-pagina.mjs';
-import {
-  aplicarDatasBrasileiras,
-} from './tutory-render/datas-pagina.mjs';
+import { funcoesDatasPagina } from './tutory-render/datas-pagina.mjs';
+import { avaliarNaPagina } from './avaliar-pagina.mjs';
 import {
   labelHoursOnChartVertices,
   stripPercentFromHoursCharts,
@@ -42,7 +42,7 @@ const cookieHeader = arg('cookie', '');
 const token = arg('token', '');
 
 if (!url || !out) {
-  console.error('Uso: node scripts/tutory-render-pdf.mjs --url URL --out FILE [--model questoes|progresso|aluno|horas-liquidas|desempenho] [--cookie PHPSESSID=..] [--token TOKEN]');
+  logError('Uso: node scripts/tutory-render-pdf.mjs --url URL --out FILE [--model questoes|progresso|aluno|horas-liquidas|desempenho] [--cookie PHPSESSID=..] [--token TOKEN]');
   process.exit(1);
 }
 
@@ -78,7 +78,7 @@ try {
   let filename = path.basename(outAbs);
 
   try {
-    await page.evaluate(aplicarDatasBrasileiras);
+    await avaliarNaPagina(page, funcoesDatasPagina);
     if (model === 'desempenho') {
       await page.evaluate(() => {
         const btn = document.getElementById('btn_download');
@@ -91,10 +91,6 @@ try {
       await page.evaluate(stripPercentFromHoursCharts);
       await page.evaluate(labelHoursOnChartVertices);
       await page.evaluate((reportModel) => {
-      if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
-        throw new Error('PDFWriter não encontrado na página');
-      }
-
       function findChartByCanvasId(id) {
         if (!window.Chart || !Chart.instances) return null;
         for (const k of Object.keys(Chart.instances)) {
@@ -104,72 +100,76 @@ try {
         }
         return null;
       }
-
-      if (reportModel === 'progresso') {
-        const horas = findChartByCanvasId('chart_horas_diarias');
-        const horasLabels = horas && horas.data && horas.data.labels ? horas.data.labels.length : 0;
+      function rotulosDoGrafico(id) {
+        const chart = findChartByCanvasId(id);
+        if (!chart || !chart.data || !chart.data.labels) return 0;
+        return chart.data.labels.length;
+      }
+      function validarProgresso() {
+        const horasLabels = rotulosDoGrafico('chart_horas_diarias');
         if (horasLabels < 7) {
           throw new Error(`chart_horas_diarias incompleto (labels=${horasLabels}, esperado >= 7 diários)`);
         }
-        const top = findChartByCanvasId('chart_top_disciplinas');
-        if (!top || !top.data || !top.data.labels || top.data.labels.length < 1) {
+        if (rotulosDoGrafico('chart_top_disciplinas') < 1) {
           throw new Error('chart_top_disciplinas ausente (página 2 Panorama)');
         }
-        const tx = findChartByCanvasId('chart_tx_acerto');
-        if (!tx || !tx.data || !tx.data.labels || tx.data.labels.length < 2) {
+        if (rotulosDoGrafico('chart_tx_acerto') < 2) {
           throw new Error('chart_tx_acerto incompleto (página 4)');
         }
-      } else if (reportModel === 'questoes') {
+      }
+      function validarAntesDeGerar(modelo) {
+        if (modelo === 'progresso') {
+          validarProgresso();
+          return;
+        }
+        if (modelo !== 'questoes') return;
         const panoramaOk = document.querySelectorAll('.main-numbers h3').length >= 3;
         const assuntosOk = document.querySelectorAll('#tabela_questoes tbody tr').length > 0;
         if (!panoramaOk || !assuntosOk) {
           throw new Error(`Seções incompletas no DOM (panorama=${panoramaOk}, assuntos=${assuntosOk})`);
         }
       }
-
-      // freeze before snapshot into jsPDF
-      if (window.Chart && Chart.instances) {
+      function congelarGraficos() {
+        if (!window.Chart || !Chart.instances) return;
         for (const k of Object.keys(Chart.instances)) {
           const inst = Chart.instances[k];
           const chart = inst.chart || inst;
           try {
             if (chart.options) chart.options.animation = false;
             if (typeof chart.update === 'function') chart.update(0);
-          } catch (e) {}
+          } catch {}
         }
       }
-
-      // Bug do painel: PDFWriter usa section-4-3 duas vezes na pág 5;
-      // a evolução deve usar section-4-4 ("Por fim, vamos analisar...").
-      if (reportModel === 'progresso' && typeof PDFWriter.start === 'function') {
+      function corrigirSecaoEvolucao() {
+        if (reportModel !== 'progresso' || typeof PDFWriter.start !== 'function') return;
         let src = PDFWriter.start.toString();
         let seen = 0;
         src = src.replace(/\$\(\s*['"]\.section-4-3['"]\s*\)/g, (m) => {
           seen += 1;
           return seen === 2 ? "$('.section-4-4')" : m;
         });
-        if (seen >= 2) {
-          // eslint-disable-next-line no-eval
-          PDFWriter.start = eval('(' + src + ')');
-        }
+        if (seen >= 2) PDFWriter.start = eval('(' + src + ')');
       }
-
-      // addChart seguro: não aborta o PDF inteiro se um canvas ainda estiver 0x0
-      if (typeof PDFWriter.addChart === 'function' && !PDFWriter.__safeAddChart) {
+      function protegerAddChart() {
+        if (typeof PDFWriter.addChart !== 'function' || PDFWriter.__safeAddChart) return;
         const originalAddChart = PDFWriter.addChart.bind(PDFWriter);
         PDFWriter.addChart = function safeAddChart(chart, y) {
-          if (!chart || !(chart.width > 0) || !(chart.height > 0)) {
-            return 0;
-          }
+          if (!chart || !(chart.width > 0) || !(chart.height > 0)) return 0;
           try {
             return originalAddChart(chart, y);
-          } catch (e) {
+          } catch {
             return 0;
           }
         };
         PDFWriter.__safeAddChart = true;
       }
-
+      if (typeof PDFWriter === 'undefined' || !PDFWriter.start) {
+        throw new Error('PDFWriter não encontrado na página');
+      }
+      validarAntesDeGerar(reportModel);
+      congelarGraficos();
+      corrigirSecaoEvolucao();
+      protegerAddChart();
       PDFWriter.start();
       if (!PDFWriter.doc || typeof PDFWriter.doc.save !== 'function') {
         throw new Error('jsPDF não inicializado após PDFWriter.start()');
@@ -188,7 +188,7 @@ try {
   } catch (downloadErr) {
     // Fallback base64 (NÃO usar page.pdf — gráficos saem errados)
     try {
-      await page.evaluate(aplicarDatasBrasileiras);
+      await avaliarNaPagina(page, funcoesDatasPagina);
       let pdfBase64;
       if (model === 'desempenho') {
         pdfBase64 = await page.evaluate(async () => {
@@ -237,7 +237,7 @@ try {
             try {
               if (chart.options) chart.options.animation = false;
               if (typeof chart.update === 'function') chart.update(0);
-            } catch (e) {}
+            } catch {}
           }
         }
         return await new Promise((resolve, reject) => {
@@ -300,7 +300,7 @@ try {
     throw new Error(`PDF sem jsPDF (provável captura incompleta; images=${imageCount})`);
   }
 
-  console.log(JSON.stringify({
+  logInfo(JSON.stringify({
     ok: true,
     out: outAbs,
     bytes: finalBuf.length,
@@ -313,7 +313,7 @@ try {
     imageCount,
   }));
 } catch (err) {
-  console.error(JSON.stringify({ ok: false, error: String(err && err.message ? err.message : err), model }));
+  logError(JSON.stringify({ ok: false, error: String(err && err.message ? err.message : err), model }));
   process.exit(1);
 } finally {
   await browser.close();

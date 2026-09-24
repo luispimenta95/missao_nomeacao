@@ -6,7 +6,7 @@
 //   - quality/no-direct-data-access is omitted: persistence is PHP
 //     Eloquent, and no JavaScript module exports a database client
 //   - import-x zones are omitted: the JS surface has no layer boundary
-//   - the console "off" override is omitted: there is no log adapter
+//   - quality/no-direct-console points at scripts/cli-log.mjs and is off only there
 import js from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
@@ -34,39 +34,32 @@ export default defineConfig([
     rules: {
       "no-empty": ["error", { allowEmptyCatch: true }],
       "no-var": "error",
-      // baseline: 1
-      "prefer-const": "warn",
-      // baseline: 19
+      "prefer-const": "error",
       "no-unused-vars": [
-        "warn",
+        "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
-      // baseline: 17
-      complexity: ["warn", 12],
-      // baseline: 3
-      "max-depth": ["warn", 4],
-      // baseline: 10
-      "max-statements": ["warn", 20],
-      "max-params": ["warn", 4],
-      // baseline: 3
+      complexity: ["error", 12],
+      "max-depth": ["error", 4],
+      "max-statements": ["error", 20],
+      "max-params": ["error", 4],
       "max-lines-per-function": [
-        "warn",
+        "error",
         { max: 150, skipBlankLines: true, skipComments: true },
       ],
-      "max-nested-callbacks": ["warn", 3],
-      // Two known offenders, kept out of the gate. The budget stays 350.
-      "quality/max-lines": [
-        "error",
-        {
-          max: 350,
-          ignore: [],
-        },
-      ],
+      "max-nested-callbacks": ["error", 3],
+      "quality/max-lines": ["error", { max: 350 }],
       // baseline: 6
       "quality/no-direct-console": [
-        "warn",
-        { logger: "the project logging helper" },
+        "error",
+        { logger: "scripts/cli-log.mjs" },
       ],
+    },
+  },
+  {
+    files: ["scripts/cli-log.mjs"],
+    rules: {
+      "quality/no-direct-console": "off",
     },
   },
   {
