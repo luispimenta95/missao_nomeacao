@@ -5,6 +5,7 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
+        "vuln": "npm audit",
         "tutory:pdf": "node scripts/tutory-render-pdf.mjs",
         "tutory:compose": "node scripts/tutory-compose-pdf.mjs"
     },
