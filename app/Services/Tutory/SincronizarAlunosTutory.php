@@ -10,7 +10,8 @@ use Throwable;
  * Espelha alunos ativos da Tutory na tabela local.
  *
  * Nome da Tutory prevalece. E-mail da Tutory prevalece se o aluno já existir.
- * recebe_email fica sempre true. Nome é único: duplicidade só é logada.
+ * recebe_email e ativo ficam sempre true: o valor obrigatório vem da Tutory.
+ * Nome é único: duplicidade só é logada.
  * O cadastro "Aluno teste" da Tutory é ignorado e não entra na tabela local.
  */
 class SincronizarAlunosTutory
@@ -176,6 +177,7 @@ class SincronizarAlunosTutory
                 'nome' => $origem['nome'],
                 'email' => $origem['email'],
                 'recebe_email' => true,
+                'ativo' => true,
             ]);
         } catch (Throwable $exc) {
             $this->log("Falha ao cadastrar {$origem['nome']}: ".$exc->getMessage());
@@ -224,6 +226,11 @@ class SincronizarAlunosTutory
 
         if (! $aluno->recebe_email) {
             $aluno->recebe_email = true;
+            $mudou = true;
+        }
+
+        if (! $aluno->ativo) {
+            $aluno->ativo = true;
             $mudou = true;
         }
 

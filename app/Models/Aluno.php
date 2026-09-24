@@ -19,6 +19,7 @@ class Aluno extends Model
         'nome',
         'email',
         'recebe_email',
+        'ativo',
         'last_performance',
         'last_performance_codigo',
         'last_question_volume',
@@ -43,6 +44,7 @@ class Aluno extends Model
 
     protected $casts = [
         'recebe_email' => 'boolean',
+        'ativo' => 'boolean',
         'assuntos_detalhe' => 'array',
         'ultimo_contato_em' => 'datetime',
         'proximo_contato_em' => 'date',
