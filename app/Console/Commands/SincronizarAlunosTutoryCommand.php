@@ -10,7 +10,7 @@ class SincronizarAlunosTutoryCommand extends Command
 {
     protected $signature = 'tutory:sincronizar-alunos';
 
-    protected $description = 'Entra na Tutory, pesquisa alunos ativos e cadastra/atualiza a tabela alunos (recebe_email=true)';
+    protected $description = 'Entra na Tutory, pesquisa alunos ativos e inativos e atualiza a tabela alunos (recebe_email=true, ativo conforme a Tutory)';
 
     public function handle(): int
     {
