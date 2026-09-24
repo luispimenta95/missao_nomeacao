@@ -1,0 +1,14 @@
+scan:
+  scanners:
+    - vuln
+    - secret
+    - misconfig
+  skip-dirs:
+    - vendor
+    - node_modules
+    - public/build
+    - storage
+    - bootstrap/cache
+severity:
+  - HIGH
+  - CRITICAL

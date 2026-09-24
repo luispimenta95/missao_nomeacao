@@ -1,0 +1,22 @@
+name: Trivy
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Varredura do repositório
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          trivy-config: trivy.yaml
+          exit-code: "0"
