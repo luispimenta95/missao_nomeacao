@@ -59,9 +59,7 @@ export default defineConfig([
         "error",
         {
           max: 350,
-          ignore: [
-            "scripts/tutory-render-pdf.mjs",
-          ],
+          ignore: [],
         },
       ],
       // baseline: 6
