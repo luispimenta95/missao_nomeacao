@@ -60,7 +60,6 @@ export default defineConfig([
         {
           max: 350,
           ignore: [
-            "scripts/tutory-compose-pdf.mjs",
             "scripts/tutory-render-pdf.mjs",
           ],
         },
