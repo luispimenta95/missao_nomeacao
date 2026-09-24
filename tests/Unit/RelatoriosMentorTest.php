@@ -80,9 +80,7 @@ class RelatoriosMentorTest extends TestCase
 
     public function test_script_de_composicao_extrai_as_secoes_pedidas(): void
     {
-        $script = base_path('scripts/tutory-compose-pdf.mjs');
-        $this->assertFileExists($script);
-        $src = (string) file_get_contents($script);
+        $src = $this->fonteDoCompositor();
 
         $this->assertStringContainsString('.main-header-card', $src);
         $this->assertStringContainsString('.metrics-grid', $src);
@@ -409,7 +407,7 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('__DATALABEL_COUNT_BAR__', $php);
         $this->assertStringContainsString('$isHours ? \'__DATALABEL_HOURS__\' : \'__DATALABEL_VALUE__\'', $php);
 
-        $script = (string) file_get_contents(base_path('scripts/tutory-compose-pdf.mjs'));
+        $script = $this->fonteDoCompositor();
         $this->assertStringContainsString('labelHoursOnChartVertices', $script);
         $this->assertStringContainsString('chart_horas_diarias', $script);
         $this->assertStringContainsString('chart_line_comparativo', $script);
@@ -549,5 +547,17 @@ class RelatoriosMentorTest extends TestCase
         $ref = new ReflectionClass($downloader);
 
         return $ref->getMethod($metodo)->invoke($downloader, $arquivo);
+    }
+
+    private function fonteDoCompositor(): string
+    {
+        $entrada = base_path('scripts/tutory-compose-pdf.mjs');
+        $this->assertFileExists($entrada);
+        $src = (string) file_get_contents($entrada);
+        foreach (glob(base_path('scripts/tutory-compose/*.mjs')) ?: [] as $modulo) {
+            $src .= "\n".(string) file_get_contents($modulo);
+        }
+
+        return $src;
     }
 }
