@@ -53,7 +53,7 @@ class DashboardAcompanhamentoTest extends TestCase
     public function test_dashboard_filtra_inativos_e_ordena_como_a_tela_de_alunos(): void
     {
         $user = User::factory()->create();
-        $this->aluno(['nome' => 'Ana Inativa', 'ativo' => false]);
+        $ana = $this->aluno(['nome' => 'Ana Inativa', 'ativo' => false]);
         $this->aluno(['nome' => 'Zeca Ativo', 'ativo' => true]);
         $this->aluno(['nome' => 'Bruno Ativo', 'ativo' => true]);
 
@@ -71,9 +71,11 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertTrue($posBruno < $posZeca && $posZeca < $posAna);
 
         $soInativos = $this->actingAs($user)
-            ->get(route('admin.dashboard', ['situacao' => 'todas', 'status' => 'inativos']))
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'status' => 'inativos', 'aluno' => $ana->id]))
             ->assertOk()
             ->assertSee('Ana Inativa')
+            ->assertSee('text-gray-700">Plano de estudos encerrado', false)
+            ->assertSee('text-gray-700">'."\n".'                Plano de estudos encerrado', false)
             ->assertDontSee('Bruno Ativo')
             ->assertDontSee('Zeca Ativo');
     }

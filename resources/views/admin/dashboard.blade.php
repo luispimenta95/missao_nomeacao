@@ -184,12 +184,16 @@ use App\Enums\FocoAcompanhamento;
                 <tbody class="divide-y divide-gray-100">
                     @forelse($linhas as $linha)
                     @php
-                    $estilo = match ($linha->ficha->acao) {
-                    AcaoAcompanhamento::Intervir => 'bg-red-100 text-red-800',
-                    AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
-                    AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
-                    AcaoAcompanhamento::Ok => 'bg-gray-100 text-gray-700',
-                    };
+                    $planoEncerrado = ! $linha->aluno->ativo;
+                    $estilo = $planoEncerrado
+                        ? 'bg-gray-100 text-gray-700'
+                        : match ($linha->ficha->acao) {
+                        AcaoAcompanhamento::Intervir => 'bg-red-100 text-red-800',
+                        AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
+                        AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
+                        AcaoAcompanhamento::Ok => 'bg-gray-100 text-gray-700',
+                        };
+                    $rotuloAcao = $planoEncerrado ? 'Plano de estudos encerrado' : $linha->ficha->acao->rotulo();
                     $urlLinha = $consulta->url(['aluno' => $linha->aluno->id, 'page' => $paginacao['pagina']]);
                     @endphp
                     <tr data-acao="{{ $linha->ficha->acao->value }}" data-aluno="{{ $linha->aluno->id }}" class="cursor-pointer {{ $aberta && $aberta->aluno->id === $linha->aluno->id ? 'bg-gray-50' : 'hover:bg-gray-50' }}" onclick="window.location='{{ $urlLinha }}'">
@@ -200,7 +204,7 @@ use App\Enums\FocoAcompanhamento;
                             </a>
                         </td>
                         <td class="px-4 py-4">
-                            <span class="inline-flex rounded px-2 py-1 text-xs font-medium {{ $estilo }}">{{ $linha->ficha->acao->rotulo() }}</span>
+                            <span class="inline-flex rounded px-2 py-1 text-xs font-medium {{ $estilo }}">{{ $rotuloAcao }}</span>
                         </td>
                         <td class="max-w-xs px-4 py-4 text-sm text-gray-700">
                             {{ $linha->ficha->motivoPrincipal()?->texto }}

@@ -3,12 +3,16 @@
     use App\Enums\TendenciaFaixa;
     use App\Services\Acompanhamento\TextoAcompanhamento;
 
-    $estilo = match ($linha->ficha->acao) {
-        AcaoAcompanhamento::Intervir => 'bg-red-100 text-red-800',
-        AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
-        AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
-        AcaoAcompanhamento::Ok => 'bg-gray-100 text-gray-700',
-    };
+    $planoEncerrado = ! $linha->aluno->ativo;
+    $estilo = $planoEncerrado
+        ? 'bg-gray-100 text-gray-700'
+        : match ($linha->ficha->acao) {
+            AcaoAcompanhamento::Intervir => 'bg-red-100 text-red-800',
+            AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
+            AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
+            AcaoAcompanhamento::Ok => 'bg-gray-100 text-gray-700',
+        };
+    $rotuloAcao = $planoEncerrado ? 'Plano de estudos encerrado' : $linha->ficha->acao->rotulo();
     $temPonte = collect($linha->ficha->motivos)->contains(fn ($motivo) => $motivo->ponteProtocoloResgate);
 @endphp
 
@@ -29,7 +33,7 @@
     <div class="flex-1 space-y-6 overflow-y-auto px-5 py-5">
         <div class="flex items-center justify-between gap-3">
             <span data-acao-ficha="{{ $linha->ficha->acao->value }}" class="inline-flex items-center gap-2 rounded px-3 py-1 text-sm font-medium {{ $estilo }}">
-                {{ $linha->ficha->acao->rotulo() }}
+                {{ $rotuloAcao }}
             </span>
             <span class="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">{{ $linha->situacao->rotulo() }}</span>
         </div>
