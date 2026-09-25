@@ -106,7 +106,13 @@ class DashboardAcompanhamentoTest extends TestCase
             'last_performance_codigo' => 'critico',
         ]);
         $this->aluno(['nome' => 'Bruno Ok', 'ativo' => true]);
-        $this->aluno(['nome' => 'Bruno Ok Inativo', 'ativo' => false]);
+        $this->aluno(['nome' => 'Jhullya', 'ativo' => true]);
+        $this->aluno([
+            'nome' => 'Karol',
+            'ativo' => true,
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
 
         $html = $this->actingAs($user)
             ->get(route('admin.dashboard', ['situacao' => 'todas']))
@@ -119,10 +125,15 @@ class DashboardAcompanhamentoTest extends TestCase
         $posParabenizar = strpos($html, 'Zeca Parabens');
         $posIntervir = strpos($html, 'Ana Intervir');
         $posOk = strpos($html, 'Bruno Ok');
+        $posKarol = strpos($html, 'Karol');
+        $posJhullya = strpos($html, 'Jhullya');
         $this->assertNotFalse($posParabenizar);
         $this->assertNotFalse($posIntervir);
         $this->assertNotFalse($posOk);
-        $this->assertTrue($posParabenizar < $posIntervir && $posIntervir < $posOk);
+        $this->assertNotFalse($posKarol);
+        $this->assertNotFalse($posJhullya);
+        $this->assertTrue($posIntervir < $posParabenizar && $posParabenizar < $posOk);
+        $this->assertTrue($posKarol < $posJhullya);
     }
 
     public function test_perfil_da_mentora_nao_entra_no_dashboard(): void
