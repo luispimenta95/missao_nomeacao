@@ -204,6 +204,12 @@ class DashboardController extends Controller
             $base = $base->reject(fn (LinhaPainel $linha) => $linha->somenteAgenda)->values();
         }
 
+        if ($consulta->status === 'ativos') {
+            $base = $base->filter(fn (LinhaPainel $linha) => $linha->aluno->ativo)->values();
+        } elseif ($consulta->status === 'inativos') {
+            $base = $base->filter(fn (LinhaPainel $linha) => ! $linha->aluno->ativo)->values();
+        }
+
         if ($consulta->busca !== '') {
             $termo = mb_strtolower($consulta->busca);
             $base = $base->filter(fn (LinhaPainel $linha) => str_contains(mb_strtolower($linha->aluno->nome), $termo))->values();
@@ -256,6 +262,15 @@ class DashboardController extends Controller
         $visiveis = $consulta->acao === null
             ? $naSituacao
             : $naSituacao->filter(fn (LinhaPainel $linha) => $linha->ficha->acao === $consulta->acao)->values();
+
+        $visiveis = $visiveis->sort(static function (LinhaPainel $a, LinhaPainel $b): int {
+            $status = ((int) $b->aluno->ativo) <=> ((int) $a->aluno->ativo);
+            if ($status !== 0) {
+                return $status;
+            }
+
+            return strcasecmp($a->aluno->nome, $b->aluno->nome);
+        })->values();
 
         return [$visiveis, $contagens];
     }
