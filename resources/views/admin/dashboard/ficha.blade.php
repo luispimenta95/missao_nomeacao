@@ -12,7 +12,7 @@
             AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
             AcaoAcompanhamento::Ok => 'bg-gray-100 text-gray-700',
         };
-    $rotuloAcao = $planoEncerrado ? 'Plano de estudos encerrado' : $linha->ficha->acao->rotulo();
+    $rotuloAcao = $planoEncerrado ? 'Restabelecer contato' : $linha->ficha->acao->rotulo();
     $temPonte = collect($linha->ficha->motivos)->contains(fn ($motivo) => $motivo->ponteProtocoloResgate);
 @endphp
 
@@ -41,16 +41,22 @@
         <section>
             <h3 class="text-sm font-semibold text-gray-700">Por quê?</h3>
             <ul class="mt-3 space-y-2">
-                @foreach($linha->ficha->motivos as $motivo)
-                    <li data-motivo="{{ $motivo->tipo->value }}" class="text-sm text-gray-700">
-                        <span class="mr-2 text-primary-light">◆</span>{{ $motivo->texto }}
-                        @if($motivo->ponteProtocoloResgate)
-                            <span class="mt-1 block pl-5 text-xs font-medium text-primary-light">Ponte com o Protocolo de Resgate</span>
-                        @endif
+                @if($planoEncerrado)
+                    <li class="text-sm text-gray-700">
+                        <span class="mr-2 text-primary-light">◆</span>Plano de estudos encerrado
                     </li>
-                @endforeach
+                @else
+                    @foreach($linha->ficha->motivos as $motivo)
+                        <li data-motivo="{{ $motivo->tipo->value }}" class="text-sm text-gray-700">
+                            <span class="mr-2 text-primary-light">◆</span>{{ $motivo->texto }}
+                            @if($motivo->ponteProtocoloResgate)
+                                <span class="mt-1 block pl-5 text-xs font-medium text-primary-light">Ponte com o Protocolo de Resgate</span>
+                            @endif
+                        </li>
+                    @endforeach
+                @endif
             </ul>
-            @if($temPonte)
+            @if($temPonte && ! $planoEncerrado)
                 <p class="mt-3 rounded bg-primary/10 px-3 py-2 text-xs leading-5 text-primary">
                     Desempenho baixo em assunto é o ponto em que o acompanhamento encontra o Protocolo de Resgate.
                 </p>

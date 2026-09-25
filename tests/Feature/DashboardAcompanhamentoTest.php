@@ -74,8 +74,10 @@ class DashboardAcompanhamentoTest extends TestCase
             ->get(route('admin.dashboard', ['situacao' => 'todas', 'status' => 'inativos', 'aluno' => $ana->id]))
             ->assertOk()
             ->assertSee('Ana Inativa')
-            ->assertSee('text-gray-700">Plano de estudos encerrado', false)
-            ->assertSee('text-gray-700">'."\n".'                Plano de estudos encerrado', false)
+            ->assertSee('text-gray-700">Restabelecer contato', false)
+            ->assertSee('text-gray-700">'."\n".'                Restabelecer contato', false)
+            ->assertSee('Plano de estudos encerrado')
+            ->assertDontSee('Plano de estudos encerrado</span>', false)
             ->assertDontSee('Bruno Ativo')
             ->assertDontSee('Zeca Ativo');
     }
