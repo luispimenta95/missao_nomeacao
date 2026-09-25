@@ -29,7 +29,6 @@ class SincronizarAlunosTutoryTest extends TestCase
         $this->assertSame('Maria Silva', $aluno->nome);
         $this->assertSame('maria@example.com', $aluno->email);
         $this->assertTrue($aluno->recebe_email);
-        $this->assertTrue($aluno->ativo);
         $this->assertTrue(collect($logs)->contains(fn (string $m) => str_contains($m, 'Cadastrado: Maria Silva')));
     }
 
@@ -40,7 +39,6 @@ class SincronizarAlunosTutoryTest extends TestCase
             'nome' => 'Maria da Plataforma',
             'email' => 'maria@example.com',
             'recebe_email' => false,
-            'ativo' => false,
         ]);
         $logs = [];
         $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
@@ -54,7 +52,6 @@ class SincronizarAlunosTutoryTest extends TestCase
         $aluno->refresh();
         $this->assertSame('Maria Silva', $aluno->nome);
         $this->assertTrue($aluno->recebe_email);
-        $this->assertTrue($aluno->ativo);
         $this->assertTrue(collect($logs)->contains(
             fn (string $m) => str_contains($m, 'Nome divergente') && str_contains($m, 'Maria da Plataforma') && str_contains($m, 'Maria Silva')
         ));

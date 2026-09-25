@@ -33,41 +33,6 @@ class AlunoAdminTest extends TestCase
         $this->assertSame(1, Aluno::query()->count());
     }
 
-    public function test_novo_aluno_nasce_ativo_e_pode_ficar_inativo(): void
-    {
-        $user = User::factory()->create();
-
-        $this->actingAs($user)
-            ->get(route('alunos.create'))
-            ->assertOk()
-            ->assertSee('name="ativo"', false)
-            ->assertSee('checked', false);
-
-        $this->actingAs($user)
-            ->post(route('alunos.store'), [
-                'nome' => 'Giovanna',
-                'email' => 'giovanna@example.com',
-                'ativo' => '1',
-            ])
-            ->assertRedirect(route('alunos.index'));
-
-        $aluno = Aluno::query()->first();
-        $this->assertTrue($aluno->ativo);
-
-        $this->actingAs($user)
-            ->put(route('alunos.update', $aluno), [
-                'nome' => 'Giovanna',
-                'email' => 'giovanna@example.com',
-            ])
-            ->assertRedirect(route('alunos.index'));
-
-        $this->assertFalse($aluno->fresh()->ativo);
-        $this->actingAs($user)
-            ->get(route('alunos.index'))
-            ->assertOk()
-            ->assertSee('Inativo');
-    }
-
     public function test_lista_mostra_as_faixas_de_desempenho_do_aluno(): void
     {
         $user = User::factory()->create();
@@ -258,14 +223,13 @@ class AlunoAdminTest extends TestCase
 
         $linhas = $this->linhasCsv((string) $resposta->getContent());
         $this->assertSame(
-            ['Nome', 'E-mail', 'Recebe e-mail', 'Status', 'Constância', 'Questões', '% acertos', 'Assuntos'],
+            ['Nome', 'E-mail', 'Recebe e-mail', 'Constância', 'Questões', '% acertos', 'Assuntos'],
             $linhas[0]
         );
         $this->assertSame([
             'Giovanna "Silva", Jr.',
             'giovanna@example.com',
             'Sim',
-            'Ativo',
             'Brigando com a constância',
             'Volume suficiente',
             'Muito bom',
@@ -275,7 +239,6 @@ class AlunoAdminTest extends TestCase
             'Maria Souza',
             'maria@example.com',
             'Não',
-            'Ativo',
             '',
             '',
             '',
