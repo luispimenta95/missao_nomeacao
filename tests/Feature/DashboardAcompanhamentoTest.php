@@ -68,7 +68,7 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertNotFalse($posBruno);
         $this->assertNotFalse($posZeca);
         $this->assertNotFalse($posAna);
-        $this->assertTrue($posAna < $posBruno && $posBruno < $posZeca);
+        $this->assertTrue($posBruno < $posZeca && $posZeca < $posAna);
 
         $soInativos = $this->actingAs($user)
             ->get(route('admin.dashboard', ['situacao' => 'todas', 'status' => 'inativos', 'aluno' => $ana->id]))
@@ -113,6 +113,12 @@ class DashboardAcompanhamentoTest extends TestCase
             'last_performance' => 'Crítico',
             'last_performance_codigo' => 'critico',
         ]);
+        $this->aluno([
+            'nome' => 'Amanda Inativa',
+            'ativo' => false,
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
 
         $html = $this->actingAs($user)
             ->get(route('admin.dashboard', ['situacao' => 'todas']))
@@ -127,13 +133,15 @@ class DashboardAcompanhamentoTest extends TestCase
         $posOk = strpos($html, 'Bruno Ok');
         $posKarol = strpos($html, 'Karol');
         $posJhullya = strpos($html, 'Jhullya');
+        $posInativa = strpos($html, 'Amanda Inativa');
         $this->assertNotFalse($posParabenizar);
         $this->assertNotFalse($posIntervir);
         $this->assertNotFalse($posOk);
         $this->assertNotFalse($posKarol);
         $this->assertNotFalse($posJhullya);
+        $this->assertNotFalse($posInativa);
         $this->assertTrue($posIntervir < $posParabenizar && $posParabenizar < $posOk);
-        $this->assertTrue($posKarol < $posJhullya);
+        $this->assertTrue($posKarol < $posJhullya && $posJhullya < $posInativa);
     }
 
     public function test_perfil_da_mentora_nao_entra_no_dashboard(): void
