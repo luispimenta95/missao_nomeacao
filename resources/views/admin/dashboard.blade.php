@@ -193,7 +193,8 @@ use App\Enums\FocoAcompanhamento;
                         AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
                         AcaoAcompanhamento::Ok => 'bg-gray-100 text-gray-700',
                         };
-                    $rotuloAcao = $planoEncerrado ? 'Plano de estudos encerrado' : $linha->ficha->acao->rotulo();
+                    $rotuloAcao = $planoEncerrado ? 'Restabelecer contato' : $linha->ficha->acao->rotulo();
+                    $motivoPrincipal = $planoEncerrado ? 'Plano de estudos encerrado' : $linha->ficha->motivoPrincipal()?->texto;
                     $urlLinha = $consulta->url(['aluno' => $linha->aluno->id, 'page' => $paginacao['pagina']]);
                     @endphp
                     <tr data-acao="{{ $linha->ficha->acao->value }}" data-aluno="{{ $linha->aluno->id }}" class="cursor-pointer {{ $aberta && $aberta->aluno->id === $linha->aluno->id ? 'bg-gray-50' : 'hover:bg-gray-50' }}" onclick="window.location='{{ $urlLinha }}'">
@@ -207,8 +208,8 @@ use App\Enums\FocoAcompanhamento;
                             <span class="inline-flex rounded px-2 py-1 text-xs font-medium {{ $estilo }}">{{ $rotuloAcao }}</span>
                         </td>
                         <td class="max-w-xs px-4 py-4 text-sm text-gray-700">
-                            {{ $linha->ficha->motivoPrincipal()?->texto }}
-                            @if(count($linha->ficha->motivos) > 1)
+                            {{ $motivoPrincipal }}
+                            @if(! $planoEncerrado && count($linha->ficha->motivos) > 1)
                             <span class="ml-1 text-xs text-gray-500">+{{ count($linha->ficha->motivos) - 1 }}</span>
                             @endif
                         </td>
