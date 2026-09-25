@@ -50,6 +50,25 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertMatchesRegularExpression('/3\s*<\/span>\s*<span class="block text-sm text-gray-600">total de alunos/', $html);
     }
 
+    public function test_perfil_da_mentora_nao_entra_no_dashboard(): void
+    {
+        $user = User::factory()->create();
+        $this->aluno([
+            'nome' => 'Nayara Oliveira',
+            'email' => 'nayara@missaonomeacao.com.br',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        $this->aluno(['nome' => 'Maria Silva', 'ativo' => true]);
+
+        $html = $this->actingAs($user)->get(route('admin.dashboard'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('Nayara Oliveira', $html);
+        $this->assertStringContainsString('Maria Silva', $html);
+        $this->assertMatchesRegularExpression('/1\s*<\/span>\s*<span class="block text-sm text-gray-600">alunos ativos/', $html);
+        $this->assertMatchesRegularExpression('/1\s*<\/span>\s*<span class="block text-sm text-gray-600">total de alunos/', $html);
+    }
+
     public function test_hierarquia_deixa_o_aluno_somente_em_intervir_com_todos_os_motivos(): void
     {
         $user = User::factory()->create(['name' => 'Nayara Oliveira']);
