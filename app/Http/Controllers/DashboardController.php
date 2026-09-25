@@ -28,7 +28,11 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $hoje = now();
-        $alunos = Aluno::query()->orderBy('nome')->get();
+        $alunos = Aluno::query()
+            ->orderBy('nome')
+            ->get()
+            ->reject(fn (Aluno $aluno) => $aluno->isTeacher())
+            ->values();
         $linhas = $this->montador->linhas($alunos, $hoje);
         $consulta = ConsultaDashboard::fromRequest($request);
         $resumo = $this->resumo($alunos, $linhas, $hoje);

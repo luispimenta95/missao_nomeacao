@@ -205,6 +205,32 @@ class SincronizarAlunosTutoryTest extends TestCase
         $this->assertNull(Aluno::query()->where('email', 'fora@example.com')->first());
     }
 
+    public function test_sincronizacao_ignora_a_professora(): void
+    {
+        $mentora = Aluno::create([
+            'tutory_id' => '9001',
+            'nome' => 'Nayara Oliveira',
+            'email' => 'nayara@missaonomeacao.com.br',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        $sync = new SincronizarAlunosTutory(logger: static function (): void {});
+
+        $resultado = $sync->sincronizarLista([
+            ['id' => '9001', 'nome' => 'Nayara Oliveira', 'email' => 'nayara.nova@example.com'],
+            ['id' => '9002', 'nome' => 'Nayara Oliveira', 'email' => 'outra@example.com'],
+        ]);
+        $sync->atualizarInativos([
+            ['id' => '9001', 'nome' => 'Nayara Oliveira', 'email' => 'nayara@missaonomeacao.com.br'],
+        ]);
+
+        $this->assertSame(0, $resultado['criados']);
+        $this->assertSame(2, $resultado['pulados']);
+        $this->assertSame(1, Aluno::query()->count());
+        $this->assertTrue($mentora->fresh()->ativo);
+        $this->assertSame('nayara@missaonomeacao.com.br', $mentora->fresh()->email);
+    }
+
     public function test_pula_sem_email(): void
     {
         $logs = [];
