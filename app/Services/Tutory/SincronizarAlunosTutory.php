@@ -10,9 +10,7 @@ use Throwable;
  * Espelha alunos ativos da Tutory na tabela local.
  *
  * Nome da Tutory prevalece. E-mail da Tutory prevalece se o aluno já existir.
- * recebe_email fica sempre true. ativo segue o status da Tutory
- * (lista ativos = true, lista inativos = false). Sem status, o padrão é true.
- * Nome é único: duplicidade só é logada.
+ * recebe_email fica sempre true. Nome é único: duplicidade só é logada.
  * O cadastro "Aluno teste" da Tutory é ignorado e não entra na tabela local.
  */
 class SincronizarAlunosTutory
@@ -39,7 +37,7 @@ class SincronizarAlunosTutory
     {
         try {
             $this->tutory->login();
-            $lista = $this->tutory->coletarAlunos();
+            $lista = $this->tutory->coletarAlunosAtivos();
 
             return $this->sincronizarLista($lista);
         } finally {
@@ -48,7 +46,7 @@ class SincronizarAlunosTutory
     }
 
     /**
-     * @param  list<array{id?: string, nome?: string, email?: string, ativo?: bool}>  $alunosTutory
+     * @param  list<array{id?: string, nome?: string, email?: string}>  $alunosTutory
      * @return array{criados: int, atualizados: int, inalterados: int, pulados: int, total: int}
      */
     public function sincronizarLista(array $alunosTutory): array
@@ -63,7 +61,6 @@ class SincronizarAlunosTutory
                 'id' => trim((string) ($origem['id'] ?? '')),
                 'nome' => trim((string) ($origem['nome'] ?? '')),
                 'email' => mb_strtolower(trim((string) ($origem['email'] ?? ''))),
-                'ativo' => array_key_exists('ativo', $origem) ? (bool) $origem['ativo'] : true,
             ]);
             match ($resultado) {
                 'criado' => $criados++,
@@ -86,7 +83,7 @@ class SincronizarAlunosTutory
     }
 
     /**
-     * @param  array{id: string, nome: string, email: string, ativo: bool}  $origem
+     * @param  array{id: string, nome: string, email: string}  $origem
      */
     private function sincronizarUm(array $origem): string
     {
@@ -119,7 +116,7 @@ class SincronizarAlunosTutory
     }
 
     /**
-     * @param  array{id: string, nome: string, email: string, ativo: bool}  $origem
+     * @param  array{id: string, nome: string, email: string}  $origem
      */
     private function localizar(array $origem): ?Aluno
     {
@@ -145,7 +142,7 @@ class SincronizarAlunosTutory
     }
 
     /**
-     * @param  array{id: string, nome: string, email: string, ativo: bool}  $origem
+     * @param  array{id: string, nome: string, email: string}  $origem
      */
     private function cadastrar(array $origem): string
     {
@@ -179,7 +176,6 @@ class SincronizarAlunosTutory
                 'nome' => $origem['nome'],
                 'email' => $origem['email'],
                 'recebe_email' => true,
-                'ativo' => $origem['ativo'],
             ]);
         } catch (Throwable $exc) {
             $this->log("Falha ao cadastrar {$origem['nome']}: ".$exc->getMessage());
@@ -193,7 +189,7 @@ class SincronizarAlunosTutory
     }
 
     /**
-     * @param  array{id: string, nome: string, email: string, ativo: bool}  $origem
+     * @param  array{id: string, nome: string, email: string}  $origem
      */
     private function editar(Aluno $aluno, array $origem): string
     {
@@ -228,11 +224,6 @@ class SincronizarAlunosTutory
 
         if (! $aluno->recebe_email) {
             $aluno->recebe_email = true;
-            $mudou = true;
-        }
-
-        if ((bool) $aluno->ativo !== $origem['ativo']) {
-            $aluno->ativo = $origem['ativo'];
             $mudou = true;
         }
 

@@ -29,7 +29,6 @@ class SincronizarAlunosTutoryTest extends TestCase
         $this->assertSame('Maria Silva', $aluno->nome);
         $this->assertSame('maria@example.com', $aluno->email);
         $this->assertTrue($aluno->recebe_email);
-        $this->assertTrue($aluno->ativo);
         $this->assertTrue(collect($logs)->contains(fn (string $m) => str_contains($m, 'Cadastrado: Maria Silva')));
     }
 
@@ -40,7 +39,6 @@ class SincronizarAlunosTutoryTest extends TestCase
             'nome' => 'Maria da Plataforma',
             'email' => 'maria@example.com',
             'recebe_email' => false,
-            'ativo' => false,
         ]);
         $logs = [];
         $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
@@ -54,30 +52,9 @@ class SincronizarAlunosTutoryTest extends TestCase
         $aluno->refresh();
         $this->assertSame('Maria Silva', $aluno->nome);
         $this->assertTrue($aluno->recebe_email);
-        $this->assertTrue($aluno->ativo);
         $this->assertTrue(collect($logs)->contains(
             fn (string $m) => str_contains($m, 'Nome divergente') && str_contains($m, 'Maria da Plataforma') && str_contains($m, 'Maria Silva')
         ));
-    }
-
-    public function test_status_inativo_da_tutory_atualiza_o_admin(): void
-    {
-        $aluno = Aluno::create([
-            'tutory_id' => '1001',
-            'nome' => 'Maria Silva',
-            'email' => 'maria@example.com',
-            'recebe_email' => true,
-            'ativo' => true,
-        ]);
-        $sync = new SincronizarAlunosTutory(logger: static function (): void {});
-
-        $sync->sincronizarLista([
-            ['id' => '1001', 'nome' => 'Maria Silva', 'email' => 'maria@example.com', 'ativo' => false],
-            ['id' => '1002', 'nome' => 'João Lima', 'email' => 'joao@example.com', 'ativo' => false],
-        ]);
-
-        $this->assertFalse($aluno->fresh()->ativo);
-        $this->assertFalse(Aluno::query()->where('tutory_id', '1002')->first()->ativo);
     }
 
     public function test_email_da_tutory_prevalece_quando_aluno_ja_existe(): void

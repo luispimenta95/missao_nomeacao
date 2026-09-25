@@ -32,14 +32,13 @@ class AlunoController extends Controller
             ->get();
 
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['Nome', 'E-mail', 'Recebe e-mail', 'Status', 'Constância', 'Questões', '% acertos', 'Assuntos']);
+        fputcsv($handle, ['Nome', 'E-mail', 'Recebe e-mail', 'Constância', 'Questões', '% acertos', 'Assuntos']);
 
         foreach ($alunos as $aluno) {
             fputcsv($handle, [
                 $aluno->nome,
                 $aluno->email,
                 $aluno->recebe_email ? 'Sim' : 'Não',
-                $aluno->ativo ? 'Ativo' : 'Inativo',
                 $aluno->last_performance ?? '',
                 $aluno->last_question_volume ?? '',
                 $aluno->last_accuracy_rate ?? '',
@@ -70,11 +69,9 @@ class AlunoController extends Controller
             'nome' => ['required', 'string', 'max:255', Rule::unique('alunos', 'nome')],
             'email' => 'required|email|max:255|unique:alunos,email',
             'recebe_email' => 'sometimes|boolean',
-            'ativo' => 'sometimes|boolean',
         ]);
 
         $data['recebe_email'] = $request->boolean('recebe_email');
-        $data['ativo'] = $request->boolean('ativo');
 
         Aluno::create($data);
 
@@ -97,11 +94,9 @@ class AlunoController extends Controller
                 Rule::unique('alunos', 'email')->ignore($aluno->id),
             ],
             'recebe_email' => 'sometimes|boolean',
-            'ativo' => 'sometimes|boolean',
         ]);
 
         $data['recebe_email'] = $request->boolean('recebe_email');
-        $data['ativo'] = $request->boolean('ativo');
 
         $aluno->update($data);
 
