@@ -98,7 +98,7 @@ class TutoryAlunosClient
     }
 
     /**
-     * Ativos e inativos. O status da Tutory vai em `ativo`.
+     * Ativos e inativos. Na consulta da Tutory o filtro inativo é status=desativados.
      * Quem aparece nas duas listas fica inativo.
      *
      * @return list<array{id: string, nome: string, email: string, ativo: bool}>
@@ -109,7 +109,7 @@ class TutoryAlunosClient
         foreach ($this->coletarPorStatus('ativos', true) as $aluno) {
             $porId[$aluno['id']] = $aluno + ['ativo' => true];
         }
-        foreach ($this->coletarPorStatus('inativos', false) as $aluno) {
+        foreach ($this->coletarPorStatus('desativados', false) as $aluno) {
             $porId[$aluno['id']] = $aluno + ['ativo' => false];
         }
 
