@@ -50,7 +50,7 @@ class Aluno extends Model
         'proximo_contato_em' => 'date',
     ];
 
-    public function ehPerfilMentora(): bool
+    public function isTeacher(): bool
     {
         return self::normalizarNome($this->nome) === self::normalizarNome('Nayara Oliveira')
             || mb_strtolower((string) $this->email) === 'nayara@missaonomeacao.com.br';

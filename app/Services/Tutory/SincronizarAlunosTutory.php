@@ -100,6 +100,11 @@ class SincronizarAlunosTutory
 
             return 'pulado';
         }
+        if ($this->isTeacher($nomeTutory, $emailTutory)) {
+            $this->log('Perfil da mentora ignorado na sincronização: "'.$nomeTutory.'".');
+
+            return 'pulado';
+        }
         if ($this->eAlunoTeste($nomeTutory)) {
             $this->log('Aluno da Tutory ignorado: "'.$nomeTutory.'" não é cadastrado (id='.($tutoryId !== '' ? $tutoryId : '—').').');
 
@@ -268,8 +273,11 @@ class SincronizarAlunosTutory
             if ($dados['nome'] === '' || $dados['email'] === '') {
                 continue;
             }
+            if ($this->isTeacher($dados['nome'], $dados['email'])) {
+                continue;
+            }
             $aluno = $this->localizar($dados);
-            if ($aluno === null || ! $aluno->ativo) {
+            if ($aluno === null || $aluno->isTeacher() || ! $aluno->ativo) {
                 continue;
             }
             $aluno->ativo = false;
@@ -285,6 +293,11 @@ class SincronizarAlunosTutory
         }
 
         return $atualizados;
+    }
+
+    private function isTeacher(string $nome, string $email): bool
+    {
+        return (new Aluno(['nome' => $nome, 'email' => $email]))->isTeacher();
     }
 
     private function eAlunoTeste(string $nome): bool

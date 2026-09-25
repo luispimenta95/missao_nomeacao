@@ -31,7 +31,7 @@ class DashboardController extends Controller
         $alunos = Aluno::query()
             ->orderBy('nome')
             ->get()
-            ->reject(fn (Aluno $aluno) => $aluno->ehPerfilMentora())
+            ->reject(fn (Aluno $aluno) => $aluno->isTeacher())
             ->values();
         $linhas = $this->montador->linhas($alunos, $hoje);
         $consulta = ConsultaDashboard::fromRequest($request);
