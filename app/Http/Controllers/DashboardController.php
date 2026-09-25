@@ -264,12 +264,17 @@ class DashboardController extends Controller
             : $naSituacao->filter(fn (LinhaPainel $linha) => $linha->ficha->acao === $consulta->acao)->values();
 
         $visiveis = $visiveis->sort(static function (LinhaPainel $a, LinhaPainel $b): int {
-            $status = ((int) $b->aluno->ativo) <=> ((int) $a->aluno->ativo);
-            if ($status !== 0) {
-                return $status;
+            $acao = $a->ficha->acao->ordemNaLista() <=> $b->ficha->acao->ordemNaLista();
+            if ($acao !== 0) {
+                return $acao;
             }
 
-            return strcasecmp($a->aluno->nome, $b->aluno->nome);
+            $nome = strcasecmp($a->aluno->nome, $b->aluno->nome);
+            if ($nome !== 0) {
+                return $nome;
+            }
+
+            return ((int) $b->aluno->ativo) <=> ((int) $a->aluno->ativo);
         })->values();
 
         return [$visiveis, $contagens];
