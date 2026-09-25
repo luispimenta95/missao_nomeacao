@@ -20,19 +20,6 @@ enum AcaoAcompanhamento: string
     }
 
     /**
-     * Ordem da lista do dashboard: Parabenizar, Intervir, Marcar presença, Ok.
-     */
-    public function ordemNaLista(): int
-    {
-        return match ($this) {
-            self::Parabenizar => 0,
-            self::Intervir => 1,
-            self::MarcarPresenca => 2,
-            self::Ok => 3,
-        };
-    }
-
-    /**
      * Intervir > Marcar presença > Parabenizar > Ok.
      */
     public function prioridade(): int
