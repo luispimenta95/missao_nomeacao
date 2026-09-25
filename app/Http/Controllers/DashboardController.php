@@ -163,7 +163,9 @@ class DashboardController extends Controller
         $hojeDia = $hoje->format('Y-m-d');
 
         return [
-            'ativos' => $alunos->count(),
+            'ativos' => $alunos->filter(fn (Aluno $aluno) => $aluno->ativo)->count(),
+            'inativos' => $alunos->filter(fn (Aluno $aluno) => ! $aluno->ativo)->count(),
+            'total' => $alunos->count(),
             'contatados' => $alunos->filter(function (Aluno $aluno) use ($hoje, $limite) {
                 return $aluno->ultimo_contato_em !== null
                     && ! $limite->excedido(ContextoAcompanhamento::diasDesde($aluno->ultimo_contato_em, $hoje));
