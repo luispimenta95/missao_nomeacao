@@ -75,7 +75,7 @@ HTML;
             if (str_contains($url, '/index')) {
                 return Http::response("adminUser = { token: 'abc123' };", 200);
             }
-            if (str_contains($url, 'status=desativados')) {
+            if (str_contains($url, 'status=inativos')) {
                 return Http::response(
                     '<html><body><div class="pesquisa-aluno-container">'
                     .'<span class="pesquisa-aluno-nome">Inativo</span>'
