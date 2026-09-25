@@ -50,6 +50,34 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertMatchesRegularExpression('/3\s*<\/span>\s*<span class="block text-sm text-gray-600">total de alunos/', $html);
     }
 
+    public function test_dashboard_filtra_inativos_e_ordena_como_a_tela_de_alunos(): void
+    {
+        $user = User::factory()->create();
+        $this->aluno(['nome' => 'Ana Inativa', 'ativo' => false]);
+        $this->aluno(['nome' => 'Zeca Ativo', 'ativo' => true]);
+        $this->aluno(['nome' => 'Bruno Ativo', 'ativo' => true]);
+
+        $html = $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas']))
+            ->assertOk()
+            ->assertSee('Inativos')
+            ->getContent();
+        $posBruno = strpos($html, 'Bruno Ativo');
+        $posZeca = strpos($html, 'Zeca Ativo');
+        $posAna = strpos($html, 'Ana Inativa');
+        $this->assertNotFalse($posBruno);
+        $this->assertNotFalse($posZeca);
+        $this->assertNotFalse($posAna);
+        $this->assertTrue($posBruno < $posZeca && $posZeca < $posAna);
+
+        $soInativos = $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'status' => 'inativos']))
+            ->assertOk()
+            ->assertSee('Ana Inativa')
+            ->assertDontSee('Bruno Ativo')
+            ->assertDontSee('Zeca Ativo');
+    }
+
     public function test_perfil_da_mentora_nao_entra_no_dashboard(): void
     {
         $user = User::factory()->create();

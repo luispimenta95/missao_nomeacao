@@ -18,6 +18,7 @@ final class ConsultaDashboard
         public string $busca,
         public ?int $alunoId,
         public int $pagina,
+        public ?string $status,
     ) {}
 
     public static function fromRequest(Request $request): self
@@ -33,6 +34,9 @@ final class ConsultaDashboard
             busca: trim((string) $request->query('busca', '')),
             alunoId: is_numeric($aluno) ? (int) $aluno : null,
             pagina: max(1, (int) $request->query('page', 1)),
+            status: in_array($request->query('status'), ['ativos', 'inativos'], true)
+                ? (string) $request->query('status')
+                : null,
         );
     }
 
@@ -50,6 +54,7 @@ final class ConsultaDashboard
             'busca' => $this->busca !== '' ? $this->busca : null,
             'aluno' => $this->alunoId,
             'page' => $this->pagina > 1 ? $this->pagina : null,
+            'status' => $this->status,
         ];
 
         foreach ($override as $chave => $valor) {
@@ -80,6 +85,7 @@ final class ConsultaDashboard
             || $this->parametro !== null
             || $this->foco !== null
             || $this->acao !== null
-            || $this->busca !== '';
+            || $this->busca !== ''
+            || $this->status !== null;
     }
 }

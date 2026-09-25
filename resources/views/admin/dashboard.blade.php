@@ -39,9 +39,9 @@ use App\Enums\FocoAcompanhamento;
 
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         @foreach([
-        ['valor' => $resumo['ativos'], 'legenda' => 'alunos ativos', 'href' => null, 'icone' => 'users'],
-        ['valor' => $resumo['inativos'], 'legenda' => 'alunos inativos', 'href' => null, 'icone' => 'users'],
-        ['valor' => $resumo['total'], 'legenda' => 'total de alunos', 'href' => null, 'icone' => 'users'],
+        ['valor' => $resumo['ativos'], 'legenda' => 'alunos ativos', 'href' => $consulta->url(['status' => 'ativos', 'page' => null, 'aluno' => null]), 'icone' => 'users'],
+        ['valor' => $resumo['inativos'], 'legenda' => 'alunos inativos', 'href' => $consulta->url(['status' => 'inativos', 'page' => null, 'aluno' => null]), 'icone' => 'users'],
+        ['valor' => $resumo['total'], 'legenda' => 'total de alunos', 'href' => $consulta->url(['status' => null, 'page' => null, 'aluno' => null]), 'icone' => 'users'],
         ['valor' => $resumo['contatados'], 'legenda' => 'contatados nos últimos 15 dias', 'href' => null, 'icone' => 'check'],
         ['valor' => $resumo['sem_contato'], 'legenda' => 'sem contato há mais de 15 dias', 'href' => $consulta->url(['foco' => FocoAcompanhamento::SemContato->value, 'situacao' => 'pendentes', 'page' => null, 'aluno' => null]), 'icone' => 'clock'],
         ['valor' => $resumo['programados'], 'legenda' => 'acompanhamentos programados', 'href' => $consulta->url(['foco' => FocoAcompanhamento::Agenda->value, 'situacao' => 'todas', 'page' => null, 'aluno' => null]), 'icone' => 'calendar'],
@@ -115,6 +115,9 @@ use App\Enums\FocoAcompanhamento;
                 {{ $situacao->rotulo() }} ({{ $contagens[$situacao->value] }})
             </a>
             @endforeach
+            <a href="{{ $consulta->url(['status' => 'inativos', 'page' => null, 'aluno' => null]) }}" class="rounded px-4 py-2 text-sm font-medium transition {{ $consulta->status === 'inativos' ? 'bg-primary text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300' }}">
+                Inativos
+            </a>
             @if($consulta->foco)
             <a href="{{ $consulta->url(['foco' => null, 'page' => null, 'aluno' => null]) }}" class="rounded bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
                 {{ $consulta->foco->rotulo() }} · limpar
@@ -148,6 +151,9 @@ use App\Enums\FocoAcompanhamento;
             @endif
             @if($consulta->acao)
             <input type="hidden" name="acao" value="{{ $consulta->acao->value }}">
+            @endif
+            @if($consulta->status)
+            <input type="hidden" name="status" value="{{ $consulta->status }}">
             @endif
             <select name="parametro" onchange="this.form.submit()" class="rounded border border-gray-300 bg-white px-3 py-3 text-sm text-gray-800 focus:border-primary focus:ring-primary">
                 <option value="">Todos os parâmetros</option>
