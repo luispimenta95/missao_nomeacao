@@ -36,6 +36,20 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->get(route('admin.dashboard.contatos.agendar', $aluno))->assertRedirect(route('login'));
     }
 
+    public function test_painel_mostra_ativos_inativos_e_total(): void
+    {
+        $user = User::factory()->create();
+        $this->aluno(['nome' => 'Ativo Um', 'ativo' => true]);
+        $this->aluno(['nome' => 'Ativo Dois', 'ativo' => true]);
+        $this->aluno(['nome' => 'Inativo Um', 'ativo' => false]);
+
+        $html = $this->actingAs($user)->get(route('admin.dashboard'))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/2\s*<\/span>\s*<span class="block text-sm text-gray-600">alunos ativos/', $html);
+        $this->assertMatchesRegularExpression('/1\s*<\/span>\s*<span class="block text-sm text-gray-600">alunos inativos/', $html);
+        $this->assertMatchesRegularExpression('/3\s*<\/span>\s*<span class="block text-sm text-gray-600">total de alunos/', $html);
+    }
+
     public function test_hierarquia_deixa_o_aluno_somente_em_intervir_com_todos_os_motivos(): void
     {
         $user = User::factory()->create(['name' => 'Nayara Oliveira']);

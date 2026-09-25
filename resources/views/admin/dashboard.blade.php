@@ -37,9 +37,11 @@ use App\Enums\FocoAcompanhamento;
     <div class="mb-4 rounded bg-green-100 p-4 text-green-800">{{ session('success') }}</div>
     @endif
 
-    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         @foreach([
         ['valor' => $resumo['ativos'], 'legenda' => 'alunos ativos', 'href' => null, 'icone' => 'users'],
+        ['valor' => $resumo['inativos'], 'legenda' => 'alunos inativos', 'href' => null, 'icone' => 'users'],
+        ['valor' => $resumo['total'], 'legenda' => 'total de alunos', 'href' => null, 'icone' => 'users'],
         ['valor' => $resumo['contatados'], 'legenda' => 'contatados nos últimos 15 dias', 'href' => null, 'icone' => 'check'],
         ['valor' => $resumo['sem_contato'], 'legenda' => 'sem contato há mais de 15 dias', 'href' => $consulta->url(['foco' => FocoAcompanhamento::SemContato->value, 'situacao' => 'pendentes', 'page' => null, 'aluno' => null]), 'icone' => 'clock'],
         ['valor' => $resumo['programados'], 'legenda' => 'acompanhamentos programados', 'href' => $consulta->url(['foco' => FocoAcompanhamento::Agenda->value, 'situacao' => 'todas', 'page' => null, 'aluno' => null]), 'icone' => 'calendar'],
