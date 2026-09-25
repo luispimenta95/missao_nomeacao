@@ -60,26 +60,6 @@ class SincronizarAlunosTutoryTest extends TestCase
         ));
     }
 
-    public function test_status_inativo_da_tutory_atualiza_o_admin(): void
-    {
-        $aluno = Aluno::create([
-            'tutory_id' => '1001',
-            'nome' => 'Maria Silva',
-            'email' => 'maria@example.com',
-            'recebe_email' => true,
-            'ativo' => true,
-        ]);
-        $sync = new SincronizarAlunosTutory(logger: static function (): void {});
-
-        $sync->sincronizarLista([
-            ['id' => '1001', 'nome' => 'Maria Silva', 'email' => 'maria@example.com', 'ativo' => false],
-            ['id' => '1002', 'nome' => 'João Lima', 'email' => 'joao@example.com', 'ativo' => false],
-        ]);
-
-        $this->assertFalse($aluno->fresh()->ativo);
-        $this->assertFalse(Aluno::query()->where('tutory_id', '1002')->first()->ativo);
-    }
-
     public function test_email_da_tutory_prevalece_quando_aluno_ja_existe(): void
     {
         $aluno = Aluno::create([

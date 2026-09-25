@@ -94,53 +94,21 @@ class TutoryAlunosClient
      */
     public function coletarAlunosAtivos(): array
     {
-        return $this->coletarPorStatus('ativos', true);
-    }
-
-    /**
-     * Ativos e inativos. O status da Tutory vai em `ativo`.
-     * Quem aparece nas duas listas fica inativo.
-     *
-     * @return list<array{id: string, nome: string, email: string, ativo: bool}>
-     */
-    public function coletarAlunos(): array
-    {
-        $porId = [];
-        foreach ($this->coletarPorStatus('ativos', true) as $aluno) {
-            $porId[$aluno['id']] = $aluno + ['ativo' => true];
-        }
-        foreach ($this->coletarPorStatus('inativos', false) as $aluno) {
-            $porId[$aluno['id']] = $aluno + ['ativo' => false];
-        }
-
-        return array_values($porId);
-    }
-
-    /**
-     * @return list<array{id: string, nome: string, email: string}>
-     */
-    private function coletarPorStatus(string $status, bool $obrigatorio): array
-    {
-        $this->log('Pesquisando alunos '.$status.' em /alunos/consulta...');
-        $resp = $this->client()->get('/alunos/consulta', ['status' => $status]);
+        $this->log('Pesquisando alunos ativos em /alunos/consulta...');
+        $resp = $this->client()->get('/alunos/consulta', ['status' => 'ativos']);
         $html = $resp->body();
         if (! str_contains($html, 'pesquisa-aluno-container')) {
-            $resp = $this->client()->asForm()->post('/alunos/consulta', ['status' => $status]);
+            $resp = $this->client()->asForm()->post('/alunos/consulta', ['status' => 'ativos']);
             $html = $resp->body();
         }
         if (! str_contains($html, 'pesquisa-aluno-container')) {
-            if ($obrigatorio) {
-                throw new RuntimeException('Lista de alunos '.$status.' não encontrada em /alunos/consulta.');
-            }
-            $this->log('Nenhum aluno '.$status.' em /alunos/consulta.');
-
-            return [];
+            throw new RuntimeException('Lista de alunos ativos não encontrada em /alunos/consulta.');
         }
 
         $alunos = [];
         $vistos = [];
         $pagina = 1;
-        $urlAtual = self::BASE.'/alunos/consulta?status='.$status;
+        $urlAtual = self::BASE.'/alunos/consulta?status=ativos';
 
         while (true) {
             $paginaAlunos = $this->parseAlunosDaPagina($html);
@@ -169,7 +137,7 @@ class TutoryAlunosClient
             }
         }
 
-        $this->log('Total de alunos '.$status.': '.count($alunos));
+        $this->log('Total de alunos ativos: '.count($alunos));
 
         return $alunos;
     }
