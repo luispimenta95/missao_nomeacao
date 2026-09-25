@@ -94,21 +94,44 @@ class TutoryAlunosClient
      */
     public function coletarAlunosAtivos(): array
     {
-        $this->log('Pesquisando alunos ativos em /alunos/consulta...');
-        $resp = $this->client()->get('/alunos/consulta', ['status' => 'ativos']);
+        return $this->coletarPorStatus('ativos', true);
+    }
+
+    /**
+     * Inativos na Tutory. O filtro da consulta é status=desativados.
+     *
+     * @return list<array{id: string, nome: string, email: string}>
+     */
+    public function coletarAlunosDesativados(): array
+    {
+        return $this->coletarPorStatus('desativados', false);
+    }
+
+    /**
+     * @return list<array{id: string, nome: string, email: string}>
+     */
+    private function coletarPorStatus(string $status, bool $obrigatorio): array
+    {
+        $this->log('Pesquisando alunos '.$status.' em /alunos/consulta...');
+        $resp = $this->client()->get('/alunos/consulta', ['status' => $status]);
         $html = $resp->body();
         if (! str_contains($html, 'pesquisa-aluno-container')) {
-            $resp = $this->client()->asForm()->post('/alunos/consulta', ['status' => 'ativos']);
+            $resp = $this->client()->asForm()->post('/alunos/consulta', ['status' => $status]);
             $html = $resp->body();
         }
         if (! str_contains($html, 'pesquisa-aluno-container')) {
-            throw new RuntimeException('Lista de alunos ativos não encontrada em /alunos/consulta.');
+            if ($obrigatorio) {
+                throw new RuntimeException('Lista de alunos '.$status.' não encontrada em /alunos/consulta.');
+            }
+            $this->log('Nenhum aluno '.$status.' em /alunos/consulta.');
+
+            return [];
         }
 
         $alunos = [];
         $vistos = [];
         $pagina = 1;
-        $urlAtual = self::BASE.'/alunos/consulta?status=ativos';
+        $urlAtual = self::BASE.'/alunos/consulta?status='.$status;
 
         while (true) {
             $paginaAlunos = $this->parseAlunosDaPagina($html);
@@ -137,7 +160,7 @@ class TutoryAlunosClient
             }
         }
 
-        $this->log('Total de alunos ativos: '.count($alunos));
+        $this->log('Total de alunos '.$status.': '.count($alunos));
 
         return $alunos;
     }

@@ -13,7 +13,7 @@ class AlunoController extends Controller
         $busca = trim((string) $request->query('busca', ''));
         $alunos = Aluno::query()
             ->comNomeParecido($busca)
-            ->orderBy('nome')
+            ->ordenadoNoRelatorio()
             ->get();
 
         if ($request->ajax()) {
@@ -28,17 +28,18 @@ class AlunoController extends Controller
         $busca = trim((string) $request->query('busca', ''));
         $alunos = Aluno::query()
             ->comNomeParecido($busca)
-            ->orderBy('nome')
+            ->ordenadoNoRelatorio()
             ->get();
 
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['Nome', 'E-mail', 'Recebe e-mail', 'Constância', 'Questões', '% acertos', 'Assuntos']);
+        fputcsv($handle, ['Nome', 'E-mail', 'Recebe e-mail', 'Status', 'Constância', 'Questões', '% acertos', 'Assuntos']);
 
         foreach ($alunos as $aluno) {
             fputcsv($handle, [
                 $aluno->nome,
                 $aluno->email,
                 $aluno->recebe_email ? 'Sim' : 'Não',
+                $aluno->ativo ? 'Ativo' : 'Inativo',
                 $aluno->last_performance ?? '',
                 $aluno->last_question_volume ?? '',
                 $aluno->last_accuracy_rate ?? '',
