@@ -193,6 +193,45 @@ class AlunoAdminTest extends TestCase
             ->assertSee('Nenhum aluno encontrado para essa busca.');
     }
 
+    public function test_relatorio_ordena_por_status_e_depois_por_nome(): void
+    {
+        $user = User::factory()->create();
+        Aluno::create([
+            'nome' => 'Ana Inativa',
+            'email' => 'ana@example.com',
+            'recebe_email' => true,
+            'ativo' => false,
+        ]);
+        Aluno::create([
+            'nome' => 'Zeca Ativo',
+            'email' => 'zeca@example.com',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        Aluno::create([
+            'nome' => 'Bruno Ativo',
+            'email' => 'bruno@example.com',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+
+        $html = $this->actingAs($user)->get(route('alunos.index'))->assertOk()->getContent();
+        $posBruno = strpos($html, 'Bruno Ativo');
+        $posZeca = strpos($html, 'Zeca Ativo');
+        $posAna = strpos($html, 'Ana Inativa');
+        $this->assertNotFalse($posBruno);
+        $this->assertNotFalse($posZeca);
+        $this->assertNotFalse($posAna);
+        $this->assertTrue($posBruno < $posZeca && $posZeca < $posAna);
+
+        $linhas = $this->linhasCsv((string) $this->actingAs($user)->get(route('alunos.export'))->getContent());
+        $this->assertSame('Bruno Ativo', $linhas[1][0]);
+        $this->assertSame('Ativo', $linhas[1][3]);
+        $this->assertSame('Zeca Ativo', $linhas[2][0]);
+        $this->assertSame('Ana Inativa', $linhas[3][0]);
+        $this->assertSame('Inativo', $linhas[3][3]);
+    }
+
     public function test_exporta_alunos_em_csv(): void
     {
         $user = User::factory()->create();
@@ -223,13 +262,14 @@ class AlunoAdminTest extends TestCase
 
         $linhas = $this->linhasCsv((string) $resposta->getContent());
         $this->assertSame(
-            ['Nome', 'E-mail', 'Recebe e-mail', 'Constância', 'Questões', '% acertos', 'Assuntos'],
+            ['Nome', 'E-mail', 'Recebe e-mail', 'Status', 'Constância', 'Questões', '% acertos', 'Assuntos'],
             $linhas[0]
         );
         $this->assertSame([
             'Giovanna "Silva", Jr.',
             'giovanna@example.com',
             'Sim',
+            'Ativo',
             'Brigando com a constância',
             'Volume suficiente',
             'Muito bom',
@@ -239,6 +279,7 @@ class AlunoAdminTest extends TestCase
             'Maria Souza',
             'maria@example.com',
             'Não',
+            'Ativo',
             '',
             '',
             '',

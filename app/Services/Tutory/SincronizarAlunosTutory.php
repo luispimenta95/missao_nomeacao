@@ -10,7 +10,10 @@ use Throwable;
  * Espelha alunos ativos da Tutory na tabela local.
  *
  * Nome da Tutory prevalece. E-mail da Tutory prevalece se o aluno já existir.
- * recebe_email fica sempre true. Nome é único: duplicidade só é logada.
+ * recebe_email fica sempre true. O status local nasce true.
+ * Só cadastra quem está ativo na Tutory e ainda não existe no portal.
+ * Quem já existe e está em status=desativados na Tutory fica inativo.
+ * Nome é único: duplicidade só é logada.
  * O cadastro "Aluno teste" da Tutory é ignorado e não entra na tabela local.
  */
 class SincronizarAlunosTutory
@@ -37,9 +40,10 @@ class SincronizarAlunosTutory
     {
         try {
             $this->tutory->login();
-            $lista = $this->tutory->coletarAlunosAtivos();
+            $resultado = $this->sincronizarLista($this->tutory->coletarAlunosAtivos());
+            $this->atualizarInativos($this->tutory->coletarAlunosDesativados());
 
-            return $this->sincronizarLista($lista);
+            return $resultado;
         } finally {
             $this->tutory->encerrar();
         }
@@ -176,6 +180,7 @@ class SincronizarAlunosTutory
                 'nome' => $origem['nome'],
                 'email' => $origem['email'],
                 'recebe_email' => true,
+                'ativo' => true,
             ]);
         } catch (Throwable $exc) {
             $this->log("Falha ao cadastrar {$origem['nome']}: ".$exc->getMessage());
@@ -242,6 +247,44 @@ class SincronizarAlunosTutory
         $this->log("Atualizado: {$aluno->nome} <{$aluno->email}> (recebe_email=true)");
 
         return 'atualizado';
+    }
+
+    /**
+     * Aluno que já está no portal e não está ativo na Tutory tem o status atualizado.
+     * Quem não existe no portal não é cadastrado.
+     *
+     * @param  list<array{id?: string, nome?: string, email?: string}>  $alunosTutory
+     */
+    public function atualizarInativos(array $alunosTutory): int
+    {
+        $atualizados = 0;
+
+        foreach ($alunosTutory as $origem) {
+            $dados = [
+                'id' => trim((string) ($origem['id'] ?? '')),
+                'nome' => trim((string) ($origem['nome'] ?? '')),
+                'email' => mb_strtolower(trim((string) ($origem['email'] ?? ''))),
+            ];
+            if ($dados['nome'] === '' || $dados['email'] === '') {
+                continue;
+            }
+            $aluno = $this->localizar($dados);
+            if ($aluno === null || ! $aluno->ativo) {
+                continue;
+            }
+            $aluno->ativo = false;
+            try {
+                $aluno->save();
+            } catch (Throwable $exc) {
+                $this->log("Falha ao inativar {$dados['nome']}: ".$exc->getMessage());
+
+                continue;
+            }
+            $atualizados++;
+            $this->log("Status atualizado: {$aluno->nome} ficou inativo (não está ativo na Tutory).");
+        }
+
+        return $atualizados;
     }
 
     private function eAlunoTeste(string $nome): bool

@@ -29,6 +29,7 @@ class SincronizarAlunosTutoryTest extends TestCase
         $this->assertSame('Maria Silva', $aluno->nome);
         $this->assertSame('maria@example.com', $aluno->email);
         $this->assertTrue($aluno->recebe_email);
+        $this->assertTrue($aluno->ativo);
         $this->assertTrue(collect($logs)->contains(fn (string $m) => str_contains($m, 'Cadastrado: Maria Silva')));
     }
 
@@ -177,6 +178,31 @@ class SincronizarAlunosTutoryTest extends TestCase
         $this->assertTrue(collect($logs)->contains(
             fn (string $m) => str_contains($m, 'Aluno teste') && str_contains($m, 'não é cadastrado')
         ));
+    }
+
+    public function test_nao_cadastra_inativo_que_nao_existe_e_inativa_quem_ja_existe(): void
+    {
+        $existente = Aluno::create([
+            'tutory_id' => '1001',
+            'nome' => 'Maria Silva',
+            'email' => 'maria@example.com',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        $sync = new SincronizarAlunosTutory(logger: static function (): void {});
+
+        $criados = $sync->sincronizarLista([
+            ['id' => '2002', 'nome' => 'João Novo', 'email' => 'joao@example.com'],
+        ]);
+        $sync->atualizarInativos([
+            ['id' => '1001', 'nome' => 'Maria Silva', 'email' => 'maria@example.com'],
+            ['id' => '3003', 'nome' => 'Fora do Portal', 'email' => 'fora@example.com'],
+        ]);
+
+        $this->assertSame(1, $criados['criados']);
+        $this->assertTrue(Aluno::query()->where('email', 'joao@example.com')->first()->ativo);
+        $this->assertFalse($existente->fresh()->ativo);
+        $this->assertNull(Aluno::query()->where('email', 'fora@example.com')->first());
     }
 
     public function test_pula_sem_email(): void
