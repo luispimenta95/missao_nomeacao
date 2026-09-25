@@ -68,7 +68,7 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertNotFalse($posBruno);
         $this->assertNotFalse($posZeca);
         $this->assertNotFalse($posAna);
-        $this->assertTrue($posBruno < $posZeca && $posZeca < $posAna);
+        $this->assertTrue($posAna < $posBruno && $posBruno < $posZeca);
 
         $soInativos = $this->actingAs($user)
             ->get(route('admin.dashboard', ['situacao' => 'todas', 'status' => 'inativos', 'aluno' => $ana->id]))
@@ -80,6 +80,49 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertDontSee('Plano de estudos encerrado</span>', false)
             ->assertDontSee('Bruno Ativo')
             ->assertDontSee('Zeca Ativo');
+    }
+
+    public function test_dashboard_ordena_por_acao_depois_nome_depois_status(): void
+    {
+        $user = User::factory()->create();
+        $this->aluno([
+            'nome' => 'Zeca Parabens',
+            'last_performance' => 'Bom',
+            'last_performance_codigo' => 'bom',
+            'prev_performance' => 'Brigando com a constância',
+            'prev_performance_codigo' => 'brigando',
+            'last_question_volume' => 'Volume suficiente',
+            'last_question_volume_codigo' => 'volume_suficiente',
+            'prev_question_volume' => 'Volume suficiente',
+            'prev_question_volume_codigo' => 'volume_suficiente',
+            'last_accuracy_rate' => 'Mediano',
+            'last_accuracy_rate_codigo' => 'mediano',
+            'prev_accuracy_rate' => 'Mediano',
+            'prev_accuracy_rate_codigo' => 'mediano',
+        ]);
+        $this->aluno([
+            'nome' => 'Ana Intervir',
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
+        $this->aluno(['nome' => 'Bruno Ok', 'ativo' => true]);
+        $this->aluno(['nome' => 'Bruno Ok Inativo', 'ativo' => false]);
+
+        $html = $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas']))
+            ->assertOk()
+            ->assertSee('data-acao="parabenizar"', false)
+            ->assertSee('data-acao="intervir"', false)
+            ->assertSee('data-acao="ok"', false)
+            ->getContent();
+
+        $posParabenizar = strpos($html, 'Zeca Parabens');
+        $posIntervir = strpos($html, 'Ana Intervir');
+        $posOk = strpos($html, 'Bruno Ok');
+        $this->assertNotFalse($posParabenizar);
+        $this->assertNotFalse($posIntervir);
+        $this->assertNotFalse($posOk);
+        $this->assertTrue($posParabenizar < $posIntervir && $posIntervir < $posOk);
     }
 
     public function test_perfil_da_mentora_nao_entra_no_dashboard(): void
