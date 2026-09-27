@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Turma;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -56,13 +55,13 @@ class TurmaRequest extends FormRequest
             'interesse_url' => 'nullable|url|max:500',
             'start_date' => 'nullable|date',
             'available_slots' => 'nullable|integer|min:0',
-            'grupo_exibicao' => ['required', Rule::in(array_keys(Turma::GRUPOS_EXIBICAO))],
+            'grupo_exibicao' => 'required|string|max:255',
             'categoria_navegacao' => 'nullable|string|max:255',
             'orgao' => 'nullable|string|max:255',
             'cargo' => 'nullable|string|max:255',
             'termos_busca' => 'nullable|string|max:2000',
-            'momento_concurso' => ['nullable', Rule::in(array_keys(Turma::MOMENTOS_CONCURSO))],
-            'acao_principal' => ['required', Rule::in(array_keys(Turma::ACOES_PRINCIPAIS))],
+            'momento_concurso' => 'nullable|string|max:255',
+            'acao_principal' => 'required|string|max:255',
             'popup_opcoes' => 'nullable|array',
             'popup_opcoes.*.label' => 'required_with:popup_opcoes.*.url|string|max:255',
             'popup_opcoes.*.url' => 'required_with:popup_opcoes.*.label|url|max:500',

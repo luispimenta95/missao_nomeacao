@@ -97,4 +97,32 @@ class TurmaAdminTest extends TestCase
         $this->assertSame('EM BREVE', $turma->badgePublico());
         $this->assertSame('fechada', $turma->status);
     }
+
+    #[Test]
+    public function admin_grava_grupo_acao_e_momento_como_texto_livre(): void
+    {
+        $user = User::factory()->create();
+        $turma = Turma::factory()->create([
+            'title' => 'PF 2026',
+            'slug' => 'pf-2026',
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('turmas.update', $turma), [
+                'title' => 'PF 2026',
+                'slug' => 'pf-2026',
+                'grupo_exibicao' => 'carreira policial',
+                'momento_concurso' => 'banca definida',
+                'acao_principal' => 'lista de espera',
+                'ativo' => '1',
+                'exibir_no_site' => '1',
+                'aceitar_novos_alunos' => '1',
+            ])
+            ->assertRedirect(route('turmas.index'));
+
+        $turma->refresh();
+        $this->assertSame('carreira policial', $turma->grupo_exibicao);
+        $this->assertSame('banca definida', $turma->momento_concurso);
+        $this->assertSame('lista de espera', $turma->acao_principal);
+    }
 }

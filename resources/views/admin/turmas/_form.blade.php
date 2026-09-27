@@ -72,11 +72,12 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <label class="block">
                 <span class="text-sm font-semibold text-gray-700">Grupo de exibição *</span>
-                <select name="grupo_exibicao" class="mt-2 w-full rounded border border-gray-300 p-3">
+                <input list="grupos-exibicao" type="text" name="grupo_exibicao" required class="mt-2 w-full rounded border border-gray-300 p-3" value="{{ old('grupo_exibicao', $turma->grupo_exibicao) }}" placeholder="turma_direcionada">
+                <datalist id="grupos-exibicao">
                     @foreach(\App\Models\Turma::GRUPOS_EXIBICAO as $valor => $label)
-                        <option value="{{ $valor }}" {{ old('grupo_exibicao', $turma->grupo_exibicao) === $valor ? 'selected' : '' }}>{{ $label }}</option>
+                        <option value="{{ $valor }}">{{ $label }}</option>
                     @endforeach
-                </select>
+                </datalist>
             </label>
             <label class="block">
                 <span class="text-sm font-semibold text-gray-700">Categoria de navegação</span>
@@ -111,12 +112,12 @@
             </label>
             <label class="block">
                 <span class="text-sm font-semibold text-gray-700">Momento do concurso</span>
-                <select name="momento_concurso" class="mt-2 w-full rounded border border-gray-300 p-3">
-                    <option value="">—</option>
+                <input list="momentos-concurso" type="text" name="momento_concurso" class="mt-2 w-full rounded border border-gray-300 p-3" value="{{ old('momento_concurso', $turma->momento_concurso) }}" placeholder="edital_publicado">
+                <datalist id="momentos-concurso">
                     @foreach(\App\Models\Turma::MOMENTOS_CONCURSO as $valor => $label)
-                        <option value="{{ $valor }}" {{ old('momento_concurso', $turma->momento_concurso) === $valor ? 'selected' : '' }}>{{ $label }}</option>
+                        <option value="{{ $valor }}">{{ $label }}</option>
                     @endforeach
-                </select>
+                </datalist>
             </label>
             <label class="inline-flex items-center gap-3 cursor-pointer mt-8">
                 <input type="checkbox" name="exibir_momento_concurso" value="1" class="h-4 w-4" {{ old('exibir_momento_concurso', $turma->exibir_momento_concurso) ? 'checked' : '' }}>
@@ -183,11 +184,12 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <label class="block md:col-span-2">
                 <span class="text-sm font-semibold text-gray-700">Ação principal do site *</span>
-                <select name="acao_principal" class="mt-2 w-full rounded border border-gray-300 p-3">
+                <input list="acoes-principais" type="text" name="acao_principal" required class="mt-2 w-full rounded border border-gray-300 p-3" value="{{ old('acao_principal', $turma->acao_principal) }}" placeholder="checkout">
+                <datalist id="acoes-principais">
                     @foreach(\App\Models\Turma::ACOES_PRINCIPAIS as $valor => $label)
-                        <option value="{{ $valor }}" {{ old('acao_principal', $turma->acao_principal) === $valor ? 'selected' : '' }}>{{ $label }}</option>
+                        <option value="{{ $valor }}">{{ $label }}</option>
                     @endforeach
-                </select>
+                </datalist>
             </label>
             <label class="block">
                 <span class="text-sm font-semibold text-gray-700">Link do checkout</span>
