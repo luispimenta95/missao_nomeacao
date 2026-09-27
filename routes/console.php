@@ -16,7 +16,7 @@ Artisan::command('inspire', function () {
 |
 | Periodo 1 (dias 01–15): todo dia 16 às 10:30 (America/Sao_Paulo)
 | Periodo 2 (dia 16–fim do mês anterior): dia 1 às 10:30
-| Sincronizar alunos ativos da Tutory: dias 1 e 16 às 06:00
+| Sincronizar alunos ativos da Tutory: todo dia às 06:00
 | Liberar períodos no admin (PDF de meses anteriores):
 |   dia 16 às 00:05 → período 1 do mês atual
 |   dia 1 às 00:05  → período 2 do mês anterior
@@ -68,7 +68,7 @@ Schedule::command('tutory:baixar-relatorios --periodo=2 --se-pendente')
 Schedule::command('tutory:sincronizar-alunos')
     ->dailyAt('06:00')
     ->timezone('America/Sao_Paulo')
-    ->name('tutory-sincronizar-alunos-dia-1')
+    ->name('tutory-sincronizar-alunos')
     ->appendOutputTo($logTutory);
 
 

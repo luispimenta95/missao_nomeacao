@@ -323,8 +323,13 @@ class AlunoAdminTest extends TestCase
     {
         $src = (string) file_get_contents(base_path('routes/console.php'));
         $this->assertStringContainsString("Schedule::command('tutory:sincronizar-alunos')", $src);
-        $this->assertStringContainsString("->monthlyOn(1, '06:00')", $src);
-        $this->assertStringContainsString("->monthlyOn(16, '06:00')", $src);
+        $this->assertStringContainsString("->dailyAt('06:00')", $src);
+        $this->assertStringNotContainsString("->monthlyOn(1, '06:00')", $src);
+        $this->assertStringNotContainsString("->monthlyOn(16, '06:00')", $src);
+
+        $workflow = (string) file_get_contents(base_path('.github/workflows/tutory-relatorios.yml'));
+        $this->assertStringContainsString('0 9 * * *', $workflow);
+        $this->assertStringNotContainsString('0 9 1,16 * *', $workflow);
         $this->assertStringContainsString("->monthlyOn(1, '10:30')", $src);
         $this->assertStringContainsString("->monthlyOn(16, '10:30')", $src);
         $this->assertStringContainsString('--se-pendente', $src);
