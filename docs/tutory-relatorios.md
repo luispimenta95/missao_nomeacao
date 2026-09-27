@@ -132,7 +132,7 @@ O Laravel **não dispara sozinho**. Só a definição em `routes/console.php` n�
 
 | Job | Comando | Quando (America/Sao_Paulo) |
 |-----|---------|--------|
-| Sincronizar alunos | `tutory:sincronizar-alunos` | Dias **1** e **16**, **06:00** |
+| Sincronizar alunos | `tutory:sincronizar-alunos` | Todo dia, **06:00** |
 | Periodo 1 | `tutory:baixar-relatorios --periodo=1 --se-pendente` | Dia **16**, **10:30** (retenta de hora em hora até 22h nos dias 16–17 se ainda não enviou) |
 | Periodo 2 | `tutory:baixar-relatorios --periodo=2 --se-pendente` | Dia **1**, **10:30** (usa 16–fim do mês que acabou; retenta nos dias 1–2) |
 
