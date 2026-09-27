@@ -80,12 +80,7 @@
             </label>
             <label class="block">
                 <span class="text-sm font-semibold text-gray-700">Categoria de navegação</span>
-                <input list="categorias-navegacao" type="text" name="categoria_navegacao" class="mt-2 w-full rounded border border-gray-300 p-3" value="{{ old('categoria_navegacao', $turma->categoria_navegacao) }}" placeholder="Policiais / Administrativas / Tribunais">
-                <datalist id="categorias-navegacao">
-                    @foreach(\App\Models\Turma::CATEGORIAS_NAVEGACAO as $categoria)
-                        <option value="{{ $categoria }}"></option>
-                    @endforeach
-                </datalist>
+                <input type="text" name="categoria_navegacao" class="mt-2 w-full rounded border border-gray-300 p-3" value="{{ old('categoria_navegacao', $turma->categoria_navegacao) }}" placeholder="Policiais / Administrativas / Tribunais">
             </label>
             <label class="block">
                 <span class="text-sm font-semibold text-gray-700">Concurso/órgão relacionado</span>
@@ -98,12 +93,7 @@
             </label>
             <label class="block">
                 <span class="text-sm font-semibold text-gray-700">Cargo</span>
-                <input list="cargos-turma" type="text" name="cargo" class="mt-2 w-full rounded border border-gray-300 p-3" value="{{ old('cargo', $turma->cargo) }}" placeholder="Agente, Escrivão, Praça">
-                <datalist id="cargos-turma">
-                    @foreach(\App\Models\Turma::CARGOS as $cargo)
-                        <option value="{{ $cargo }}"></option>
-                    @endforeach
-                </datalist>
+                <input type="text" name="cargo" class="mt-2 w-full rounded border border-gray-300 p-3" value="{{ old('cargo', $turma->cargo) }}" placeholder="Agente, Escrivão, Praça">
             </label>
             <label class="block md:col-span-2">
                 <span class="text-sm font-semibold text-gray-700">Termos de busca</span>
