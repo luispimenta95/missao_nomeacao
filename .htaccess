@@ -9,9 +9,11 @@
     # Sem este arquivo, /server/login é 404 do Apache (o front controller está em public/).
 
     # Não exponha arquivos e pastas do Laravel.
+    # storage/ fica de fora: a capa da turma é servida em /storage/... e o
+    # rewrite abaixo aponta para public/storage, sem abrir storage/logs.
     RewriteRule ^\.env - [F,L]
     RewriteRule ^(composer\.(json|lock)|artisan|phpunit\.xml)$ - [F,L]
-    RewriteRule ^(app|bootstrap|config|database|docker|docs|resources|routes|scripts|storage|tests|vendor)/ - [F,L]
+    RewriteRule ^(app|bootstrap|config|database|docker|docs|resources|routes|scripts|tests|vendor)/ - [F,L]
 
     # Já está em public/ — o .htaccess de lá envia para index.php.
     RewriteRule ^public($|/) - [L]

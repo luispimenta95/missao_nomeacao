@@ -17,6 +17,10 @@ class HostingerSubdirectoryTest extends TestCase
         $this->assertStringContainsString('RewriteRule ^(.*)$ public/$1 [L]', $htaccess);
         $this->assertStringContainsString('RewriteRule ^\\.env - [F,L]', $htaccess);
         $this->assertStringContainsString('vendor)/ - [F,L]', $htaccess);
+        $this->assertDoesNotMatchRegularExpression(
+            '/RewriteRule \^\([^)\n]*\bstorage\b[^)\n]*\)\/ - \[F,L\]/',
+            $htaccess
+        );
     }
 
     public function test_front_controller_ajusta_script_name_antes_do_laravel(): void
