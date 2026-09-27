@@ -37,7 +37,7 @@ Schedule::command('tutory:baixar-relatorios --periodo=2 --se-pendente')
     ->name('tutory-relatorios-periodo-2')
     ->withoutOverlapping(180)
     ->appendOutputTo($logTutory)
-    ->onFailure(fn () => Log::error('[scheduler] tutory:baixar-relatorios --periodo=2 falhou'));
+    ->onFailure(fn() => Log::error('[scheduler] tutory:baixar-relatorios --periodo=2 falhou'));
 
 Schedule::command('tutory:baixar-relatorios --periodo=1 --se-pendente')
     ->monthlyOn(16, '10:30')
@@ -45,13 +45,13 @@ Schedule::command('tutory:baixar-relatorios --periodo=1 --se-pendente')
     ->name('tutory-relatorios-periodo-1')
     ->withoutOverlapping(180)
     ->appendOutputTo($logTutory)
-    ->onFailure(fn () => Log::error('[scheduler] tutory:baixar-relatorios --periodo=1 falhou'));
+    ->onFailure(fn() => Log::error('[scheduler] tutory:baixar-relatorios --periodo=1 falhou'));
 
 Schedule::command('tutory:baixar-relatorios --periodo=1 --se-pendente')
     ->hourly()
     ->timezone('America/Sao_Paulo')
     ->between('11:00', '22:00')
-    ->when(fn () => in_array((int) now('America/Sao_Paulo')->day, [16, 17], true))
+    ->when(fn() => in_array((int) now('America/Sao_Paulo')->day, [16, 17], true))
     ->name('tutory-relatorios-periodo-1-retentativa')
     ->withoutOverlapping(180)
     ->appendOutputTo($logTutory);
@@ -60,22 +60,17 @@ Schedule::command('tutory:baixar-relatorios --periodo=2 --se-pendente')
     ->hourly()
     ->timezone('America/Sao_Paulo')
     ->between('11:00', '22:00')
-    ->when(fn () => in_array((int) now('America/Sao_Paulo')->day, [1, 2], true))
+    ->when(fn() => in_array((int) now('America/Sao_Paulo')->day, [1, 2], true))
     ->name('tutory-relatorios-periodo-2-retentativa')
     ->withoutOverlapping(180)
     ->appendOutputTo($logTutory);
 
 Schedule::command('tutory:sincronizar-alunos')
-    ->monthlyOn(1, '06:00')
+    ->dailyAt('06:00')
     ->timezone('America/Sao_Paulo')
     ->name('tutory-sincronizar-alunos-dia-1')
     ->appendOutputTo($logTutory);
 
-Schedule::command('tutory:sincronizar-alunos')
-    ->monthlyOn(16, '06:00')
-    ->timezone('America/Sao_Paulo')
-    ->name('tutory-sincronizar-alunos-dia-16')
-    ->appendOutputTo($logTutory);
 
 Schedule::command('tutory:liberar-periodos-pdf')
     ->monthlyOn(1, '00:05')
