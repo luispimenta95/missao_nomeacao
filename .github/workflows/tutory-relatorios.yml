@@ -1,28 +1,27 @@
 name: Tutory Relatorios
 
-# Disparo principal dos jobs da Tutory. O cron da Hostinger NÃO é
-# instalado no deploy; sem este workflow (ou um cron manual no hPanel)
-# tutory:baixar-relatorios nunca roda sozinho.
+# Reforço dos jobs da Tutory. O disparo principal é o cron da Hostinger
+# (scripts/instalar-cron-scheduler.sh, chamado no deploy), que roda
+# `php artisan schedule:run` todo minuto. tutory:executar-agendados
+# recupera o que passou do horário e ainda não concluiu naquele dia.
 #
-# Horários em UTC (Brasília = UTC-3, sem horário de verão):
-#   00:05 BRT = 03:05 UTC  → libera períodos de PDF no admin (dias 1 e 16)
-#   06:00 BRT = 09:00 UTC  → sincronizar alunos (todo dia)
-#   10:30 BRT = 13:30 UTC  → PDF + e-mail (dia 16 = período 1; dia 1 = período 2)
+# O schedule do GitHub é best-effort: no pico da hora o evento é
+# descartado e nenhuma run aparece em Actions. Por isso o cron abaixo
+# evita o minuto 0 e só chama o comando de catch-up, duas vezes por hora.
+# Horários em UTC (Brasília = UTC-3, sem horário de verão).
 
 on:
   schedule:
-    - cron: "5 3 1,16 * *"
-    - cron: "0 9 * * *"
-    - cron: "30 13 16 * *"
-    - cron: "30 13 1 * *"
+    - cron: "17,47 * * * *"
   workflow_dispatch:
     inputs:
       comando:
         description: Comando artisan a executar na Hostinger
         type: choice
         required: true
-        default: tutory:baixar-relatorios --periodo=1 --se-pendente
+        default: tutory:executar-agendados
         options:
+          - tutory:executar-agendados
           - tutory:sincronizar-alunos
           - tutory:baixar-relatorios --periodo=1 --se-pendente
           - tutory:baixar-relatorios --periodo=2 --se-pendente
@@ -44,20 +43,13 @@ jobs:
         id: pick
         env:
           EVENT_NAME: ${{ github.event_name }}
-          SCHEDULE: ${{ github.event.schedule }}
           INPUT_CMD: ${{ github.event.inputs.comando }}
         run: |
           set -euo pipefail
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             CMD="$INPUT_CMD"
-          elif [ "$SCHEDULE" = "5 3 1,16 * *" ]; then
-            CMD="tutory:liberar-periodos-pdf"
-          elif [ "$SCHEDULE" = "0 9 * * *" ]; then
-            CMD="tutory:sincronizar-alunos"
-          elif [ "$SCHEDULE" = "30 13 16 * *" ]; then
-            CMD="tutory:baixar-relatorios --periodo=1 --se-pendente"
           else
-            CMD="tutory:baixar-relatorios --periodo=2 --se-pendente"
+            CMD="tutory:executar-agendados"
           fi
           echo "cmd=$CMD" >> "$GITHUB_OUTPUT"
           echo "Vai executar: php artisan $CMD"

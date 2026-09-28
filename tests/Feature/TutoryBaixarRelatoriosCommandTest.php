@@ -28,7 +28,7 @@ class TutoryBaixarRelatoriosCommandTest extends TestCase
     {
         $this->artisan('tutory:scheduler-status')
             ->expectsOutputToContain('APP_TIMEZONE')
-            ->expectsOutputToContain('tutory:baixar-relatorios')
+            ->expectsOutputToContain('tutory:executar-agendados')
             ->assertSuccessful();
     }
 }

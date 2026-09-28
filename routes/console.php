@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Configuracao;
+use App\Services\Tutory\TutoryAgendaDoDia;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -14,72 +16,35 @@ Artisan::command('inspire', function () {
 | Relatórios do Coach (Tutory)
 |--------------------------------------------------------------------------
 |
-| Periodo 1 (dias 01–15): todo dia 16 às 10:30 (America/Sao_Paulo)
-| Periodo 2 (dia 16–fim do mês anterior): dia 1 às 10:30
-| Sincronizar alunos ativos da Tutory: todo dia às 06:00
-| Liberar períodos no admin (PDF de meses anteriores):
-|   dia 16 às 00:05 → período 1 do mês atual
-|   dia 1 às 00:05  → período 2 do mês anterior
-|   (insert + delete para manter 2 × N meses no combo)
+| Quem decide a janela é tutory:executar-agendados (America/Sao_Paulo):
+|   sincronizar alunos: todo dia a partir das 06:00, uma vez
+|   período 1 (dias 01–15): dia 16, 10:30–22:59; retenta no dia 17, 11:00–22:59
+|   período 2 (dia 16–fim): dia 1, 10:30–22:59; retenta no dia 2, 11:00–22:59
+|   liberar períodos no admin: dias 1 e 16 a partir das 00:05, uma vez
 |
-| O Laravel NÃO dispara sozinho. Sem `php artisan schedule:run` a cada
-| minuto no cron da Hostinger, estes horários nunca executam.
-| O workflow .github/workflows/tutory-relatorios.yml chama o artisan
-| por SSH e é o disparo principal.
+| O Laravel não dispara sozinho. O deploy instala um cron na Hostinger:
+|   * * * * * php artisan schedule:run
+| Um tick depois do horário ainda executa o que ficou pendente naquele dia.
+| O workflow .github/workflows/tutory-relatorios.yml é só um reforço: o
+| schedule do GitHub atrasa ou descarta o evento e a run nem aparece.
 |
 */
 
 $logTutory = storage_path('logs/tutory-schedule.log');
 
-Schedule::command('tutory:baixar-relatorios --periodo=2 --se-pendente')
-    ->monthlyOn(1, '10:30')
+Schedule::command('tutory:executar-agendados')
+    ->everyMinute()
     ->timezone('America/Sao_Paulo')
-    ->name('tutory-relatorios-periodo-2')
+    ->name('tutory-executar-agendados')
     ->withoutOverlapping(180)
     ->appendOutputTo($logTutory)
-    ->onFailure(fn() => Log::error('[scheduler] tutory:baixar-relatorios --periodo=2 falhou'));
+    ->onFailure(fn () => Log::error('[scheduler] tutory:executar-agendados falhou'));
 
-Schedule::command('tutory:baixar-relatorios --periodo=1 --se-pendente')
-    ->monthlyOn(16, '10:30')
+Schedule::call(function () {
+    Configuracao::definir(
+        TutoryAgendaDoDia::HEARTBEAT,
+        now('America/Sao_Paulo')->toIso8601String()
+    );
+})->everyMinute()
     ->timezone('America/Sao_Paulo')
-    ->name('tutory-relatorios-periodo-1')
-    ->withoutOverlapping(180)
-    ->appendOutputTo($logTutory)
-    ->onFailure(fn() => Log::error('[scheduler] tutory:baixar-relatorios --periodo=1 falhou'));
-
-Schedule::command('tutory:baixar-relatorios --periodo=1 --se-pendente')
-    ->hourly()
-    ->timezone('America/Sao_Paulo')
-    ->between('11:00', '22:00')
-    ->when(fn() => in_array((int) now('America/Sao_Paulo')->day, [16, 17], true))
-    ->name('tutory-relatorios-periodo-1-retentativa')
-    ->withoutOverlapping(180)
-    ->appendOutputTo($logTutory);
-
-Schedule::command('tutory:baixar-relatorios --periodo=2 --se-pendente')
-    ->hourly()
-    ->timezone('America/Sao_Paulo')
-    ->between('11:00', '22:00')
-    ->when(fn() => in_array((int) now('America/Sao_Paulo')->day, [1, 2], true))
-    ->name('tutory-relatorios-periodo-2-retentativa')
-    ->withoutOverlapping(180)
-    ->appendOutputTo($logTutory);
-
-Schedule::command('tutory:sincronizar-alunos')
-    ->dailyAt('06:00')
-    ->timezone('America/Sao_Paulo')
-    ->name('tutory-sincronizar-alunos')
-    ->appendOutputTo($logTutory);
-
-
-Schedule::command('tutory:liberar-periodos-pdf')
-    ->monthlyOn(1, '00:05')
-    ->timezone('America/Sao_Paulo')
-    ->name('tutory-liberar-periodos-pdf-dia-1')
-    ->appendOutputTo($logTutory);
-
-Schedule::command('tutory:liberar-periodos-pdf')
-    ->monthlyOn(16, '00:05')
-    ->timezone('America/Sao_Paulo')
-    ->name('tutory-liberar-periodos-pdf-dia-16')
-    ->appendOutputTo($logTutory);
+    ->name('tutory-heartbeat');
