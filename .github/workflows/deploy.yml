@@ -37,3 +37,4 @@ jobs:
               touch database/database.sqlite
             fi
             php artisan migrate --force --no-interaction
+            bash scripts/instalar-cron-scheduler.sh

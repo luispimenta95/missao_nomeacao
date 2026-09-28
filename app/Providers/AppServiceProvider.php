@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Services\Tutory\TutorySchedulerKick;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -30,6 +33,18 @@ class AppServiceProvider extends ServiceProvider
         if (str_starts_with($rootUrl !== '' ? $rootUrl : $appUrl, 'https://')) {
             URL::forceScheme('https');
         }
+
+        if ($this->app->runningInConsole() || $this->app->runningUnitTests()) {
+            return;
+        }
+
+        $this->app->terminating(function () {
+            try {
+                app(TutorySchedulerKick::class)->disparar();
+            } catch (Throwable $exc) {
+                Log::error('[tutory-scheduler] '.$exc->getMessage());
+            }
+        });
     }
 
     /**

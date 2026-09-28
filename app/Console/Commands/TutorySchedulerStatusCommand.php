@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Configuracao;
+use App\Services\Tutory\TutoryAgendaDoDia;
 use App\Services\Tutory\TutoryRelatorioAgenda;
 use Illuminate\Console\Command;
 use Throwable;
@@ -16,8 +17,13 @@ class TutorySchedulerStatusCommand extends Command
     public function handle(): int
     {
         $tz = (string) config('app.timezone');
+        $agora = now()->timezone($tz);
         $this->info('APP_TIMEZONE: '.$tz);
-        $this->info('Agora: '.now()->timezone($tz)->toDateTimeString());
+        $this->info('Agora: '.$agora->toDateTimeString());
+        $this->line('Heartbeat do cron: '.$this->valorEnvio(TutoryAgendaDoDia::HEARTBEAT));
+        $this->line('Sync de hoje: '.$this->valorEnvio('tutory.job.sincronizar-alunos.'.$agora->format('Y-m-d')));
+        $this->line('Liberar períodos de hoje: '.$this->valorEnvio('tutory.job.liberar-periodos.'.$agora->format('Y-m-d')));
+        $this->alertarCronParado();
         $this->newLine();
 
         foreach (['1', '2'] as $periodo) {
@@ -33,10 +39,26 @@ class TutorySchedulerStatusCommand extends Command
             $this->error('schedule:list falhou: '.$exc->getMessage());
         }
         $this->newLine();
-        $this->comment('O agendamento do Laravel só dispara se o cron da Hostinger chamar `php artisan schedule:run` a cada minuto.');
-        $this->comment('O workflow GitHub "Tutory Relatorios" chama o artisan direto por SSH, sem depender desse cron.');
+        $this->comment('Sem cron, uma visita ao site dispara tutory:executar-agendados depois da resposta.');
+        $this->comment('No hPanel, o cron de todo minuto deve chamar scripts/tutory-scheduler.sh.');
+        $this->comment('O workflow GitHub "Tutory Relatorios" só reforça, quando o schedule dele chega a criar uma run.');
 
         return self::SUCCESS;
+    }
+
+    private function alertarCronParado(): void
+    {
+        $heart = Configuracao::valor(TutoryAgendaDoDia::HEARTBEAT);
+        if ($heart === null || $heart === '') {
+            $this->warn('Sem heartbeat. O cron ainda não chamou schedule:run neste servidor.');
+
+            return;
+        }
+
+        $ts = strtotime($heart);
+        if ($ts !== false && (time() - $ts) > 600) {
+            $this->warn('O cron está atrasado mais de 10 minutos. Veja storage/logs/schedule-run.log e o crontab.');
+        }
     }
 
     private function valorEnvio(string $chave): string

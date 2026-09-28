@@ -125,18 +125,30 @@ node scripts/tutory-render-pdf.mjs --url "https://admin.tutory.com.br/documentos
 
 ## Agendamento
 
-O Laravel **não dispara sozinho**. Só a definição em `routes/console.php` não envia PDF. Precisa de um dos dois:
+O Laravel **não dispara sozinho**. O schedule do GitHub Actions também não serve de relógio: o evento `schedule` é best-effort, some no pico da hora e **nenhuma run aparece** em Actions. A sincronização manual (Action → Run workflow, ou `php artisan` no SSH) grava o mesmo `production.INFO` e por isso parece que “o job rodou”, mas o horário sozinho não chegou a disparar.
 
-1. **GitHub Action** `.github/workflows/tutory-relatorios.yml` (disparo principal) — SSH na Hostinger no horário. Também pode ser disparada à mão em Actions → Tutory Relatorios → Run workflow.
-2. **Cron na Hostinger** chamando `php artisan schedule:run` **a cada minuto**. O deploy **não** cria esse cron. Sem ele, `monthlyOn(16, '10:30')` nunca executa.
+Há três disparos, do mais garantido neste plano da Hostinger para o reforço:
+
+1. **Visita ao site.** Depois que a resposta sai, `TutorySchedulerKick` chama `tutory:executar-agendados --sem-relatorios` (sincroniza alunos e libera períodos; não gera o PDF, porque o PHP do site corta a execução no meio do envio). Não depende de hPanel nem do schedule do GitHub. Se ninguém abriu o site às 06:00, a primeira visita do dia ainda sincroniza.
+2. **Cron no hPanel** (recomendado para o PDF, que pode passar do tempo do PHP web). Websites → Cron Jobs → Custom, uma vez por minuto:
+
+```text
+/bin/sh /home/USUARIO/domains/missaonomeacao.com.br/public_html/server/scripts/tutory-scheduler.sh
+```
+
+O plano Web/Cloud **não tem** `crontab` pelo SSH; o deploy tenta instalar e, se o binário não existir, imprime essa linha. No VPS, `scripts/instalar-cron-scheduler.sh` grava o cron de `schedule:run`.
+3. **GitHub Action** `.github/workflows/tutory-relatorios.yml`, nos minutos 17 e 47 de cada hora (UTC), chamando o mesmo comando. Também dá para rodar à mão em Actions → Tutory Relatorios → Run workflow.
+
+`tutory:executar-agendados` recupera o que passou do horário e ainda não concluiu naquele dia.
 
 | Job | Comando | Quando (America/Sao_Paulo) |
 |-----|---------|--------|
-| Sincronizar alunos | `tutory:sincronizar-alunos` | Todo dia, **06:00** |
-| Periodo 1 | `tutory:baixar-relatorios --periodo=1 --se-pendente` | Dia **16**, **10:30** (retenta de hora em hora até 22h nos dias 16–17 se ainda não enviou) |
-| Periodo 2 | `tutory:baixar-relatorios --periodo=2 --se-pendente` | Dia **1**, **10:30** (usa 16–fim do mês que acabou; retenta nos dias 1–2) |
+| Sincronizar alunos | `tutory:sincronizar-alunos` | Todo dia, a partir das **06:00**, uma vez |
+| Periodo 1 | `tutory:baixar-relatorios --periodo=1 --se-pendente` | Dia **16**, **10:30–22:59** (retenta no dia **17**, **11:00–22:59**, se ainda não enviou) |
+| Periodo 2 | `tutory:baixar-relatorios --periodo=2 --se-pendente` | Dia **1**, **10:30–22:59** (retenta no dia **2**, **11:00–22:59**) |
+| Liberar períodos no admin | `tutory:liberar-periodos-pdf` | Dias **1** e **16**, a partir das **00:05**, uma vez |
 
-`--se-pendente` grava em `configuracoes` e evita e-mail duplicado se Action e cron rodarem no mesmo período.
+`--se-pendente` grava em `configuracoes` e evita e-mail duplicado se o cron e a Action rodarem no mesmo período. A trava do sync (`tutory.job.sincronizar-alunos.YYYY-MM-DD`) vale só para o agendado; rodar `tutory:sincronizar-alunos` à mão não é bloqueado por ela.
 
 A Tutory sempre envia um cadastro chamado **Aluno teste**. O job ignora esse nome (maiúsculas/minúsculas e espaços extras não importam) e **não o cadastra** na tabela local.
 
@@ -153,13 +165,7 @@ php artisan tutory:sincronizar-alunos
 php artisan tutory:baixar-relatorios --periodo=1
 ```
 
-Cron opcional no hPanel da Hostinger (caminho do deploy):
-
-```cron
-* * * * * cd ~/domains/missaonomeacao.com.br/public_html/server && php artisan schedule:run >> storage/logs/schedule-run.log 2>&1
-```
-
-Conferir: `php artisan schedule:list`
+Conferir: `php artisan schedule:list` e `php artisan tutory:scheduler-status` (o heartbeat mostra o último tick, seja da visita, do cron ou da Action).
 
 ## Gestão de desempenho (admin)
 
