@@ -321,19 +321,27 @@ class AlunoAdminTest extends TestCase
 
     public function test_comando_de_sincronizacao_esta_agendado_as_6h(): void
     {
+        $agenda = new \App\Services\Tutory\TutoryAgendaDoDia;
+        $fuso = new \DateTimeZone('America/Sao_Paulo');
+        $cedo = array_column($agenda->devidos(new \DateTimeImmutable('2026-09-28 05:59:00', $fuso)), 'id');
+        $naHora = array_column($agenda->devidos(new \DateTimeImmutable('2026-09-28 06:00:00', $fuso)), 'id');
+        $this->assertNotContains('sincronizar-alunos', $cedo);
+        $this->assertContains('sincronizar-alunos', $naHora);
+
         $src = (string) file_get_contents(base_path('routes/console.php'));
-        $this->assertStringContainsString("Schedule::command('tutory:sincronizar-alunos')", $src);
-        $this->assertStringContainsString("->dailyAt('06:00')", $src);
-        $this->assertStringNotContainsString("->monthlyOn(1, '06:00')", $src);
-        $this->assertStringNotContainsString("->monthlyOn(16, '06:00')", $src);
+        $this->assertStringContainsString("Schedule::command('tutory:executar-agendados')", $src);
+        $this->assertStringContainsString('->everyMinute()', $src);
+        $this->assertStringContainsString("->timezone('America/Sao_Paulo')", $src);
+        $this->assertStringNotContainsString("->dailyAt('06:00')", $src);
 
         $workflow = (string) file_get_contents(base_path('.github/workflows/tutory-relatorios.yml'));
-        $this->assertStringContainsString('0 9 * * *', $workflow);
+        $this->assertStringContainsString('tutory:executar-agendados', $workflow);
+        $this->assertStringContainsString('17,47 * * * *', $workflow);
+        $this->assertStringNotContainsString('0 9 * * *', $workflow);
         $this->assertStringNotContainsString('0 9 1,16 * *', $workflow);
-        $this->assertStringContainsString("->monthlyOn(1, '10:30')", $src);
-        $this->assertStringContainsString("->monthlyOn(16, '10:30')", $src);
-        $this->assertStringContainsString('--se-pendente', $src);
-        $this->assertStringContainsString("->timezone('America/Sao_Paulo')", $src);
+
+        $deploy = (string) file_get_contents(base_path('.github/workflows/deploy.yml'));
+        $this->assertStringContainsString('instalar-cron-scheduler.sh', $deploy);
     }
 
     /**

@@ -47,15 +47,24 @@ class LiberarPeriodosPdfCommandTest extends TestCase
         );
         $this->assertSame(12, RelatorioPdfPeriodo::query()->count());
 
+        $fuso = new \DateTimeZone('America/Sao_Paulo');
+        $regras = new \App\Services\Tutory\TutoryAgendaDoDia;
+        $ids = static fn (string $quando): array => array_column(
+            $regras->devidos(new \DateTimeImmutable($quando, $fuso)),
+            'id'
+        );
+        $this->assertContains('liberar-periodos', $ids('2026-09-16 00:05:00'));
+        $this->assertContains('liberar-periodos', $ids('2026-10-01 00:05:00'));
+        $this->assertNotContains('liberar-periodos', $ids('2026-09-16 00:04:00'));
+        $this->assertNotContains('liberar-periodos', $ids('2026-09-15 12:00:00'));
+
         $agenda = (string) file_get_contents(base_path('routes/console.php'));
-        $this->assertStringContainsString("Schedule::command('tutory:liberar-periodos-pdf')", $agenda);
-        $this->assertStringContainsString('->monthlyOn(1, \'00:05\')', $agenda);
-        $this->assertStringContainsString('->monthlyOn(16, \'00:05\')', $agenda);
+        $this->assertStringContainsString("Schedule::command('tutory:executar-agendados')", $agenda);
         $this->assertStringNotContainsString("->dailyAt('00:05')", $agenda);
 
         $workflow = (string) file_get_contents(base_path('.github/workflows/tutory-relatorios.yml'));
         $this->assertStringContainsString('tutory:liberar-periodos-pdf', $workflow);
-        $this->assertStringContainsString('5 3 1,16 * *', $workflow);
-        $this->assertStringNotContainsString('"5 3 * * *"', $workflow);
+        $this->assertStringContainsString('tutory:executar-agendados', $workflow);
+        $this->assertStringNotContainsString('5 3 1,16 * *', $workflow);
     }
 }
