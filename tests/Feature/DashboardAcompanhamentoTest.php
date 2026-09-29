@@ -50,7 +50,7 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertMatchesRegularExpression('/3\s*<\/span>\s*<span class="block text-sm text-gray-600">total de alunos/', $html);
     }
 
-    public function test_dashboard_filtra_inativos_e_ordena_como_a_tela_de_alunos(): void
+    public function test_dashboard_filtra_inativos_e_ordena_por_nome(): void
     {
         $user = User::factory()->create();
         $ana = $this->aluno(['nome' => 'Ana Inativa', 'ativo' => false]);
@@ -68,7 +68,7 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertNotFalse($posBruno);
         $this->assertNotFalse($posZeca);
         $this->assertNotFalse($posAna);
-        $this->assertTrue($posBruno < $posZeca && $posZeca < $posAna);
+        $this->assertTrue($posAna < $posBruno && $posBruno < $posZeca);
 
         $soInativos = $this->actingAs($user)
             ->get(route('admin.dashboard', ['situacao' => 'todas', 'status' => 'inativos', 'aluno' => $ana->id]))
@@ -82,7 +82,7 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertDontSee('Zeca Ativo');
     }
 
-    public function test_dashboard_ordena_por_acao_depois_nome_depois_status(): void
+    public function test_dashboard_ordena_somente_por_nome(): void
     {
         $user = User::factory()->create();
         $this->aluno([
@@ -140,8 +140,11 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertNotFalse($posKarol);
         $this->assertNotFalse($posJhullya);
         $this->assertNotFalse($posInativa);
-        $this->assertTrue($posIntervir < $posParabenizar && $posParabenizar < $posOk);
-        $this->assertTrue($posKarol < $posJhullya && $posJhullya < $posInativa);
+        $this->assertTrue($posInativa < $posIntervir);
+        $this->assertTrue($posIntervir < $posOk);
+        $this->assertTrue($posOk < $posJhullya);
+        $this->assertTrue($posJhullya < $posKarol);
+        $this->assertTrue($posKarol < $posParabenizar);
     }
 
     public function test_perfil_da_mentora_nao_entra_no_dashboard(): void
