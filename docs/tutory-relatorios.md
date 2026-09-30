@@ -146,6 +146,8 @@ A Action do GitHub chama o mesmo comando só nos horários equivalentes em UTC. 
 
 A Tutory sempre envia um cadastro chamado **Aluno teste**. O job ignora esse nome (maiúsculas/minúsculas e espaços extras não importam) e **não o cadastra** na tabela local.
 
+Nos alunos **ativos**, o sync abre Ações → Cadastro (`/alunos/index?aid={id}`) e grava `telefone` como `55` + DDD + número, só dígitos. O valor da Tutory prevalece sobre o que estiver no admin. Alunos desativados não têm o telefone consultado.
+
 Para inspecionar no servidor:
 
 ```bash
