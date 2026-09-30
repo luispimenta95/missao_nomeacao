@@ -242,6 +242,32 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertSee('data-acao="marcar_presenca"', false);
     }
 
+    public function test_ficha_abre_whatsapp_do_aluno_em_nova_aba(): void
+    {
+        $user = User::factory()->create();
+        $aluno = $this->aluno([
+            'nome' => 'Edileusa Pires',
+            'telefone' => '55 (61) 9912-38860',
+        ]);
+
+        $html = $this->actingAs($user)
+            ->get(route('admin.dashboard', ['aluno' => $aluno->id]))
+            ->assertOk()
+            ->assertSee('Registrar contato')
+            ->assertSee('Conversar com aluno')
+            ->assertSee('href="https://wa.me/5561991238860"', false)
+            ->assertSee('target="_blank"', false)
+            ->getContent();
+        $this->assertTrue(strpos($html, 'Registrar contato') < strpos($html, 'Conversar com aluno'));
+
+        $semTelefone = $this->aluno(['nome' => 'Sem Telefone']);
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['aluno' => $semTelefone->id]))
+            ->assertOk()
+            ->assertDontSee('Conversar com aluno')
+            ->assertDontSee('https://wa.me/');
+    }
+
     public function test_registrar_contato_conclui_a_acao_academica(): void
     {
         $user = User::factory()->create();
