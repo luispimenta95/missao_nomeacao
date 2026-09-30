@@ -59,6 +59,19 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function whatsapp(Aluno $aluno)
+    {
+        $url = $aluno->linkWhatsappWeb();
+        abort_if($url === null, 404);
+
+        return response()
+            ->view('admin.dashboard.whatsapp', [
+                'url' => $url,
+                'nome' => $aluno->nome,
+            ])
+            ->header('Cache-Control', 'no-store');
+    }
+
     public function storeContato(Request $request, Aluno $aluno)
     {
         $dados = $request->validate([
