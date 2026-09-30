@@ -54,8 +54,10 @@ class LiberarPeriodosPdfCommandTest extends TestCase
             'id'
         );
         $this->assertContains('liberar-periodos', $ids('2026-09-16 00:05:00'));
+        $this->assertContains('liberar-periodos', $ids('2026-09-16 00:09:00'));
         $this->assertContains('liberar-periodos', $ids('2026-10-01 00:05:00'));
         $this->assertNotContains('liberar-periodos', $ids('2026-09-16 00:04:00'));
+        $this->assertNotContains('liberar-periodos', $ids('2026-09-16 00:10:00'));
         $this->assertNotContains('liberar-periodos', $ids('2026-09-15 12:00:00'));
 
         $agenda = (string) file_get_contents(base_path('routes/console.php'));
@@ -65,6 +67,6 @@ class LiberarPeriodosPdfCommandTest extends TestCase
         $workflow = (string) file_get_contents(base_path('.github/workflows/tutory-relatorios.yml'));
         $this->assertStringContainsString('tutory:liberar-periodos-pdf', $workflow);
         $this->assertStringContainsString('tutory:executar-agendados', $workflow);
-        $this->assertStringNotContainsString('5 3 1,16 * *', $workflow);
+        $this->assertStringContainsString('5-9 3 1,16 * *', $workflow);
     }
 }

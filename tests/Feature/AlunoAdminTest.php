@@ -325,8 +325,12 @@ class AlunoAdminTest extends TestCase
         $fuso = new \DateTimeZone('America/Sao_Paulo');
         $cedo = array_column($agenda->devidos(new \DateTimeImmutable('2026-09-28 05:59:00', $fuso)), 'id');
         $naHora = array_column($agenda->devidos(new \DateTimeImmutable('2026-09-28 06:00:00', $fuso)), 'id');
+        $ainda = array_column($agenda->devidos(new \DateTimeImmutable('2026-09-28 06:04:00', $fuso)), 'id');
+        $tarde = array_column($agenda->devidos(new \DateTimeImmutable('2026-09-29 11:05:00', $fuso)), 'id');
         $this->assertNotContains('sincronizar-alunos', $cedo);
         $this->assertContains('sincronizar-alunos', $naHora);
+        $this->assertContains('sincronizar-alunos', $ainda);
+        $this->assertNotContains('sincronizar-alunos', $tarde);
 
         $src = (string) file_get_contents(base_path('routes/console.php'));
         $this->assertStringContainsString("Schedule::command('tutory:executar-agendados')", $src);
@@ -336,12 +340,12 @@ class AlunoAdminTest extends TestCase
 
         $workflow = (string) file_get_contents(base_path('.github/workflows/tutory-relatorios.yml'));
         $this->assertStringContainsString('tutory:executar-agendados', $workflow);
-        $this->assertStringContainsString('17,47 * * * *', $workflow);
-        $this->assertStringNotContainsString('0 9 * * *', $workflow);
-        $this->assertStringNotContainsString('0 9 1,16 * *', $workflow);
+        $this->assertStringContainsString('0-4 9 * * *', $workflow);
+        $this->assertStringNotContainsString('17,47 * * * *', $workflow);
 
         $deploy = (string) file_get_contents(base_path('.github/workflows/deploy.yml'));
         $this->assertStringContainsString('instalar-cron-scheduler.sh', $deploy);
+        $this->assertStringContainsString('garantir-cron-hostinger.sh', $deploy);
     }
 
     /**
