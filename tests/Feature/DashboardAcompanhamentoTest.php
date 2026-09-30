@@ -523,10 +523,13 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertSee('Andreza Crítica')
             ->assertSee('Helena Em Dia')
             ->assertSee('Caio Presença')
+            ->assertSee('name="acao"', false)
+            ->assertSee('Todas as ações (3)')
             ->assertSee('Ok (1)')
             ->assertSee('Marcar presença (1)')
             ->assertSee('Intervir (1)')
-            ->assertSee('Constância: Bom');
+            ->assertSee('Constância: Bom')
+            ->assertDontSee('ring-2 ring-primary-light');
 
         $legado = $this->aluno([
             'nome' => 'Legado Em Dia',
@@ -541,7 +544,8 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertOk()
             ->assertSee('Helena Em Dia')
             ->assertDontSee('Andreza Crítica')
-            ->assertDontSee('Caio Presença');
+            ->assertDontSee('Caio Presença')
+            ->assertSee('value="ok" selected', false);
 
         $this->actingAs($user)
             ->get(route('admin.dashboard', ['acao' => 'marcar_presenca']))
