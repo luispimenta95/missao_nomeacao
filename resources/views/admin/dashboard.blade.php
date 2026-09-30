@@ -125,32 +125,10 @@ use App\Enums\FocoAcompanhamento;
             @endif
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 px-5 pt-3">
-            <a href="{{ $consulta->url(['acao' => null, 'page' => null, 'aluno' => null]) }}" class="rounded px-4 py-2 text-sm font-medium transition {{ $consulta->acao === null ? 'bg-primary-light text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
-                Todas as ações ({{ $contagens[$consulta->situacao->value] }})
-            </a>
-            @foreach(AcaoAcompanhamento::cases() as $acao)
-            @php
-            $chip = match ($acao) {
-            AcaoAcompanhamento::Intervir => 'bg-red-100 text-red-800',
-            AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
-            AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
-            AcaoAcompanhamento::Ok => 'bg-gray-100 text-gray-700',
-            };
-            @endphp
-            <a href="{{ $consulta->url(['acao' => $acao->value, 'page' => null, 'aluno' => null]) }}" class="rounded px-4 py-2 text-sm font-medium {{ $consulta->acao === $acao ? 'ring-2 ring-primary-light '.$chip : $chip }}">
-                {{ $acao->rotulo() }} ({{ $contagens[$acao->value] }})
-            </a>
-            @endforeach
-        </div>
-
-        <form method="GET" action="{{ route('admin.dashboard') }}" class="grid gap-3 px-5 py-4 md:grid-cols-[240px_1fr]">
+        <form method="GET" action="{{ route('admin.dashboard') }}" class="grid gap-3 px-5 py-4 md:grid-cols-[240px_240px_1fr]">
             <input type="hidden" name="situacao" value="{{ $consulta->situacao->value }}">
             @if($consulta->foco)
             <input type="hidden" name="foco" value="{{ $consulta->foco->value }}">
-            @endif
-            @if($consulta->acao)
-            <input type="hidden" name="acao" value="{{ $consulta->acao->value }}">
             @endif
             @if($consulta->status)
             <input type="hidden" name="status" value="{{ $consulta->status }}">
@@ -159,6 +137,12 @@ use App\Enums\FocoAcompanhamento;
                 <option value="">Todos os parâmetros</option>
                 @foreach(FiltroParametroAcompanhamento::cases() as $parametro)
                 <option value="{{ $parametro->value }}" @selected($consulta->parametro === $parametro)>{{ $parametro->rotulo() }}</option>
+                @endforeach
+            </select>
+            <select name="acao" onchange="this.form.submit()" class="rounded border border-gray-300 bg-white px-3 py-3 text-sm text-gray-800 focus:border-primary focus:ring-primary">
+                <option value="">Todas as ações ({{ $contagens[$consulta->situacao->value] }})</option>
+                @foreach(AcaoAcompanhamento::cases() as $acao)
+                <option value="{{ $acao->value }}" @selected($consulta->acao === $acao)>{{ $acao->rotulo() }} ({{ $contagens[$acao->value] }})</option>
                 @endforeach
             </select>
             <label class="relative block">
