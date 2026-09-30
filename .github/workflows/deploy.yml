@@ -16,15 +16,16 @@ jobs:
         uses: easingthemes/ssh-deploy@v5.1.0
         with:
           SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_KEY }}
-          # --delete apaga no servidor o que não está no git. .env e sqlite
-          # existem só na Hostinger — o --exclude precisa estar nos ARGS
-          # (ssh-deploy quebra ARGS por espaço; não use aspas internas).
-          ARGS: "-avzr --delete --exclude=.env --exclude=.env.backup --exclude=.env.local --exclude=.env.production"
+          # --delete apaga no servidor o que não está no git. .env, sqlite e
+          # uploads (capas das turmas em public/storage) existem só na Hostinger.
+          # O --exclude precisa estar nos ARGS (ssh-deploy quebra ARGS por espaço;
+          # não use aspas internas).
+          ARGS: "-avzr --delete --exclude=.env --exclude=.env.backup --exclude=.env.local --exclude=.env.production --exclude=public/storage/ --exclude=storage/app/public/"
           REMOTE_PORT: ${{ secrets.HOSTINGER_PORT }}
           REMOTE_HOST: ${{ secrets.HOSTINGER_HOST }}
           REMOTE_USER: ${{ secrets.HOSTINGER_USER }}
           TARGET: "domains/missaonomeacao.com.br/public_html/server/"
-          EXCLUDE: "/.git/, /node_modules/, /vendor/, .env, .env.backup, .env.local, .env.production, /database/*.sqlite*, /storage/logs/, /storage/framework/cache/, /storage/framework/sessions/, /storage/framework/views/"
+          EXCLUDE: "/.git/, /node_modules/, /vendor/, .env, .env.backup, .env.local, .env.production, /database/*.sqlite*, /public/storage/, /storage/app/public/, /storage/logs/, /storage/framework/cache/, /storage/framework/sessions/, /storage/framework/views/"
           SCRIPT_AFTER_REQUIRED: "true"
           SCRIPT_AFTER: |
             cd domains/missaonomeacao.com.br/public_html/server

@@ -270,6 +270,20 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringNotContainsString('TARGET: "domains/missaonomeacao.com.br/public_html/"', $yml);
     }
 
+    public function test_deploy_nao_apaga_as_capas_das_turmas(): void
+    {
+        $yml = (string) file_get_contents(base_path('.github/workflows/deploy.yml'));
+        $this->assertStringContainsString('--exclude=public/storage/', $yml);
+        $this->assertStringContainsString('/public/storage/', $yml);
+        $this->assertStringContainsString('--exclude=storage/app/public/', $yml);
+        $this->assertStringContainsString('/storage/app/public/', $yml);
+
+        $gitignore = (string) file_get_contents(base_path('.gitignore'));
+        $this->assertStringContainsString('/public/storage', $gitignore);
+
+        $this->assertSame(public_path('storage'), config('filesystems.disks.public.root'));
+    }
+
     public function test_css_do_consolidado_nao_deixa_bloco_cinza_no_rodape(): void
     {
         $downloader = new CoachReportDownloader('1', static function (): void {});
