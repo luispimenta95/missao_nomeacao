@@ -125,28 +125,22 @@ node scripts/tutory-render-pdf.mjs --url "https://admin.tutory.com.br/documentos
 
 ## Agendamento
 
-O Laravel **não dispara sozinho**. O schedule do GitHub Actions também não serve de relógio: o evento `schedule` é best-effort, some no pico da hora e **nenhuma run aparece** em Actions. A sincronização manual (Action → Run workflow, ou `php artisan` no SSH) grava o mesmo `production.INFO` e por isso parece que “o job rodou”, mas o horário sozinho não chegou a disparar.
+O Laravel **não dispara sozinho**. O fuso dos jobs é **America/Sao_Paulo** (UTC−3 o ano inteiro), não o relógio UTC do servidor. Cada job só roda no minuto da tabela e nos **4 minutos seguintes**. A sincronização das 06:00 não roda às 11:05.
 
-Há três disparos, do mais garantido neste plano da Hostinger para o reforço:
-
-1. **Visita ao site.** Depois que a resposta sai, `TutorySchedulerKick` chama `tutory:executar-agendados --sem-relatorios` (sincroniza alunos e libera períodos; não gera o PDF, porque o PHP do site corta a execução no meio do envio). Não depende de hPanel nem do schedule do GitHub. Se ninguém abriu o site às 06:00, a primeira visita do dia ainda sincroniza.
-2. **Cron no hPanel** (recomendado para o PDF, que pode passar do tempo do PHP web). Websites → Cron Jobs → Custom, uma vez por minuto:
+O relógio é um cron **de todo minuto** na Hostinger, que chama `scripts/tutory-scheduler.sh`. O PHP é que decide se aquele minuto é o horário do job. O plano Web/Cloud não tem `crontab` pelo SSH. O deploy cria o cron pela API da Hostinger quando o secret `HOSTINGER_API_TOKEN` existe; se não existir, cadastre no hPanel → Cron Jobs → Custom, uma vez por minuto:
 
 ```text
 /bin/sh /home/USUARIO/domains/missaonomeacao.com.br/public_html/server/scripts/tutory-scheduler.sh
 ```
 
-O plano Web/Cloud **não tem** `crontab` pelo SSH; o deploy tenta instalar e, se o binário não existir, imprime essa linha. No VPS, `scripts/instalar-cron-scheduler.sh` grava o cron de `schedule:run`.
-3. **GitHub Action** `.github/workflows/tutory-relatorios.yml`, nos minutos 17 e 47 de cada hora (UTC), chamando o mesmo comando. Também dá para rodar à mão em Actions → Tutory Relatorios → Run workflow.
-
-`tutory:executar-agendados` recupera o que passou do horário e ainda não concluiu naquele dia.
+A Action do GitHub chama o mesmo comando só nos horários equivalentes em UTC. Uma visita ao site também chama o comando, mas só se o relógio já estiver dentro desses 4 minutos, e sem gerar PDF.
 
 | Job | Comando | Quando (America/Sao_Paulo) |
 |-----|---------|--------|
-| Sincronizar alunos | `tutory:sincronizar-alunos` | Todo dia, a partir das **06:00**, uma vez |
-| Periodo 1 | `tutory:baixar-relatorios --periodo=1 --se-pendente` | Dia **16**, **10:30–22:59** (retenta no dia **17**, **11:00–22:59**, se ainda não enviou) |
-| Periodo 2 | `tutory:baixar-relatorios --periodo=2 --se-pendente` | Dia **1**, **10:30–22:59** (retenta no dia **2**, **11:00–22:59**) |
-| Liberar períodos no admin | `tutory:liberar-periodos-pdf` | Dias **1** e **16**, a partir das **00:05**, uma vez |
+| Sincronizar alunos | `tutory:sincronizar-alunos` | Todo dia, **06:00** |
+| Periodo 1 | `tutory:baixar-relatorios --periodo=1 --se-pendente` | Dia **16**, **10:30**. Se não enviou, de hora em hora às **11:00–22:00** nos dias **16** e **17** |
+| Periodo 2 | `tutory:baixar-relatorios --periodo=2 --se-pendente` | Dia **1**, **10:30**. Se não enviou, de hora em hora às **11:00–22:00** nos dias **1** e **2** |
+| Liberar períodos no admin | `tutory:liberar-periodos-pdf` | Dias **1** e **16**, **00:05** |
 
 `--se-pendente` grava em `configuracoes` e evita e-mail duplicado se o cron e a Action rodarem no mesmo período. A trava do sync (`tutory.job.sincronizar-alunos.YYYY-MM-DD`) vale só para o agendado; rodar `tutory:sincronizar-alunos` à mão não é bloqueado por ela.
 

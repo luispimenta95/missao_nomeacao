@@ -9,10 +9,9 @@ use Throwable;
 /**
  * Dispara o scheduler no fim do request HTTP.
  *
- * No plano compartilhado da Hostinger não há crontab pelo SSH, e o schedule
- * do GitHub Actions descarta o evento sem criar run. A visita ao site (admin
- * ou landing) é o relógio que existe de fato: a resposta já foi enviada, e
- * tutory:executar-agendados recupera o que passou do horário.
+ * A visita só dispara o job se o relógio de America/Sao_Paulo estiver no
+ * minuto agendado (ou nos 4 minutos seguintes). Não recupera um horário
+ * que já passou.
  */
 class TutorySchedulerKick
 {

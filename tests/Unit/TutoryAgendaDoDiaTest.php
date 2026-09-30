@@ -24,25 +24,32 @@ class TutoryAgendaDoDiaTest extends TestCase
         $this->fuso = new DateTimeZone('America/Sao_Paulo');
     }
 
-    public function test_sync_abre_as_6_e_continua_devido_o_resto_do_dia(): void
+    public function test_sync_so_roda_as_6_em_sao_paulo(): void
     {
         $agenda = new TutoryAgendaDoDia;
 
         $this->assertNotContains('sincronizar-alunos', $this->ids($agenda, '2026-09-28 05:59:00'));
         $this->assertContains('sincronizar-alunos', $this->ids($agenda, '2026-09-28 06:00:00'));
-        $this->assertContains('sincronizar-alunos', $this->ids($agenda, '2026-09-28 11:25:00'));
-        $this->assertNotContains('relatorio-1', $this->ids($agenda, '2026-09-28 11:25:00'));
-        $this->assertNotContains('liberar-periodos', $this->ids($agenda, '2026-09-28 11:25:00'));
+        $this->assertContains('sincronizar-alunos', $this->ids($agenda, '2026-09-28 06:04:00'));
+        $this->assertNotContains('sincronizar-alunos', $this->ids($agenda, '2026-09-28 06:05:00'));
+        $this->assertNotContains('sincronizar-alunos', $this->ids($agenda, '2026-09-29 11:05:00'));
+        $this->assertNotContains('relatorio-1', $this->ids($agenda, '2026-09-29 11:05:00'));
+        $this->assertNotContains('liberar-periodos', $this->ids($agenda, '2026-09-29 11:05:00'));
     }
 
-    public function test_relatorio_periodo_1_na_janela_e_na_retentativa(): void
+    public function test_relatorio_periodo_1_no_minuto_marcado(): void
     {
         $agenda = new TutoryAgendaDoDia;
 
         $this->assertNotContains('relatorio-1', $this->ids($agenda, '2026-09-16 10:29:00'));
         $this->assertContains('relatorio-1', $this->ids($agenda, '2026-09-16 10:30:00'));
-        $this->assertContains('relatorio-1', $this->ids($agenda, '2026-09-16 22:59:00'));
-        $this->assertNotContains('relatorio-1', $this->ids($agenda, '2026-09-16 23:00:00'));
+        $this->assertContains('relatorio-1', $this->ids($agenda, '2026-09-16 10:34:00'));
+        $this->assertNotContains('relatorio-1', $this->ids($agenda, '2026-09-16 10:35:00'));
+        $this->assertContains('relatorio-1', $this->ids($agenda, '2026-09-16 11:00:00'));
+        $this->assertNotContains('relatorio-1', $this->ids($agenda, '2026-09-16 11:30:00'));
+        $this->assertContains('relatorio-1', $this->ids($agenda, '2026-09-16 22:00:00'));
+        $this->assertContains('relatorio-1', $this->ids($agenda, '2026-09-16 22:04:00'));
+        $this->assertNotContains('relatorio-1', $this->ids($agenda, '2026-09-16 22:05:00'));
         $this->assertNotContains('relatorio-1', $this->ids($agenda, '2026-09-17 10:59:00'));
         $this->assertContains('relatorio-1', $this->ids($agenda, '2026-09-17 11:00:00'));
         $this->assertNotContains('relatorio-1', $this->ids($agenda, '2026-09-17 23:00:00'));
@@ -57,20 +64,26 @@ class TutoryAgendaDoDiaTest extends TestCase
         $this->assertNotContains('sincronizar-alunos', $meiaNoite);
         $this->assertNotContains('relatorio-2', $meiaNoite);
 
+        $seis = $this->ids($agenda, '2026-10-01 06:00:00');
+        $this->assertContains('sincronizar-alunos', $seis);
+        $this->assertNotContains('liberar-periodos', $seis);
+        $this->assertNotContains('relatorio-2', $seis);
+
         $dezEMeia = $this->ids($agenda, '2026-10-01 10:30:00');
-        $this->assertContains('liberar-periodos', $dezEMeia);
-        $this->assertContains('sincronizar-alunos', $dezEMeia);
         $this->assertContains('relatorio-2', $dezEMeia);
+        $this->assertNotContains('sincronizar-alunos', $dezEMeia);
+        $this->assertNotContains('liberar-periodos', $dezEMeia);
 
         $this->assertNotContains('relatorio-2', $this->ids($agenda, '2026-10-02 10:59:00'));
         $this->assertContains('relatorio-2', $this->ids($agenda, '2026-10-02 12:00:00'));
+        $this->assertNotContains('relatorio-2', $this->ids($agenda, '2026-10-02 12:30:00'));
         $this->assertNotContains('relatorio-2', $this->ids($agenda, '2026-10-02 23:00:00'));
     }
 
     public function test_executor_roda_o_sync_uma_vez_por_dia(): void
     {
         $executor = new TutoryAgendaExecutor;
-        $quando = new DateTimeImmutable('2026-09-28 11:25:00', $this->fuso);
+        $quando = new DateTimeImmutable('2026-09-28 06:00:00', $this->fuso);
         $rodados = [];
 
         $executor->executar($quando, function (string $comando, array $argumentos) use (&$rodados): int {
@@ -125,7 +138,7 @@ class TutoryAgendaDoDiaTest extends TestCase
         $rodados = 0;
 
         $resultado = $executor->executar(
-            new DateTimeImmutable('2026-09-28 11:25:00', $this->fuso),
+            new DateTimeImmutable('2026-09-28 06:02:00', $this->fuso),
             function () use (&$rodados): int {
                 $rodados++;
 
@@ -147,7 +160,7 @@ class TutoryAgendaDoDiaTest extends TestCase
         $rodados = 0;
 
         $executor->executar(
-            new DateTimeImmutable('2026-09-28 11:25:00', $this->fuso),
+            new DateTimeImmutable('2026-09-28 06:03:00', $this->fuso),
             function () use (&$rodados): int {
                 $rodados++;
 
@@ -160,7 +173,7 @@ class TutoryAgendaDoDiaTest extends TestCase
 
     public function test_executor_pula_relatorio_que_ja_foi_enviado(): void
     {
-        $quando = new DateTimeImmutable('2026-09-16 15:00:00', $this->fuso);
+        $quando = new DateTimeImmutable('2026-09-16 10:30:00', $this->fuso);
         (new TutoryRelatorioAgenda)->marcarConcluido('1', $quando);
 
         $executor = new TutoryAgendaExecutor;
@@ -173,14 +186,14 @@ class TutoryAgendaDoDiaTest extends TestCase
 
         $this->assertNotContains('tutory:baixar-relatorios', $rodados);
         $this->assertContains('relatorio-1', $resultado['pulados']);
-        $this->assertContains('tutory:sincronizar-alunos', $rodados);
+        $this->assertNotContains('tutory:sincronizar-alunos', $rodados);
     }
 
     public function test_visita_nao_dispara_geracao_de_pdf(): void
     {
         $rodados = [];
         (new TutoryAgendaExecutor)->executar(
-            new DateTimeImmutable('2026-09-16 15:00:00', $this->fuso),
+            new DateTimeImmutable('2026-09-28 06:01:00', $this->fuso),
             function (string $comando) use (&$rodados): int {
                 $rodados[] = $comando;
 
@@ -190,7 +203,7 @@ class TutoryAgendaDoDiaTest extends TestCase
         );
 
         $this->assertContains('tutory:sincronizar-alunos', $rodados);
-        $this->assertContains('tutory:liberar-periodos-pdf', $rodados);
+        $this->assertNotContains('tutory:liberar-periodos-pdf', $rodados);
         $this->assertNotContains('tutory:baixar-relatorios', $rodados);
 
         $provider = (string) file_get_contents(base_path('app/Providers/AppServiceProvider.php'));

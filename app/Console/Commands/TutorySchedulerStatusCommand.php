@@ -39,9 +39,8 @@ class TutorySchedulerStatusCommand extends Command
             $this->error('schedule:list falhou: '.$exc->getMessage());
         }
         $this->newLine();
-        $this->comment('Sem cron, uma visita ao site dispara tutory:executar-agendados depois da resposta.');
-        $this->comment('No hPanel, o cron de todo minuto deve chamar scripts/tutory-scheduler.sh.');
-        $this->comment('O workflow GitHub "Tutory Relatorios" só reforça, quando o schedule dele chega a criar uma run.');
+        $this->comment('Cada job só roda no minuto de America/Sao_Paulo (mais 4 minutos de tolerância).');
+        $this->comment('O cron de todo minuto é scripts/tutory-scheduler.sh. Sem ele, o GitHub não segura o horário.');
 
         return self::SUCCESS;
     }

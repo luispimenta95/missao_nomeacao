@@ -1,18 +1,27 @@
 name: Tutory Relatorios
 
-# Reforço dos jobs da Tutory. O disparo principal é o cron da Hostinger
-# (scripts/instalar-cron-scheduler.sh, chamado no deploy), que roda
-# `php artisan schedule:run` todo minuto. tutory:executar-agendados
-# recupera o que passou do horário e ainda não concluiu naquele dia.
+# Reforço dos horários da Tutory. O relógio que segura o minuto é o cron
+# de todo minuto na Hostinger. Estes crons são UTC (Brasília = UTC−3).
+# O artisan só executa se, em America/Sao_Paulo, o relógio estiver no
+# minuto marcado ou nos 4 seguintes. Um atraso até 11:05 não dispara as 06:00.
 #
-# O schedule do GitHub é best-effort: no pico da hora o evento é
-# descartado e nenhuma run aparece em Actions. Por isso o cron abaixo
-# evita o minuto 0 e só chama o comando de catch-up, duas vezes por hora.
-# Horários em UTC (Brasília = UTC-3, sem horário de verão).
+#   06:00 BRT = 09:00 UTC  sync, todo dia
+#   00:05 BRT = 03:05 UTC  liberar períodos, dias 1 e 16
+#   10:30 BRT = 13:30 UTC  PDF, dia 16 (período 1) e dia 1 (período 2)
+#   11:00–22:00 BRT        retentativa de hora em hora
+#     11:00–20:00 BRT = 14:00–23:00 UTC no mesmo dia
+#     21:00–22:00 BRT = 00:00–01:00 UTC no dia seguinte
 
 on:
   schedule:
-    - cron: "17,47 * * * *"
+    - cron: "0-4 9 * * *"
+    - cron: "5-9 3 1,16 * *"
+    - cron: "30-34 13 16 * *"
+    - cron: "30-34 13 1 * *"
+    - cron: "0-4 14-23 16,17 * *"
+    - cron: "0-4 0,1 17,18 * *"
+    - cron: "0-4 14-23 1,2 * *"
+    - cron: "0-4 0,1 2,3 * *"
   workflow_dispatch:
     inputs:
       comando:
