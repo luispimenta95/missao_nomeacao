@@ -86,7 +86,7 @@ Colunas de faixa do último período (não renomeie; o admin e o e-mail já leem
 - `last_subjects`
 - `prev_*` — período anterior, para a tendência do dashboard
 
-`recebe_email` decide o envio. `ativo` espelha o status na Tutory.
+`recebe_email` decide o envio. `ativo` espelha o status na Tutory. `telefone` guarda o telefone de contato informado no admin (opcional, até 50 caracteres). O sync da Tutory não preenche nem apaga esse campo.
 
 ### Desempenho
 

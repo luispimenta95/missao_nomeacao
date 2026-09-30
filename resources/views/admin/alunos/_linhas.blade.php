@@ -2,6 +2,7 @@
 <tr class="hover:bg-gray-50">
     <td class="px-4 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">{{ $aluno->nome }}</td>
     <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{{ $aluno->email }}</td>
+    <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{{ $aluno->telefone ?: '—' }}</td>
     <td class="px-4 py-3 text-sm whitespace-nowrap">{{ $aluno->ativo ? 'Ativo' : 'Inativo' }}</td>
     <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_performance" /></td>
     <td class="px-4 py-3 text-sm text-gray-700"><x-desempenho-badge :valor="$aluno->last_question_volume" /></td>

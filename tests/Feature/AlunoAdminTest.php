@@ -33,6 +33,56 @@ class AlunoAdminTest extends TestCase
         $this->assertSame(1, Aluno::query()->count());
     }
 
+    public function test_admin_salva_e_limpa_o_telefone_de_contato(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('alunos.store'), [
+                'nome' => 'Giovanna',
+                'email' => 'giovanna@example.com',
+                'telefone' => ' (61) 99999-0000 ',
+                'recebe_email' => '1',
+            ])
+            ->assertRedirect(route('alunos.index'))
+            ->assertSessionHas('success');
+
+        $aluno = Aluno::query()->where('email', 'giovanna@example.com')->first();
+        $this->assertNotNull($aluno);
+        $this->assertSame('(61) 99999-0000', $aluno->telefone);
+
+        $this->actingAs($user)
+            ->get(route('alunos.index'))
+            ->assertOk()
+            ->assertSee('(61) 99999-0000');
+
+        $this->actingAs($user)
+            ->get(route('alunos.edit', $aluno))
+            ->assertOk()
+            ->assertSee('value="(61) 99999-0000"', false);
+
+        $this->actingAs($user)
+            ->from(route('alunos.create'))
+            ->post(route('alunos.store'), [
+                'nome' => 'Outra Pessoa',
+                'email' => 'outra@example.com',
+                'telefone' => str_repeat('9', 51),
+            ])
+            ->assertRedirect(route('alunos.create'))
+            ->assertSessionHasErrors('telefone');
+
+        $this->actingAs($user)
+            ->put(route('alunos.update', $aluno), [
+                'nome' => 'Giovanna',
+                'email' => 'giovanna@example.com',
+                'telefone' => '   ',
+                'recebe_email' => '1',
+            ])
+            ->assertRedirect(route('alunos.index'));
+
+        $this->assertNull($aluno->fresh()->telefone);
+    }
+
     public function test_lista_mostra_as_faixas_de_desempenho_do_aluno(): void
     {
         $user = User::factory()->create();
@@ -226,10 +276,10 @@ class AlunoAdminTest extends TestCase
 
         $linhas = $this->linhasCsv((string) $this->actingAs($user)->get(route('alunos.export'))->getContent());
         $this->assertSame('Bruno Ativo', $linhas[1][0]);
-        $this->assertSame('Ativo', $linhas[1][3]);
+        $this->assertSame('Ativo', $linhas[1][4]);
         $this->assertSame('Zeca Ativo', $linhas[2][0]);
         $this->assertSame('Ana Inativa', $linhas[3][0]);
-        $this->assertSame('Inativo', $linhas[3][3]);
+        $this->assertSame('Inativo', $linhas[3][4]);
     }
 
     public function test_exporta_alunos_em_csv(): void
@@ -238,6 +288,7 @@ class AlunoAdminTest extends TestCase
         Aluno::create([
             'nome' => 'Giovanna "Silva", Jr.',
             'email' => 'giovanna@example.com',
+            'telefone' => '(61) 99999-0000',
             'recebe_email' => true,
             'last_performance' => 'Brigando com a constância',
             'last_question_volume' => 'Volume suficiente',
@@ -262,12 +313,13 @@ class AlunoAdminTest extends TestCase
 
         $linhas = $this->linhasCsv((string) $resposta->getContent());
         $this->assertSame(
-            ['Nome', 'E-mail', 'Recebe e-mail', 'Status', 'Constância', 'Questões', '% acertos', 'Assuntos'],
+            ['Nome', 'E-mail', 'Telefone', 'Recebe e-mail', 'Status', 'Constância', 'Questões', '% acertos', 'Assuntos'],
             $linhas[0]
         );
         $this->assertSame([
             'Giovanna "Silva", Jr.',
             'giovanna@example.com',
+            '(61) 99999-0000',
             'Sim',
             'Ativo',
             'Brigando com a constância',
@@ -278,6 +330,7 @@ class AlunoAdminTest extends TestCase
         $this->assertSame([
             'Maria Souza',
             'maria@example.com',
+            '',
             'Não',
             'Ativo',
             '',
