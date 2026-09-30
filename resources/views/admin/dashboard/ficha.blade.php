@@ -3,17 +3,15 @@
     use App\Enums\TendenciaFaixa;
     use App\Services\Acompanhamento\TextoAcompanhamento;
 
-    $planoEncerrado = ! $linha->aluno->ativo;
+    $planoEncerrado = $linha->ficha->acao === AcaoAcompanhamento::RestabelecerContato;
     $linkWhatsapp = $linha->aluno->linkWhatsappWeb() ?? '';
-    $estilo = $planoEncerrado
-        ? 'bg-gray-100 text-gray-700'
-        : match ($linha->ficha->acao) {
-            AcaoAcompanhamento::Intervir => 'bg-red-100 text-red-800',
-            AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
-            AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
-            AcaoAcompanhamento::Ok => 'bg-gray-100 text-gray-700',
-        };
-    $rotuloAcao = $planoEncerrado ? 'Restabelecer contato' : $linha->ficha->acao->rotulo();
+    $estilo = match ($linha->ficha->acao) {
+        AcaoAcompanhamento::Intervir => 'bg-red-100 text-red-800',
+        AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
+        AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
+        AcaoAcompanhamento::Ok, AcaoAcompanhamento::RestabelecerContato => 'bg-gray-100 text-gray-700',
+    };
+    $rotuloAcao = $linha->ficha->acao->rotulo();
     $temPonte = collect($linha->ficha->motivos)->contains(fn ($motivo) => $motivo->ponteProtocoloResgate);
 @endphp
 
