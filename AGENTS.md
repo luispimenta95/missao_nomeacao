@@ -119,12 +119,12 @@ Trava de “já enviei” e heartbeat ficam na tabela `configuracoes`, via `Conf
 
 Quem decide se o minuto é de um job é `TutoryAgendaDoDia` (America/Sao_Paulo). Cada horário vale no minuto marcado e nos **4 minutos seguintes**. Um tick às 11:05 não dispara o job das 06:00.
 
-| Job | Comando | Quando |
-|---|---|---|
-| Sync | `tutory:sincronizar-alunos` | todo dia, 06:00 |
-| Período 1 | `tutory:baixar-relatorios --periodo=1 --se-pendente` | dia 16, 10:30; retentativa de hora em hora, 11:00–22:00, nos dias 16 e 17 |
-| Período 2 | `tutory:baixar-relatorios --periodo=2 --se-pendente` | dia 1, 10:30; retentativa 11:00–22:00 nos dias 1 e 2 |
-| Liberar períodos no admin | `tutory:liberar-periodos-pdf` | dias 1 e 16, 00:05 |
+| Job                       | Comando                                              | Quando                                                                    |
+| ------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------- |
+| Sync                      | `tutory:sincronizar-alunos`                          | todo dia, 06:00                                                           |
+| Período 1                 | `tutory:baixar-relatorios --periodo=1 --se-pendente` | dia 16, 10:30; retentativa de hora em hora, 11:00–22:00, nos dias 16 e 17 |
+| Período 2                 | `tutory:baixar-relatorios --periodo=2 --se-pendente` | dia 1, 10:30; retentativa 11:00–22:00 nos dias 1 e 2                      |
+| Liberar períodos no admin | `tutory:liberar-periodos-pdf`                        | dias 1 e 16, 00:05                                                        |
 
 O Laravel não dispara sozinho. O relógio é um cron de todo minuto na Hostinger (`scripts/tutory-scheduler.sh`), que chama `tutory:executar-agendados`. O schedule em `routes/console.php` também é de todo minuto. A Action `tutory-relatorios.yml` repete os mesmos horários em UTC. Uma visita ao site chama `TutorySchedulerKick` no `terminating`, só dentro dessa janela de 4 minutos, e sem gerar PDF.
 
@@ -161,3 +161,4 @@ Credenciais da Tutory são `LOGIN_USER` e `LOGIN_PASSWORD`. Não hardcode senha 
 - Nova coluna: migration com data, `$fillable` e cast. Produção aplica com `migrate --force` no deploy; não dependa de `migrate:fresh`.
 - Não adicione Node, Puppeteer ou Chrome ao caminho de produção.
 - Não calcule “está na hora?” com `now()` em UTC. Use `America/Sao_Paulo`, como `TutoryAgendaDoDia`.
+- Evite utilizar sub agentes que façam uso de ferramentas visuais para validar as mudanças realizadas
