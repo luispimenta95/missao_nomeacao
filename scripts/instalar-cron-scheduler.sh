@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Tenta gravar o cron do scheduler. No plano Web/Cloud da Hostinger o
-# binário crontab não existe; nesse caso o script só imprime o comando
-# do hPanel. A visita ao site cobre a sincronização enquanto o cron não existe.
+# Tenta gravar o cron de todo minuto. O PHP só executa o job no minuto
+# de America/Sao_Paulo. No plano Web/Cloud o binário crontab não existe.
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,7 +16,7 @@ if ! command -v crontab >/dev/null 2>&1; then
   echo "AVISO: este plano da Hostinger não tem crontab pelo SSH." >&2
   echo "No hPanel → Cron Jobs → Custom, uma vez por minuto, use:" >&2
   echo "/bin/sh $APP_DIR/scripts/tutory-scheduler.sh" >&2
-  echo "Enquanto o cron não existir, uma visita ao site sincroniza os alunos depois da resposta." >&2
+  echo "Sem esse cron, um tick atrasado não executa o horário que já passou." >&2
   exit 0
 fi
 

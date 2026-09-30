@@ -39,3 +39,9 @@ jobs:
             fi
             php artisan migrate --force --no-interaction
             bash scripts/instalar-cron-scheduler.sh
+
+      - name: Cron de todo minuto na Hostinger
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          HOSTINGER_USER: ${{ secrets.HOSTINGER_USER }}
+        run: bash scripts/garantir-cron-hostinger.sh

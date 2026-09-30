@@ -7,17 +7,18 @@ use DateTimeInterface;
 use DateTimeZone;
 
 /**
- * Janelas dos jobs da Tutory em America/Sao_Paulo.
+ * Horários dos jobs da Tutory em America/Sao_Paulo (UTC−3, o ano inteiro).
  *
- * O tick pode chegar depois do minuto exato (cron atrasado, schedule do
- * GitHub descartado). A partir do horário de abertura o job continua devido
- * até ser concluído naquele dia — ou, no caso do PDF, até o fim da retentativa.
+ * O job só está devido no minuto marcado e nos 4 minutos seguintes.
+ * Um tick às 11:05 não dispara a sincronização das 06:00.
  */
 class TutoryAgendaDoDia
 {
     public const HEARTBEAT = 'tutory.scheduler.heartbeat';
 
     public const STALE_SEGUNDOS = 1800;
+
+    public const TOLERANCIA_MINUTOS = 4;
 
     private const FUSO = 'America/Sao_Paulo';
 
@@ -31,7 +32,7 @@ class TutoryAgendaDoDia
         $data = $sp->format('Y-m-d');
         $jobs = [];
 
-        if (in_array($dia, [1, 16], true) && $this->aPartirDe($sp, 0, 5)) {
+        if (in_array($dia, [1, 16], true) && $this->noHorario($sp, 0, 5)) {
             $jobs[] = $this->job(
                 'liberar-periodos',
                 'tutory:liberar-periodos-pdf',
@@ -40,7 +41,7 @@ class TutoryAgendaDoDia
             );
         }
 
-        if ($this->aPartirDe($sp, 6, 0)) {
+        if ($this->noHorario($sp, 6, 0)) {
             $jobs[] = $this->job(
                 'sincronizar-alunos',
                 'tutory:sincronizar-alunos',
@@ -80,30 +81,31 @@ class TutoryAgendaDoDia
     }
 
     /**
-     * Dia de abertura (16 = período 1, 1 = período 2): 10:30–22:59.
-     * Dia seguinte: 11:00–22:59, para retentar se o envio não concluiu.
+     * Dia de abertura (16 = período 1, 1 = período 2): 10:30.
+     * Retentativa de hora em hora, no minuto 0, das 11:00 às 22:00,
+     * no dia de abertura e no dia seguinte, se o envio não concluiu.
      */
     private function janelaRelatorio(DateTimeImmutable $sp, int $diaAbertura): bool
     {
         $dia = (int) $sp->format('j');
-        if ($dia === $diaAbertura) {
-            return $this->aPartirDe($sp, 10, 30) && $this->ate($sp, 22, 59);
+        if ($dia === $diaAbertura && $this->noHorario($sp, 10, 30)) {
+            return true;
         }
-        if ($dia === $diaAbertura + 1) {
-            return $this->aPartirDe($sp, 11, 0) && $this->ate($sp, 22, 59);
+        if ($dia !== $diaAbertura && $dia !== $diaAbertura + 1) {
+            return false;
         }
 
-        return false;
+        $hora = (int) $sp->format('G');
+        $minuto = (int) $sp->format('i');
+
+        return $hora >= 11 && $hora <= 22 && $minuto <= self::TOLERANCIA_MINUTOS;
     }
 
-    private function aPartirDe(DateTimeImmutable $sp, int $hora, int $minuto): bool
+    private function noHorario(DateTimeImmutable $sp, int $hora, int $minuto): bool
     {
-        return $this->minutos($sp) >= ($hora * 60 + $minuto);
-    }
+        $delta = $this->minutos($sp) - ($hora * 60 + $minuto);
 
-    private function ate(DateTimeImmutable $sp, int $hora, int $minuto): bool
-    {
-        return $this->minutos($sp) <= ($hora * 60 + $minuto);
+        return $delta >= 0 && $delta <= self::TOLERANCIA_MINUTOS;
     }
 
     private function minutos(DateTimeImmutable $sp): int

@@ -16,17 +16,15 @@ Artisan::command('inspire', function () {
 | Relatórios do Coach (Tutory)
 |--------------------------------------------------------------------------
 |
-| Quem decide a janela é tutory:executar-agendados (America/Sao_Paulo):
-|   sincronizar alunos: todo dia a partir das 06:00, uma vez
-|   período 1 (dias 01–15): dia 16, 10:30–22:59; retenta no dia 17, 11:00–22:59
-|   período 2 (dia 16–fim): dia 1, 10:30–22:59; retenta no dia 2, 11:00–22:59
-|   liberar períodos no admin: dias 1 e 16 a partir das 00:05, uma vez
+| Quem decide o horário é tutory:executar-agendados (America/Sao_Paulo, UTC−3):
+|   sincronizar alunos: todo dia às 06:00
+|   período 1 (dias 01–15): dia 16 às 10:30; retenta de hora em hora, 11:00–22:00, nos dias 16 e 17
+|   período 2 (dia 16–fim): dia 1 às 10:30; retenta de hora em hora, 11:00–22:00, nos dias 1 e 2
+|   liberar períodos no admin: dias 1 e 16 às 00:05
+| Cada horário aceita 4 minutos de atraso do tick. 11:05 não roda o job das 06:00.
 |
-| O Laravel não dispara sozinho. O deploy instala um cron na Hostinger:
-|   * * * * * php artisan schedule:run
-| Um tick depois do horário ainda executa o que ficou pendente naquele dia.
-| O workflow .github/workflows/tutory-relatorios.yml é só um reforço: o
-| schedule do GitHub atrasa ou descarta o evento e a run nem aparece.
+| O relógio é o cron de todo minuto na Hostinger (`scripts/tutory-scheduler.sh`).
+| O schedule do GitHub só chama o artisan nesses mesmos horários, em UTC.
 |
 */
 

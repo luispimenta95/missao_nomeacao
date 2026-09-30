@@ -4,6 +4,7 @@
     use App\Services\Acompanhamento\TextoAcompanhamento;
 
     $planoEncerrado = ! $linha->aluno->ativo;
+    $numeroWhatsapp = preg_replace('/\D+/', '', (string) $linha->aluno->telefone) ?? '';
     $estilo = $planoEncerrado
         ? 'bg-gray-100 text-gray-700'
         : match ($linha->ficha->acao) {
@@ -22,6 +23,9 @@
             <span class="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">{{ $linha->iniciais }}</span>
             <div>
                 <h2 class="text-lg font-bold text-gray-800">{{ $linha->aluno->nome }}</h2>
+                @if(filled($linha->aluno->telefone))
+                    <p class="text-sm text-gray-600">{{ $linha->aluno->telefone }}</p>
+                @endif
                 <a href="{{ route('alunos.edit', $linha->aluno) }}" class="text-sm font-medium text-primary hover:text-primary-light">Ver ficha do aluno</a>
             </div>
         </div>
@@ -141,6 +145,12 @@
                 Registrar contato
             </button>
         </form>
+
+        @if($numeroWhatsapp !== '')
+            <a href="https://wa.me/{{ $numeroWhatsapp }}" target="_blank" rel="noopener noreferrer" class="flex w-full items-center justify-center gap-2 rounded border border-primary bg-white px-4 py-3 text-sm font-medium text-primary transition hover:bg-primary hover:text-white">
+                Conversar com aluno
+            </a>
+        @endif
 
         <form method="POST" action="{{ route('admin.dashboard.agenda.store', $linha->aluno) }}" class="space-y-3">
             @csrf

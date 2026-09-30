@@ -231,6 +231,87 @@ class SincronizarAlunosTutoryTest extends TestCase
         $this->assertSame('nayara@missaonomeacao.com.br', $mentora->fresh()->email);
     }
 
+    public function test_telefone_da_tutory_prevalece_e_ausencia_nao_apaga(): void
+    {
+        $aluno = Aluno::create([
+            'tutory_id' => '404960',
+            'nome' => 'Edileusa Pires',
+            'email' => 'edileusa@example.com',
+            'telefone' => '61999990000',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        $logs = [];
+        $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        });
+
+        $sync->sincronizarLista([
+            [
+                'id' => '404960',
+                'nome' => 'Edileusa Pires',
+                'email' => 'edileusa@example.com',
+                'telefone' => '5561991238860',
+            ],
+        ]);
+
+        $this->assertSame('5561991238860', $aluno->fresh()->telefone);
+        $this->assertTrue(collect($logs)->contains(
+            fn (string $m) => str_contains($m, 'Telefone divergente') && str_contains($m, '5561991238860')
+        ));
+
+        $sync->sincronizarLista([
+            ['id' => '404960', 'nome' => 'Edileusa Pires', 'email' => 'edileusa@example.com'],
+        ]);
+        $this->assertSame('5561991238860', $aluno->fresh()->telefone);
+
+        $sync->sincronizarLista([
+            [
+                'id' => '404960',
+                'nome' => 'Edileusa Pires',
+                'email' => 'edileusa@example.com',
+                'telefone' => null,
+            ],
+        ]);
+        $this->assertNull($aluno->fresh()->telefone);
+    }
+
+    public function test_cadastra_ativo_com_telefone_da_tutory(): void
+    {
+        $sync = new SincronizarAlunosTutory(logger: static function (): void {});
+        $resultado = $sync->sincronizarLista([
+            [
+                'id' => '404960',
+                'nome' => 'Edileusa Pires',
+                'email' => 'edileusa@example.com',
+                'telefone' => '5561991238860',
+            ],
+        ]);
+
+        $this->assertSame(1, $resultado['criados']);
+        $this->assertSame('5561991238860', Aluno::query()->first()->telefone);
+    }
+
+    public function test_inativar_nao_altera_o_telefone(): void
+    {
+        $aluno = Aluno::create([
+            'tutory_id' => '1001',
+            'nome' => 'Maria Silva',
+            'email' => 'maria@example.com',
+            'telefone' => '5561991238860',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        $sync = new SincronizarAlunosTutory(logger: static function (): void {});
+        $sync->atualizarInativos([
+            ['id' => '1001', 'nome' => 'Maria Silva', 'email' => 'maria@example.com'],
+        ]);
+
+        $aluno->refresh();
+        $this->assertFalse($aluno->ativo);
+        $this->assertSame('5561991238860', $aluno->telefone);
+    }
+
     public function test_pula_sem_email(): void
     {
         $logs = [];
