@@ -40,6 +40,15 @@
                 </label>
             </div>
 
+            <div class="mb-6">
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Telefone</span>
+                    <input type="tel" name="telefone" maxlength="50" class="mt-2 w-full rounded border border-gray-300 p-3 focus:ring-primary focus:border-primary @error('telefone') border-red-500 @enderror" value="{{ old('telefone', $aluno->telefone) }}" placeholder="(61) 99999-0000">
+                    @error('telefone') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                </label>
+                <p class="text-xs text-gray-500 mt-1">Telefone de contato do aluno. Opcional.</p>
+            </div>
+
             <x-desempenho-readonly label="Constância" :valor="$aluno->last_performance" />
             <x-desempenho-readonly label="Quantidade total de questões" :valor="$aluno->last_question_volume" />
             <x-desempenho-readonly label="Percentual geral de acertos" :valor="$aluno->last_accuracy_rate" />

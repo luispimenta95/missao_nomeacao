@@ -22,6 +22,9 @@
             <span class="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">{{ $linha->iniciais }}</span>
             <div>
                 <h2 class="text-lg font-bold text-gray-800">{{ $linha->aluno->nome }}</h2>
+                @if(filled($linha->aluno->telefone))
+                    <p class="text-sm text-gray-600">{{ $linha->aluno->telefone }}</p>
+                @endif
                 <a href="{{ route('alunos.edit', $linha->aluno) }}" class="text-sm font-medium text-primary hover:text-primary-light">Ver ficha do aluno</a>
             </div>
         </div>

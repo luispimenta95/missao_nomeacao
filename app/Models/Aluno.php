@@ -18,6 +18,7 @@ class Aluno extends Model
         'tutory_id',
         'nome',
         'email',
+        'telefone',
         'recebe_email',
         'ativo',
         'last_performance',

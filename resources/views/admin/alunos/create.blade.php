@@ -39,6 +39,15 @@
                 </label>
             </div>
 
+            <div class="mb-6">
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Telefone</span>
+                    <input type="tel" name="telefone" maxlength="50" class="mt-2 w-full rounded border border-gray-300 p-3 focus:ring-primary focus:border-primary @error('telefone') border-red-500 @enderror" value="{{ old('telefone') }}" placeholder="(61) 99999-0000">
+                    @error('telefone') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                </label>
+                <p class="text-xs text-gray-500 mt-1">Telefone de contato do aluno. Opcional.</p>
+            </div>
+
             <div class="mb-8">
                 <label class="inline-flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" name="recebe_email" value="1" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {{ old('recebe_email') ? 'checked' : '' }}>
