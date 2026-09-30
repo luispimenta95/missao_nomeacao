@@ -13,7 +13,7 @@ Documentação de domínio, quando precisar de detalhe:
 
 1. **Site e captação.** Landing em Blade (`/`), materiais para download, leads e inscrições. A API pública `GET /api/turmas` e `GET /api/turmas/{slug}` alimenta o site (origens em `CORS_ALLOWED_ORIGINS`).
 2. **Admin da mentora** (`/admin`, sessão Laravel). Turmas, materiais, alunos, leads, inscrições, visitas anônimas, parâmetros de desempenho, fonte do PDF e um dashboard de acompanhamento (intervir, marcar presença, parabenizar, ok, restabelecer contato).
-3. **Relatórios do Coach (Tutory).** Jobs Artisan entram no admin da Tutory, baixam os HTMLs oficiais dos alunos ativos, montam **um** PDF consolidado, classificam o desempenho, gravam as faixas no aluno e enviam **um** e-mail com **um** anexo para quem tem `recebe_email=true`.
+3. **Relatórios do Coach (Tutory).** Jobs Artisan entram no admin da Tutory, baixam os HTMLs oficiais dos alunos ativos, montam **um** PDF consolidado, classificam o desempenho, gravam as faixas no aluno e enviam **um** e-mail com **um** anexo. O envio exige aluno ativo na Tutory, nome igual no admin, `recebe_email=true` e e-mail válido.
 
 Produção roda na Hostinger, em `domains/missaonomeacao.com.br/public_html/server`, servida em `https://missaonomeacao.com.br/server`. O front controller é `public/index.php`, mas as URLs públicas não levam `/public` (`App\Http\HostingerSubdirectory` e `AppServiceProvider::urlSemSufixoPublic`).
 
@@ -86,7 +86,7 @@ Colunas de faixa do último período (não renomeie; o admin e o e-mail já leem
 - `last_subjects`
 - `prev_*` — período anterior, para a tendência do dashboard
 
-`recebe_email` decide o envio. `ativo` espelha o status na Tutory. `telefone` guarda o contato no padrão `55` + DDD + número, só dígitos (DDD `61` e telefone `9912-38860` viram `5561991238860`). O sync dos ativos abre Ações → Cadastro (`/alunos/index?aid={id}`) e grava o valor da Tutory por cima do local. Cadastro sem DDD ou sem número deixa o campo vazio. Falha ao abrir o cadastro não apaga o telefone já salvo. Alunos desativados não passam por essa etapa.
+`recebe_email` é uma das condições do e-mail do PDF quinzenal; a regra completa está em Relatórios Tutory. `ativo` espelha o status na Tutory. `telefone` guarda o contato no padrão `55` + DDD + número, só dígitos (DDD `61` e telefone `9912-38860` viram `5561991238860`). O sync dos ativos abre Ações → Cadastro (`/alunos/index?aid={id}`) e grava o valor da Tutory por cima do local. Cadastro sem DDD ou sem número deixa o campo vazio. Falha ao abrir o cadastro não apaga o telefone já salvo. Alunos desativados não passam por essa etapa.
 
 ### Desempenho
 
@@ -108,6 +108,14 @@ Comando de entrada: `php artisan tutory:baixar-relatorios`.
 - `--se-pendente` — não reenvia se aquele período do mês já concluiu
 
 O service é `App\Services\Tutory\CoachReportDownloader`. Fluxo: login na Tutory, lista de alunos ativos, cinco HTMLs oficiais por aluno (`desempenho`, `aluno`, `horas-liquidas`, `questoes`, `progresso`), um PDF consolidado, avaliação, e-mail, e **apagar os PDFs** da pasta de download. Logs `log_download_*.txt` permanecem.
+
+O e-mail com o PDF sai só quando as três condições valem juntas:
+
+1. O aluno está ativo na Tutory (`/alunos/consulta?status=ativos`, com `data-id`). É essa lista que gera o consolidado. Aluno desativado não entra, então não há PDF novo.
+2. O cadastro em `alunos` tem o mesmo nome do arquivo `relatorio_consolidado_*`.
+3. `recebe_email` está marcado e o e-mail é válido. Sem o checkbox, as faixas ainda são gravadas e o e-mail não sai.
+
+O sync das 06:00 volta a marcar `recebe_email` em quem continua ativo na Tutory. Desmarcado no admin, o envio segura só até essa sincronização. **Aluno teste** e **Nayara Oliveira** não estão na tabela local, então não recebem o e-mail. `--teste` limita geração e envio a quem tem "Giovanna" no nome. O agendado manda uma vez por quinzena (`--se-pendente`): período 1 no dia 16, período 2 no dia 1.
 
 O PDF final não é a junção dos cinco PDFs oficiais. A ordem é capa institucional, seções extraídas sem alterar os números da Tutory, capa final. Identidade do PDF: azul `#001D3D`, dourado `#BF8F00`, Inter, cabeçalho `MISSÃO NOMEAÇÃO`. Capas em `resources/relatorios/capa.pdf` e `capa-final.pdf`.
 
