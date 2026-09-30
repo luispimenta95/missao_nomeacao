@@ -57,6 +57,16 @@ class Aluno extends Model
             || mb_strtolower((string) $this->email) === 'nayara@missaonomeacao.com.br';
     }
 
+    public function linkWhatsappWeb(): ?string
+    {
+        $numero = preg_replace('/\D+/', '', (string) $this->telefone) ?? '';
+        if ($numero === '') {
+            return null;
+        }
+
+        return 'https://web.whatsapp.com/send?phone='.$numero.'&text='.rawurlencode('Olá');
+    }
+
     public static function normalizarNome(string $nome): string
     {
         $limpo = trim(preg_replace('/\s+/u', ' ', $nome) ?? '');
