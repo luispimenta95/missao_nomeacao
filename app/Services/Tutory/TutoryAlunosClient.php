@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 /**
- * Sessão HTTP no admin da Tutory para listar alunos ativos.
+ * Sessão HTTP no admin da Tutory para listar alunos.
+ *
+ * Nos ativos, cada card abre Ações → Cadastro (`/alunos/index?aid={id}`)
+ * e o telefone volta no padrão 55 + DDD + número, só dígitos.
  */
 class TutoryAlunosClient
 {
@@ -90,7 +93,7 @@ class TutoryAlunosClient
     }
 
     /**
-     * @return list<array{id: string, nome: string, email: string}>
+     * @return list<array{id: string, nome: string, email: string, telefone?: string|null}>
      */
     public function coletarAlunosAtivos(): array
     {
@@ -144,6 +147,11 @@ class TutoryAlunosClient
                 if ($aluno['email'] === '') {
                     $aluno['email'] = $this->buscarEmailNoCadastro($aluno['id']);
                 }
+                if ($status === 'ativos') {
+                    $aluno = $this->anexarTelefoneDoCadastro($aluno, $urlAtual);
+                } else {
+                    unset($aluno['cadastro_href']);
+                }
                 $alunos[] = $aluno;
             }
 
@@ -163,6 +171,148 @@ class TutoryAlunosClient
         $this->log('Total de alunos '.$status.': '.count($alunos));
 
         return $alunos;
+    }
+
+    /**
+     * DDD 61 e telefone 9912-38860 viram 5561991238860.
+     */
+    public static function montarTelefone(string $ddd, string $numero): ?string
+    {
+        $dddDigitos = preg_replace('/\D+/', '', $ddd) ?? '';
+        $numeroDigitos = preg_replace('/\D+/', '', $numero) ?? '';
+        if ($dddDigitos === '' || $numeroDigitos === '') {
+            return null;
+        }
+
+        $telefone = '55'.$dddDigitos.$numeroDigitos;
+        if (strlen($telefone) > 50) {
+            return null;
+        }
+
+        return $telefone;
+    }
+
+    /**
+     * @return array{encontrou: bool, telefone: string|null}
+     */
+    public function extrairTelefoneDoCadastro(string $html): array
+    {
+        $xp = $this->loadDom($html);
+        $ddd = $xp->query('//*[@id="cadastroAlunoDDD" or @name="ddd"]');
+        $celular = $xp->query('//*[@id="cadastroAlunoTel" or @name="celular"]');
+        $temDdd = $ddd !== false && $ddd->length > 0 && $ddd->item(0) instanceof DOMElement;
+        $temCelular = $celular !== false && $celular->length > 0 && $celular->item(0) instanceof DOMElement;
+        if (! $temDdd && ! $temCelular) {
+            return ['encontrou' => false, 'telefone' => null];
+        }
+
+        $valorDdd = $temDdd ? $this->valorSelecionado($ddd->item(0)) : '';
+        $valorCelular = $temCelular ? trim($celular->item(0)->getAttribute('value')) : '';
+
+        return [
+            'encontrou' => true,
+            'telefone' => self::montarTelefone($valorDdd, $valorCelular),
+        ];
+    }
+
+    /**
+     * @param  array{id: string, nome: string, email: string, cadastro_href?: string}  $aluno
+     * @return array{id: string, nome: string, email: string, telefone?: string|null}
+     */
+    private function anexarTelefoneDoCadastro(array $aluno, string $urlAtual): array
+    {
+        $href = trim((string) ($aluno['cadastro_href'] ?? ''));
+        unset($aluno['cadastro_href']);
+        $url = $this->urlDoCadastro($href, $urlAtual, $aluno['id']);
+        $this->log('Abrindo cadastro do aluno '.$aluno['id'].' (Ações → Cadastro)...');
+        $resp = $this->client()->get($url);
+        if ($resp->status() >= 400) {
+            $this->log('Cadastro indisponível para o aluno '.$aluno['id'].' (HTTP '.$resp->status().'). Telefone local mantido.');
+
+            return $aluno;
+        }
+
+        $lido = $this->extrairTelefoneDoCadastro($resp->body());
+        if (! $lido['encontrou']) {
+            $this->log('Cadastro do aluno '.$aluno['id'].' sem DDD e telefone. Telefone local mantido.');
+
+            return $aluno;
+        }
+
+        $aluno['telefone'] = $lido['telefone'];
+        $this->log($lido['telefone'] !== null
+            ? 'Telefone da Tutory id='.$aluno['id'].': '.$lido['telefone']
+            : 'Cadastro da Tutory id='.$aluno['id'].' sem telefone.');
+
+        return $aluno;
+    }
+
+    private function extrairHrefCadastro(DOMXPath $xp, DOMElement $card): string
+    {
+        $links = $xp->query('.//a[contains(concat(" ", normalize-space(@class), " "), " dropdown-item ")]', $card);
+        if ($links === false) {
+            return '';
+        }
+        foreach ($links as $link) {
+            if (! $link instanceof DOMElement) {
+                continue;
+            }
+            $texto = mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string) $link->textContent) ?? ''));
+            if ($texto !== 'cadastro') {
+                continue;
+            }
+            $href = trim($link->getAttribute('href'));
+            if ($this->hrefInutil($href)) {
+                continue;
+            }
+
+            return $href;
+        }
+
+        return '';
+    }
+
+    private function urlDoCadastro(string $href, string $urlAtual, string $id): string
+    {
+        if ($href !== '') {
+            return $this->resolverRelativo($href, $urlAtual);
+        }
+
+        return self::BASE.'/alunos/index?aid='.rawurlencode($id);
+    }
+
+    private function resolverRelativo(string $href, string $urlAtual): string
+    {
+        if (str_starts_with($href, 'http://') || str_starts_with($href, 'https://')) {
+            return $href;
+        }
+        if (str_starts_with($href, '/')) {
+            return self::BASE.$href;
+        }
+
+        $path = parse_url($urlAtual, PHP_URL_PATH);
+        $path = is_string($path) && $path !== '' ? $path : '/';
+        $dir = preg_replace('#/[^/]*$#', '/', $path) ?? '/';
+
+        return self::BASE.$dir.ltrim($href, '/');
+    }
+
+    private function valorSelecionado(DOMElement $select): string
+    {
+        if ($select->tagName !== 'select') {
+            return trim($select->getAttribute('value'));
+        }
+
+        foreach ($select->getElementsByTagName('option') as $opcao) {
+            if (! $opcao instanceof DOMElement || ! $opcao->hasAttribute('selected')) {
+                continue;
+            }
+            $valor = trim($opcao->getAttribute('value'));
+
+            return $valor !== '' ? $valor : trim($opcao->textContent);
+        }
+
+        return '';
     }
 
     public function encerrar(): void
@@ -212,7 +362,7 @@ class TutoryAlunosClient
     }
 
     /**
-     * @return list<array{id: string, nome: string, email: string}>
+     * @return list<array{id: string, nome: string, email: string, cadastro_href?: string}>
      */
     private function parseAlunosDaPagina(string $html): array
     {
@@ -242,11 +392,16 @@ class TutoryAlunosClient
                 continue;
             }
 
-            $alunos[] = [
+            $aluno = [
                 'id' => $id,
                 'nome' => $nome,
                 'email' => $this->extrairEmailDoCard($xp, $card),
             ];
+            $cadastro = $this->extrairHrefCadastro($xp, $card);
+            if ($cadastro !== '') {
+                $aluno['cadastro_href'] = $cadastro;
+            }
+            $alunos[] = $aluno;
         }
 
         return $alunos;
