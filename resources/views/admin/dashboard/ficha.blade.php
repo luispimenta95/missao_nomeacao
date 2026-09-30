@@ -4,6 +4,7 @@
     use App\Services\Acompanhamento\TextoAcompanhamento;
 
     $planoEncerrado = ! $linha->aluno->ativo;
+    $numeroWhatsapp = preg_replace('/\D+/', '', (string) $linha->aluno->telefone) ?? '';
     $estilo = $planoEncerrado
         ? 'bg-gray-100 text-gray-700'
         : match ($linha->ficha->acao) {
@@ -144,6 +145,12 @@
                 Registrar contato
             </button>
         </form>
+
+        @if($numeroWhatsapp !== '')
+            <a href="https://wa.me/{{ $numeroWhatsapp }}" target="_blank" rel="noopener noreferrer" class="flex w-full items-center justify-center gap-2 rounded border border-primary bg-white px-4 py-3 text-sm font-medium text-primary transition hover:bg-primary hover:text-white">
+                Conversar com aluno
+            </a>
+        @endif
 
         <form method="POST" action="{{ route('admin.dashboard.agenda.store', $linha->aluno) }}" class="space-y-3">
             @csrf
