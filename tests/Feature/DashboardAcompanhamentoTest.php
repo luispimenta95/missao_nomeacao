@@ -255,7 +255,7 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertOk()
             ->assertSee('Registrar contato')
             ->assertSee('Conversar com aluno')
-            ->assertSee('href="https://wa.me/5561991238860?text=Ol%C3%A1"', false)
+            ->assertSee('href="https://web.whatsapp.com/send?phone=5561991238860&amp;text=Ol%C3%A1"', false)
             ->assertSee('target="_blank"', false)
             ->getContent();
         $this->assertTrue(strpos($html, 'Registrar contato') < strpos($html, 'Conversar com aluno'));
@@ -265,7 +265,7 @@ class DashboardAcompanhamentoTest extends TestCase
             ->get(route('admin.dashboard', ['aluno' => $semTelefone->id]))
             ->assertOk()
             ->assertDontSee('Conversar com aluno')
-            ->assertDontSee('https://wa.me/');
+            ->assertDontSee('https://web.whatsapp.com/send');
     }
 
     public function test_registrar_contato_conclui_a_acao_academica(): void

@@ -5,10 +5,11 @@
 
     $planoEncerrado = ! $linha->aluno->ativo;
     $numeroWhatsapp = preg_replace('/\D+/', '', (string) $linha->aluno->telefone) ?? '';
-    // Sem ?text=, o WhatsApp só foca a última conversa e ignora o número.
+    // wa.me abre o aplicativo e, se ele já está aberto, fica na última conversa.
+    // O endereço do WhatsApp Web leva o navegador direto ao número do aluno.
     $linkWhatsapp = $numeroWhatsapp === ''
         ? ''
-        : 'https://wa.me/'.$numeroWhatsapp.'?text='.rawurlencode('Olá');
+        : 'https://web.whatsapp.com/send?phone='.$numeroWhatsapp.'&text='.rawurlencode('Olá');
     $estilo = $planoEncerrado
         ? 'bg-gray-100 text-gray-700'
         : match ($linha->ficha->acao) {
