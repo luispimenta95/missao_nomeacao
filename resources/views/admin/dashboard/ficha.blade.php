@@ -5,6 +5,10 @@
 
     $planoEncerrado = ! $linha->aluno->ativo;
     $numeroWhatsapp = preg_replace('/\D+/', '', (string) $linha->aluno->telefone) ?? '';
+    // Sem ?text=, o WhatsApp só foca a última conversa e ignora o número.
+    $linkWhatsapp = $numeroWhatsapp === ''
+        ? ''
+        : 'https://wa.me/'.$numeroWhatsapp.'?text='.rawurlencode('Olá');
     $estilo = $planoEncerrado
         ? 'bg-gray-100 text-gray-700'
         : match ($linha->ficha->acao) {
@@ -147,7 +151,7 @@
         </form>
 
         @if($numeroWhatsapp !== '')
-            <a href="https://wa.me/{{ $numeroWhatsapp }}" target="_blank" rel="noopener noreferrer" class="flex w-full items-center justify-center gap-2 rounded border border-primary bg-white px-4 py-3 text-sm font-medium text-primary transition hover:bg-primary hover:text-white">
+            <a href="{{ $linkWhatsapp }}" target="_blank" rel="noopener noreferrer" class="flex w-full items-center justify-center gap-2 rounded border border-primary bg-white px-4 py-3 text-sm font-medium text-primary transition hover:bg-primary hover:text-white">
                 Conversar com aluno
             </a>
         @endif

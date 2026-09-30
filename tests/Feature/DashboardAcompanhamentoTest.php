@@ -255,7 +255,7 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertOk()
             ->assertSee('Registrar contato')
             ->assertSee('Conversar com aluno')
-            ->assertSee('href="https://wa.me/5561991238860"', false)
+            ->assertSee('href="https://wa.me/5561991238860?text=Ol%C3%A1"', false)
             ->assertSee('target="_blank"', false)
             ->getContent();
         $this->assertTrue(strpos($html, 'Registrar contato') < strpos($html, 'Conversar com aluno'));
