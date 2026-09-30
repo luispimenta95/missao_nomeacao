@@ -102,7 +102,7 @@ use App\Enums\FocoAcompanhamento;
         <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 px-5 py-5">
             <div>
                 <h2 class="text-lg font-bold text-gray-800">Ações de acompanhamento</h2>
-                <p class="mt-1 max-w-2xl text-sm text-gray-600">Cada aluno entra em uma única ação: Intervir, Marcar presença ou Parabenizar. Quem não se enquadra aparece em Ok. A ficha reúne todos os motivos.</p>
+                <p class="mt-1 max-w-2xl text-sm text-gray-600">Cada aluno ativo entra em uma única ação: Intervir, Marcar presença ou Parabenizar. Quem não se enquadra aparece em Ok. Aluno inativo entra em Restabelecer contato. A ficha reúne todos os motivos.</p>
             </div>
             @if($consulta->temFiltro())
                 <a href="{{ route('admin.dashboard') }}" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 transition hover:bg-gray-300">Limpar filtros</a>
@@ -168,16 +168,14 @@ use App\Enums\FocoAcompanhamento;
                 <tbody class="divide-y divide-gray-100">
                     @forelse($linhas as $linha)
                     @php
-                    $planoEncerrado = ! $linha->aluno->ativo;
-                    $estilo = $planoEncerrado
-                        ? 'bg-gray-100 text-gray-700'
-                        : match ($linha->ficha->acao) {
+                    $planoEncerrado = $linha->ficha->acao === AcaoAcompanhamento::RestabelecerContato;
+                    $estilo = match ($linha->ficha->acao) {
                         AcaoAcompanhamento::Intervir => 'bg-red-100 text-red-800',
                         AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
                         AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
-                        AcaoAcompanhamento::Ok => 'bg-gray-100 text-gray-700',
-                        };
-                    $rotuloAcao = $planoEncerrado ? 'Restabelecer contato' : $linha->ficha->acao->rotulo();
+                        AcaoAcompanhamento::Ok, AcaoAcompanhamento::RestabelecerContato => 'bg-gray-100 text-gray-700',
+                    };
+                    $rotuloAcao = $linha->ficha->acao->rotulo();
                     $motivoPrincipal = $planoEncerrado ? 'Plano de estudos encerrado' : $linha->ficha->motivoPrincipal()?->texto;
                     $urlLinha = $consulta->url(['aluno' => $linha->aluno->id, 'page' => $paginacao['pagina']]);
                     @endphp

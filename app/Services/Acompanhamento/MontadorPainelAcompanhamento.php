@@ -39,6 +39,13 @@ final class MontadorPainelAcompanhamento
     {
         $ctx = ContextoAcompanhamento::fromAluno($aluno, $hoje);
         $ficha = $this->classificador->classificar($ctx) ?? $this->fichaEmDia($ctx);
+        if (! $aluno->ativo) {
+            $ficha = new FichaAcompanhamento(
+                AcaoAcompanhamento::RestabelecerContato,
+                $ficha->motivos,
+                $ficha->evolucoes,
+            );
+        }
 
         $situacao = SituacaoAcompanhamento::Pendente;
         if ($aluno->acao_resolvida_assinatura !== null && $aluno->acao_resolvida_assinatura === $ficha->assinatura()) {

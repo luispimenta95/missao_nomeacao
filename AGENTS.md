@@ -12,7 +12,7 @@ Documentação de domínio, quando precisar de detalhe:
 **Missão Nomeação** é o backend da mentoria para concursos. Faz três coisas:
 
 1. **Site e captação.** Landing em Blade (`/`), materiais para download, leads e inscrições. A API pública `GET /api/turmas` e `GET /api/turmas/{slug}` alimenta o site (origens em `CORS_ALLOWED_ORIGINS`).
-2. **Admin da mentora** (`/admin`, sessão Laravel). Turmas, materiais, alunos, leads, inscrições, visitas anônimas, parâmetros de desempenho, fonte do PDF e um dashboard de acompanhamento (intervir, marcar presença, parabenizar, ok).
+2. **Admin da mentora** (`/admin`, sessão Laravel). Turmas, materiais, alunos, leads, inscrições, visitas anônimas, parâmetros de desempenho, fonte do PDF e um dashboard de acompanhamento (intervir, marcar presença, parabenizar, ok, restabelecer contato).
 3. **Relatórios do Coach (Tutory).** Jobs Artisan entram no admin da Tutory, baixam os HTMLs oficiais dos alunos ativos, montam **um** PDF consolidado, classificam o desempenho, gravam as faixas no aluno e enviam **um** e-mail com **um** anexo para quem tem `recebe_email=true`.
 
 Produção roda na Hostinger, em `domains/missaonomeacao.com.br/public_html/server`, servida em `https://missaonomeacao.com.br/server`. O front controller é `public/index.php`, mas as URLs públicas não levam `/public` (`App\Http\HostingerSubdirectory` e `AppServiceProvider::urlSemSufixoPublic`).
@@ -96,7 +96,7 @@ O percentual geral só entra com 100 questões ou mais. Assuntos com rendimento 
 
 ### Acompanhamento
 
-O dashboard (`/admin/dashboard`) não recalcula o PDF. Ele lê as faixas já gravadas no aluno e classifica a ação com os enums de `app/Enums` (`AcaoAcompanhamento`: intervir > marcar presença > parabenizar > ok). A regra mora em `App\Services\Acompanhamento`. Contatos e o próximo contato ficam em `contatos_aluno` e nas colunas `ultimo_contato_em` / `proximo_contato_em` do aluno.
+O dashboard (`/admin/dashboard`) não recalcula o PDF. Ele lê as faixas já gravadas no aluno e classifica a ação com os enums de `app/Enums` (`AcaoAcompanhamento`: intervir > marcar presença > parabenizar > ok). Aluno inativo não disputa essa ordem: o montador troca a ação para restabelecer contato. A regra mora em `App\Services\Acompanhamento`. Contatos e o próximo contato ficam em `contatos_aluno` e nas colunas `ultimo_contato_em` / `proximo_contato_em` do aluno.
 
 ### Relatórios Tutory
 

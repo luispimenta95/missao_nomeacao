@@ -555,6 +555,53 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertDontSee('Helena Em Dia');
     }
 
+    public function test_inativo_sai_de_intervir_e_entra_em_restabelecer_contato(): void
+    {
+        $user = User::factory()->create();
+        $this->aluno([
+            'nome' => 'Georgia Ativa',
+            'ativo' => true,
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
+        $this->aluno([
+            'nome' => 'Isadora Inativa',
+            'ativo' => false,
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
+
+        $html = $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas']))
+            ->assertOk()
+            ->assertSee('Intervir (1)')
+            ->assertSee('Restabelecer contato (1)')
+            ->assertSee('Georgia Ativa')
+            ->assertSee('Isadora Inativa')
+            ->assertSee('Plano de estudos encerrado')
+            ->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/1\s*<\/span>\s*<span class="mt-1 block text-sm leading-5">intervenções pendentes/',
+            $html,
+        );
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'acao' => 'intervir']))
+            ->assertOk()
+            ->assertSee('Georgia Ativa')
+            ->assertSee('value="intervir" selected', false)
+            ->assertDontSee('Isadora Inativa');
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'acao' => 'restabelecer_contato']))
+            ->assertOk()
+            ->assertSee('Isadora Inativa')
+            ->assertSee('Restabelecer contato')
+            ->assertSee('value="restabelecer_contato" selected', false)
+            ->assertDontSee('Georgia Ativa');
+    }
+
     /**
      * @param  array<string, mixed>  $dados
      */
