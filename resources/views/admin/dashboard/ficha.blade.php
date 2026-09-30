@@ -4,12 +4,7 @@
     use App\Services\Acompanhamento\TextoAcompanhamento;
 
     $planoEncerrado = ! $linha->aluno->ativo;
-    $numeroWhatsapp = preg_replace('/\D+/', '', (string) $linha->aluno->telefone) ?? '';
-    // wa.me abre o aplicativo e, se ele já está aberto, fica na última conversa.
-    // O endereço do WhatsApp Web leva o navegador direto ao número do aluno.
-    $linkWhatsapp = $numeroWhatsapp === ''
-        ? ''
-        : 'https://web.whatsapp.com/send?phone='.$numeroWhatsapp.'&text='.rawurlencode('Olá');
+    $linkWhatsapp = $linha->aluno->linkWhatsappWeb() ?? '';
     $estilo = $planoEncerrado
         ? 'bg-gray-100 text-gray-700'
         : match ($linha->ficha->acao) {
@@ -151,8 +146,8 @@
             </button>
         </form>
 
-        @if($numeroWhatsapp !== '')
-            <a href="{{ $linkWhatsapp }}" target="_blank" rel="noopener noreferrer" class="flex w-full items-center justify-center gap-2 rounded border border-primary bg-white px-4 py-3 text-sm font-medium text-primary transition hover:bg-primary hover:text-white">
+        @if($linkWhatsapp !== '')
+            <a href="{{ $linkWhatsapp }}" target="_blank" data-abrir="{{ route('admin.dashboard.whatsapp', $linha->aluno) }}" onclick="var j=window.open(this.dataset.abrir,'missao-whatsapp'); if(j){ j.focus(); return false; }" class="flex w-full items-center justify-center gap-2 rounded border border-primary bg-white px-4 py-3 text-sm font-medium text-primary transition hover:bg-primary hover:text-white">
                 Conversar com aluno
             </a>
         @endif

@@ -250,15 +250,22 @@ class DashboardAcompanhamentoTest extends TestCase
             'telefone' => '55 (61) 9912-38860',
         ]);
 
+        $abrir = route('admin.dashboard.whatsapp', $aluno);
         $html = $this->actingAs($user)
             ->get(route('admin.dashboard', ['aluno' => $aluno->id]))
             ->assertOk()
             ->assertSee('Registrar contato')
             ->assertSee('Conversar com aluno')
             ->assertSee('href="https://web.whatsapp.com/send?phone=5561991238860&amp;text=Ol%C3%A1"', false)
-            ->assertSee('target="_blank"', false)
+            ->assertSee('data-abrir="'.$abrir.'"', false)
+            ->assertSee("window.open(this.dataset.abrir,'missao-whatsapp')", false)
             ->getContent();
         $this->assertTrue(strpos($html, 'Registrar contato') < strpos($html, 'Conversar com aluno'));
+
+        $this->actingAs($user)
+            ->get($abrir)
+            ->assertOk()
+            ->assertSee('location.replace("https:\\/\\/web.whatsapp.com\\/send?phone=5561991238860\\u0026text=Ol%C3%A1")', false);
 
         $semTelefone = $this->aluno(['nome' => 'Sem Telefone']);
         $this->actingAs($user)
@@ -266,6 +273,10 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertOk()
             ->assertDontSee('Conversar com aluno')
             ->assertDontSee('https://web.whatsapp.com/send');
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard.whatsapp', $semTelefone))
+            ->assertNotFound();
     }
 
     public function test_registrar_contato_conclui_a_acao_academica(): void
