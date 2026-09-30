@@ -30,14 +30,7 @@ final class MontadorPainelAcompanhamento
             }
         }
 
-        usort($linhas, static function (LinhaPainel $a, LinhaPainel $b): int {
-            $prioridade = $b->ficha->acao->prioridade() <=> $a->ficha->acao->prioridade();
-            if ($prioridade !== 0) {
-                return $prioridade;
-            }
-
-            return strcasecmp($a->aluno->nome, $b->aluno->nome);
-        });
+        usort($linhas, static fn (LinhaPainel $a, LinhaPainel $b): int => strcasecmp($a->aluno->nome, $b->aluno->nome));
 
         return collect($linhas)->values();
     }
