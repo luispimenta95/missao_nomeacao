@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
 {
@@ -75,32 +76,34 @@ class DashboardController extends Controller
     public function storeContato(Request $request, Aluno $aluno)
     {
         $dados = $request->validate([
-            'observacao' => ['nullable', 'string', 'max:2000'],
+            'observacao' => ['required', 'string', 'max:2000'],
+            'itens_abordados' => ['accepted'],
+        ], [
+            'observacao.required' => 'Informe a observação do contato.',
+            'itens_abordados.accepted' => 'Confirme que todos os itens do acompanhamento foram abordados.',
         ]);
 
-        $agora = now();
-        $observacao = trim((string) ($dados['observacao'] ?? ''));
-        $aluno->ultimo_contato_em = $agora;
-        if ($observacao !== '') {
-            $aluno->ultima_observacao = $observacao;
+        $observacao = trim($dados['observacao']);
+        if ($observacao === '') {
+            throw ValidationException::withMessages([
+                'observacao' => 'Informe a observação do contato.',
+            ]);
         }
+
+        $agora = now();
+        $aluno->ultimo_contato_em = $agora;
+        $aluno->ultima_observacao = $observacao;
         if ($aluno->proximo_contato_em !== null && $aluno->proximo_contato_em->toDateString() <= $agora->toDateString()) {
             $aluno->proximo_contato_em = null;
         }
 
-        $linha = $this->montador->linha($aluno, $agora);
-        if ($linha !== null && ! $linha->somenteAgenda) {
-            $aluno->acao_resolvida = $linha->ficha->acao;
-            $aluno->acao_resolvida_assinatura = $linha->ficha->assinatura();
-        } else {
-            $aluno->acao_resolvida = null;
-            $aluno->acao_resolvida_assinatura = null;
-        }
+        $aluno->acao_resolvida = AcaoAcompanhamento::Ok;
+        $aluno->acao_resolvida_assinatura = $this->montador->assinaturaDasMetricas($aluno, $agora);
 
         $aluno->save();
         $aluno->contatos()->create([
             'user_id' => $request->user()?->id,
-            'observacao' => $observacao !== '' ? $observacao : null,
+            'observacao' => $observacao,
             'ocorrido_em' => $agora,
         ]);
 

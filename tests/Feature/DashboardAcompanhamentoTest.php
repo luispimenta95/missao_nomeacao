@@ -184,8 +184,11 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertOk()
             ->assertSee('Olá, Nayara!')
             ->assertSee('João Almeida')
+            ->assertSee('O que deve ser destacado neste acompanhamento?')
+            ->assertSee('Todos os itens do acompanhamento foram abordados?')
             ->assertSee('Constância crítica')
             ->assertSee('Desempenho em questões: baixo')
+            ->assertSee('data-motivo="constancia_critica"', false)
             ->assertSee('data-acao="intervir"', false)
             ->assertDontSee('data-acao="marcar_presenca"', false)
             ->assertDontSee('data-acao="parabenizar"', false)
@@ -291,11 +294,12 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->actingAs($user)
             ->post(route('admin.dashboard.contatos.store', $aluno), [
                 'observacao' => 'Combinamos uma revisão de questões.',
+                'itens_abordados' => '1',
             ])
             ->assertRedirect(route('admin.dashboard.contatos.agendar', $aluno));
 
         $aluno->refresh();
-        $this->assertSame(AcaoAcompanhamento::MarcarPresenca, $aluno->acao_resolvida);
+        $this->assertSame(AcaoAcompanhamento::Ok, $aluno->acao_resolvida);
         $this->assertNotNull($aluno->ultimo_contato_em);
         $this->assertNull($aluno->proximo_contato_em);
         $this->assertSame('Combinamos uma revisão de questões.', $aluno->ultima_observacao);
@@ -326,7 +330,142 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertOk()
             ->assertSee('Ana Souza')
             ->assertSee('Combinamos uma revisão de questões.')
+            ->assertSee('Ações do mentor concluídas neste acompanhamento')
+            ->assertSee('data-acao="ok"', false)
+            ->assertSee('data-acao-ficha="ok"', false)
             ->assertSee('Concluída');
+    }
+
+    public function test_observacao_e_confirmacao_dos_itens_sao_obrigatorias(): void
+    {
+        $user = User::factory()->create();
+        $aluno = $this->aluno(['nome' => 'Paula Dias']);
+        $ficha = route('admin.dashboard', ['aluno' => $aluno->id]);
+
+        $this->actingAs($user)
+            ->from($ficha)
+            ->post(route('admin.dashboard.contatos.store', $aluno), [])
+            ->assertRedirect($ficha)
+            ->assertSessionHasErrors(['observacao', 'itens_abordados']);
+
+        $this->actingAs($user)
+            ->from($ficha)
+            ->post(route('admin.dashboard.contatos.store', $aluno), [
+                'observacao' => '   ',
+                'itens_abordados' => '1',
+            ])
+            ->assertRedirect($ficha)
+            ->assertSessionHasErrors('observacao');
+
+        $this->assertSame(0, ContatoAluno::query()->count());
+        $this->assertNull($aluno->fresh()->acao_resolvida);
+
+        $this->actingAs($user)
+            ->get($ficha)
+            ->assertOk()
+            ->assertSee('O que deve ser destacado neste acompanhamento?')
+            ->assertSee('Todos os itens do acompanhamento foram abordados?')
+            ->assertSee('name="observacao" rows="3" required', false)
+            ->assertSee('Sim, todos foram abordados')
+            ->assertSee('Não, ainda não');
+    }
+
+    public function test_contato_deixa_acao_ok_ate_agendamento_vencido_ou_relatorio_novo(): void
+    {
+        $this->seed(ParametrosDesempenhoSeeder::class);
+        $user = User::factory()->create();
+        $aluno = $this->aluno([
+            'nome' => 'Rita Critica',
+            'ativo' => true,
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.dashboard.contatos.store', $aluno), [
+                'observacao' => 'Conversamos sobre a constância.',
+                'itens_abordados' => '1',
+            ])
+            ->assertRedirect(route('admin.dashboard.contatos.agendar', $aluno));
+
+        $this->assertSame(AcaoAcompanhamento::Ok, $aluno->fresh()->acao_resolvida);
+
+        $this->actingAs($user)
+            ->post(route('admin.dashboard.contatos.agendar.store', $aluno), [
+                'decisao' => 'sim',
+                'proximo_contato_em' => '2026-09-25',
+            ])
+            ->assertRedirect(route('admin.dashboard', ['aluno' => $aluno->id]));
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'concluidas', 'aluno' => $aluno->id]))
+            ->assertOk()
+            ->assertSee('data-acao="ok"', false)
+            ->assertSee('data-acao-ficha="ok"', false)
+            ->assertDontSee('data-acao="intervir"', false);
+
+        Carbon::setTestNow(Carbon::parse('2026-09-25 10:00:00', 'America/Sao_Paulo'));
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'concluidas', 'aluno' => $aluno->id]))
+            ->assertOk()
+            ->assertSee('data-acao-ficha="ok"', false)
+            ->assertDontSee('data-acao="marcar_presenca"', false);
+
+        Carbon::setTestNow(Carbon::parse('2026-09-26 10:00:00', 'America/Sao_Paulo'));
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'aluno' => $aluno->id]))
+            ->assertOk()
+            ->assertSee('data-acao="marcar_presenca"', false)
+            ->assertSee('data-acao-ficha="marcar_presenca"', false)
+            ->assertSee('Nenhum contato registrado após a data agendada (25/09/2026)')
+            ->assertSee('Pendente')
+            ->assertDontSee('data-acao="intervir"', false);
+
+        $aluno->refresh();
+        $aluno->aplicarAvaliacaoDesempenho((new AvaliadorDesempenho)->avaliarRelatorio([
+            'nome' => $aluno->nome,
+            'dias_analisados' => 15,
+            'dias_estudados' => 2,
+            'dias_falhados' => 13,
+            'total_questoes' => 40,
+            'percentual_acertos' => 40,
+        ]), '2026-09-2');
+
+        $this->assertNull($aluno->fresh()->acao_resolvida);
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'aluno' => $aluno->id]))
+            ->assertOk()
+            ->assertSee('data-acao="intervir"', false)
+            ->assertSee('data-acao-ficha="intervir"', false)
+            ->assertSee('Constância crítica');
+    }
+
+    public function test_contato_em_aluno_inativo_tambem_deixa_a_acao_ok(): void
+    {
+        $user = User::factory()->create();
+        $aluno = $this->aluno([
+            'nome' => 'Inativa Contatada',
+            'ativo' => false,
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.dashboard.contatos.store', $aluno), [
+                'observacao' => 'Plano encerrado, combinamos o retorno.',
+                'itens_abordados' => '1',
+            ])
+            ->assertRedirect(route('admin.dashboard.contatos.agendar', $aluno));
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'aluno' => $aluno->id]))
+            ->assertOk()
+            ->assertSee('data-acao="ok"', false)
+            ->assertSee('data-acao-ficha="ok"', false)
+            ->assertDontSee('data-acao="restabelecer_contato"', false);
     }
 
     public function test_sim_agenda_a_data_informada_pelo_mentor(): void
@@ -339,7 +478,10 @@ class DashboardAcompanhamentoTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->post(route('admin.dashboard.contatos.store', $aluno), [])
+            ->post(route('admin.dashboard.contatos.store', $aluno), [
+                'observacao' => 'Alinhamos o próximo passo.',
+                'itens_abordados' => '1',
+            ])
             ->assertRedirect(route('admin.dashboard.contatos.agendar', $aluno));
 
         $this->actingAs($user)
