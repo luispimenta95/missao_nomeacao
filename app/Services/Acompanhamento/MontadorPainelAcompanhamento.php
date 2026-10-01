@@ -3,6 +3,7 @@
 namespace App\Services\Acompanhamento;
 
 use App\Enums\AcaoAcompanhamento;
+use App\Enums\FiltroParametroAcompanhamento;
 use App\Enums\PapelFaixa;
 use App\Enums\ParametroAcompanhamento;
 use App\Enums\SituacaoAcompanhamento;
@@ -38,18 +39,25 @@ final class MontadorPainelAcompanhamento
     public function linha(Aluno $aluno, DateTimeInterface $hoje): LinhaPainel
     {
         $ctx = ContextoAcompanhamento::fromAluno($aluno, $hoje);
-        $ficha = $this->classificador->classificar($ctx) ?? $this->fichaEmDia($ctx);
-        if (! $aluno->ativo) {
+        $ficha = $this->fichaPorMetricas($ctx);
+        $situacao = SituacaoAcompanhamento::Pendente;
+
+        // Contato registrado neste ciclo: a ação fica Ok até o agendamento
+        // vencer sem novo contato, ou até um relatório quinzenal novo limpar
+        // acao_resolvida e devolver a classificação pelas métricas.
+        if ($aluno->acao_resolvida !== null) {
+            if ($this->agendamentoVencidoSemContato($aluno, $hoje)) {
+                $ficha = $this->fichaMarcarPresencaPorAgendamento($aluno, $ficha);
+            } else {
+                $ficha = $this->fichaAcoesConcluidas($ficha);
+                $situacao = SituacaoAcompanhamento::Concluida;
+            }
+        } elseif (! $aluno->ativo) {
             $ficha = new FichaAcompanhamento(
                 AcaoAcompanhamento::RestabelecerContato,
                 $ficha->motivos,
                 $ficha->evolucoes,
             );
-        }
-
-        $situacao = SituacaoAcompanhamento::Pendente;
-        if ($aluno->acao_resolvida_assinatura !== null && $aluno->acao_resolvida_assinatura === $ficha->assinatura()) {
-            $situacao = SituacaoAcompanhamento::Concluida;
         }
 
         $assuntos = array_values(array_filter(
@@ -68,6 +76,11 @@ final class MontadorPainelAcompanhamento
             somenteAgenda: false,
             assuntos: $assuntos,
         );
+    }
+
+    public function assinaturaDasMetricas(Aluno $aluno, DateTimeInterface $hoje): string
+    {
+        return $this->fichaPorMetricas(ContextoAcompanhamento::fromAluno($aluno, $hoje))->assinatura();
     }
 
     private function fichaEmDia(ContextoAcompanhamento $ctx): FichaAcompanhamento
@@ -94,5 +107,68 @@ final class MontadorPainelAcompanhamento
             [$motivo],
             $this->classificador->evolucoes($ctx),
         );
+    }
+
+    private function fichaPorMetricas(ContextoAcompanhamento $ctx): FichaAcompanhamento
+    {
+        return $this->classificador->classificar($ctx) ?? $this->fichaEmDia($ctx);
+    }
+
+    private function fichaAcoesConcluidas(FichaAcompanhamento $base): FichaAcompanhamento
+    {
+        return new FichaAcompanhamento(
+            AcaoAcompanhamento::Ok,
+            [new MotivoAcompanhamento(
+                TipoMotivoAcompanhamento::Panorama,
+                AcaoAcompanhamento::Ok,
+                'Ações do mentor concluídas neste acompanhamento',
+                false,
+                null,
+                0,
+            )],
+            $base->evolucoes,
+        );
+    }
+
+    private function fichaMarcarPresencaPorAgendamento(Aluno $aluno, FichaAcompanhamento $base): FichaAcompanhamento
+    {
+        $data = $aluno->proximo_contato_em?->format('d/m/Y') ?? '';
+
+        return new FichaAcompanhamento(
+            AcaoAcompanhamento::MarcarPresenca,
+            [new MotivoAcompanhamento(
+                TipoMotivoAcompanhamento::ContatoAgendado,
+                AcaoAcompanhamento::MarcarPresenca,
+                'Nenhum contato registrado após a data agendada ('.$data.')',
+                false,
+                FiltroParametroAcompanhamento::Contato,
+                0,
+            )],
+            $base->evolucoes,
+        );
+    }
+
+    /**
+     * A data de hoje passou da data agendada e nenhum contato foi registrado
+     * nesse dia ou depois.
+     */
+    private function agendamentoVencidoSemContato(Aluno $aluno, DateTimeInterface $hoje): bool
+    {
+        $agendado = $aluno->proximo_contato_em;
+        if ($agendado === null) {
+            return false;
+        }
+
+        $agendadoDia = $agendado->toDateString();
+        if ($hoje->format('Y-m-d') <= $agendadoDia) {
+            return false;
+        }
+
+        $ultimo = $aluno->ultimo_contato_em;
+        if ($ultimo === null) {
+            return true;
+        }
+
+        return $ultimo->format('Y-m-d') < $agendadoDia;
     }
 }

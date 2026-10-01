@@ -102,7 +102,7 @@ use App\Enums\FocoAcompanhamento;
         <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 px-5 py-5">
             <div>
                 <h2 class="text-lg font-bold text-gray-800">Ações de acompanhamento</h2>
-                <p class="mt-1 max-w-2xl text-sm text-gray-600">Cada aluno ativo entra em uma única ação: Intervir, Marcar presença ou Parabenizar. Quem não se enquadra aparece em Ok. Aluno inativo entra em Restabelecer contato. A ficha reúne todos os motivos.</p>
+                <p class="mt-1 max-w-2xl text-sm text-gray-600">A ação segue as métricas do último relatório. Registrar um contato deixa a ação em Ok, qualquer que seja o status anterior. Ela só muda de novo se a data agendada passar sem outro contato (Marcar presença) ou se chegar um relatório quinzenal. Aluno inativo sem contato neste ciclo entra em Restabelecer contato.</p>
             </div>
             @if($consulta->temFiltro())
                 <a href="{{ route('admin.dashboard') }}" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 transition hover:bg-gray-300">Limpar filtros</a>

@@ -13,6 +13,22 @@
     };
     $rotuloAcao = $linha->ficha->acao->rotulo();
     $temPonte = collect($linha->ficha->motivos)->contains(fn ($motivo) => $motivo->ponteProtocoloResgate);
+    $itensDestaque = [];
+    if ($planoEncerrado) {
+        $itensDestaque[] = [
+            'tipo' => 'plano_encerrado',
+            'texto' => 'Plano de estudos encerrado',
+            'ponte' => false,
+        ];
+    } else {
+        foreach ($linha->ficha->motivos as $motivo) {
+            $itensDestaque[] = [
+                'tipo' => $motivo->tipo->value,
+                'texto' => $motivo->texto,
+                'ponte' => $motivo->ponteProtocoloResgate,
+            ];
+        }
+    }
 @endphp
 
 <aside class="fixed inset-y-0 right-0 z-40 flex w-full max-w-[420px] flex-col border-l border-gray-200 bg-white shadow-lg">
@@ -39,31 +55,6 @@
             </span>
             <span class="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">{{ $linha->situacao->rotulo() }}</span>
         </div>
-
-        <section>
-            <h3 class="text-sm font-semibold text-gray-700">Por quê?</h3>
-            <ul class="mt-3 space-y-2">
-                @if($planoEncerrado)
-                    <li class="text-sm text-gray-700">
-                        <span class="mr-2 text-primary-light">◆</span>Plano de estudos encerrado
-                    </li>
-                @else
-                    @foreach($linha->ficha->motivos as $motivo)
-                        <li data-motivo="{{ $motivo->tipo->value }}" class="text-sm text-gray-700">
-                            <span class="mr-2 text-primary-light">◆</span>{{ $motivo->texto }}
-                            @if($motivo->ponteProtocoloResgate)
-                                <span class="mt-1 block pl-5 text-xs font-medium text-primary-light">Ponte com o Protocolo de Resgate</span>
-                            @endif
-                        </li>
-                    @endforeach
-                @endif
-            </ul>
-            @if($temPonte && ! $planoEncerrado)
-                <p class="mt-3 rounded bg-primary/10 px-3 py-2 text-xs leading-5 text-primary">
-                    Desempenho baixo em assunto é o ponto em que o acompanhamento encontra o Protocolo de Resgate.
-                </p>
-            @endif
-        </section>
 
         <section>
             <h3 class="text-sm font-semibold text-gray-700">Evolução dos parâmetros</h3>
@@ -111,7 +102,27 @@
 
         <section class="rounded bg-gray-50 p-4">
             <h3 class="text-sm font-semibold text-gray-700">Acompanhamento</h3>
-            <dl class="mt-3 space-y-3 text-sm">
+            <h4 class="mt-4 text-sm font-semibold text-gray-800">O que deve ser destacado neste acompanhamento?</h4>
+            <ul class="mt-3 space-y-2">
+                @foreach($itensDestaque as $item)
+                    <li data-motivo="{{ $item['tipo'] }}" @class([
+                        'rounded border border-gray-200 border-l-4 px-3 py-2.5 text-sm font-medium leading-5 text-gray-800 shadow-sm',
+                        'border-l-green-700 bg-green-50' => $item['tipo'] === 'panorama',
+                        'border-l-primary-light bg-white' => $item['tipo'] !== 'panorama',
+                    ])>
+                        <span class="mr-2 text-base text-primary-light" aria-hidden="true">◆</span>{{ $item['texto'] }}
+                        @if($item['ponte'])
+                            <span class="mt-1 block pl-5 text-xs font-semibold text-primary-light">Ponte com o Protocolo de Resgate</span>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+            @if($temPonte && ! $planoEncerrado)
+                <p class="mt-3 rounded border border-primary-light/40 bg-white px-3 py-2 text-xs font-medium leading-5 text-primary">
+                    Desempenho baixo em assunto é o ponto em que o acompanhamento encontra o Protocolo de Resgate.
+                </p>
+            @endif
+            <dl class="mt-4 space-y-3 text-sm">
                 <div>
                     <dt class="text-xs text-gray-500">Último contato</dt>
                     <dd class="font-medium text-gray-800">{{ $linha->ultimoContato }}</dd>
@@ -133,11 +144,12 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('admin.dashboard.contatos.store', $linha->aluno) }}?{{ http_build_query($consulta->parametros(['aluno' => $linha->aluno->id, 'page' => null])) }}" class="space-y-3">
+        <form id="form-registrar-contato" method="POST" action="{{ route('admin.dashboard.contatos.store', $linha->aluno) }}?{{ http_build_query($consulta->parametros(['aluno' => $linha->aluno->id, 'page' => null])) }}" class="space-y-3">
             @csrf
+            <input type="hidden" name="itens_abordados" value="">
             <label class="block">
-                <span class="text-sm font-semibold text-gray-700">Observação do contato</span>
-                <textarea name="observacao" rows="3" class="mt-2 w-full rounded border border-gray-300 p-3 text-sm text-gray-800 focus:border-primary focus:ring-primary" placeholder="O que foi combinado neste contato?">{{ old('observacao') }}</textarea>
+                <span class="text-sm font-semibold text-gray-700">Observação do contato <span class="text-red-800" aria-hidden="true">*</span></span>
+                <textarea name="observacao" rows="3" required class="mt-2 w-full rounded border border-gray-300 p-3 text-sm text-gray-800 focus:border-primary focus:ring-primary" placeholder="O que foi combinado neste contato?">{{ old('observacao') }}</textarea>
             </label>
             <button type="submit" class="flex w-full items-center justify-center gap-2 rounded bg-primary px-4 py-3 text-sm font-medium text-white transition hover:bg-primary-light">
                 Registrar contato
@@ -180,4 +192,48 @@
             </ul>
         </details>
     </div>
+
+    <dialog id="dialogo-itens-abordados" class="w-full max-w-md rounded border border-gray-200 bg-white p-6 shadow-lg backdrop:bg-black/40" aria-labelledby="dialogo-itens-titulo">
+        <h4 id="dialogo-itens-titulo" class="text-base font-semibold text-gray-800">Todos os itens do acompanhamento foram abordados?</h4>
+        <ul class="mt-4 space-y-2">
+            @foreach($itensDestaque as $item)
+                <li class="rounded border border-gray-200 border-l-4 border-l-primary-light bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800">{{ $item['texto'] }}</li>
+            @endforeach
+        </ul>
+        <div class="mt-5 flex flex-col gap-2">
+            <button type="button" id="confirmar-itens-sim" class="rounded bg-primary px-4 py-3 text-sm font-medium text-white transition hover:bg-primary-light">Sim, todos foram abordados</button>
+            <button type="button" id="confirmar-itens-nao" class="rounded bg-gray-200 px-4 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-300">Não, ainda não</button>
+        </div>
+    </dialog>
 </aside>
+<script>
+    (function () {
+        var form = document.getElementById('form-registrar-contato');
+        var dialogo = document.getElementById('dialogo-itens-abordados');
+        var sim = document.getElementById('confirmar-itens-sim');
+        var nao = document.getElementById('confirmar-itens-nao');
+        if (!form || !dialogo || !sim || !nao) {
+            return;
+        }
+        form.addEventListener('submit', function (event) {
+            if (form.dataset.confirmado === '1') {
+                return;
+            }
+            event.preventDefault();
+            dialogo.showModal();
+        });
+        sim.addEventListener('click', function () {
+            if (form.dataset.confirmado === '1') {
+                return;
+            }
+            form.dataset.confirmado = '1';
+            form.querySelector('[name="itens_abordados"]').value = '1';
+            sim.disabled = true;
+            dialogo.close();
+            form.requestSubmit();
+        });
+        nao.addEventListener('click', function () {
+            dialogo.close();
+        });
+    })();
+</script>
