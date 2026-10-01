@@ -519,6 +519,37 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertSee('data-acao="marcar_presenca"', false);
     }
 
+    public function test_remarcar_data_grava_a_nova_e_o_cancelar_preserva_a_anterior(): void
+    {
+        $user = User::factory()->create();
+        $aluno = $this->aluno([
+            'nome' => 'Helena Agenda',
+            'proximo_contato_em' => '2026-10-10',
+        ]);
+        $ficha = route('admin.dashboard', ['situacao' => 'todas', 'aluno' => $aluno->id]);
+
+        $this->actingAs($user)
+            ->get($ficha)
+            ->assertOk()
+            ->assertSee('Remarcar data')
+            ->assertSee('Cancelar mantém essa data.')
+            ->assertSee('id="cancelar-remarcar-data"', false)
+            ->assertSee('data-data-original="2026-10-10"', false)
+            ->assertSee('restaurarDataAnterior', false)
+            ->assertDontSee('Agendar acompanhamento');
+
+        $this->actingAs($user)
+            ->from($ficha)
+            ->post(route('admin.dashboard.agenda.store', $aluno), [
+                'proximo_contato_em' => '2026-10-20',
+                'remarcar' => '1',
+            ])
+            ->assertRedirect($ficha)
+            ->assertSessionHas('success', 'Próximo contato remarcado para 20/10/2026.');
+
+        $this->assertSame('2026-10-20', $aluno->fresh()->proximo_contato_em?->toDateString());
+    }
+
     public function test_agendar_para_hoje_entra_na_lista_do_dia(): void
     {
         $user = User::factory()->create();

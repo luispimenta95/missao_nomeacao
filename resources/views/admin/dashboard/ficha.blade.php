@@ -5,6 +5,7 @@
 
     $planoEncerrado = $linha->ficha->acao === AcaoAcompanhamento::RestabelecerContato;
     $linkWhatsapp = $linha->aluno->linkWhatsappWeb() ?? '';
+    $dataProximo = optional($linha->aluno->proximo_contato_em)->toDateString();
     $estilo = match ($linha->ficha->acao) {
         AcaoAcompanhamento::Intervir => 'bg-red-100 text-red-800',
         AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
@@ -133,7 +134,12 @@
                 </div>
                 <div>
                     <dt class="text-xs text-gray-500">Próximo contato</dt>
-                    <dd class="font-medium text-gray-800">{{ $linha->proximoContato === '—' ? 'Nenhum agendado' : $linha->proximoContato }}</dd>
+                    <dd class="mt-1 flex items-center justify-between gap-3">
+                        <span class="font-medium text-gray-800">{{ $linha->proximoContato === '—' ? 'Nenhum agendado' : $linha->proximoContato }}</span>
+                        @if($dataProximo)
+                            <button type="button" id="abrir-remarcar-data" class="shrink-0 rounded border border-primary px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-primary hover:text-white">Remarcar data</button>
+                        @endif
+                    </dd>
                 </div>
             </dl>
         </section>
@@ -162,15 +168,17 @@
             </a>
         @endif
 
-        <form method="POST" action="{{ route('admin.dashboard.agenda.store', $linha->aluno) }}" class="space-y-3">
-            @csrf
-            <label class="block">
-                <span class="text-sm font-semibold text-gray-700">Agendar acompanhamento</span>
-                <input type="date" name="proximo_contato_em" value="{{ old('proximo_contato_em', optional($linha->aluno->proximo_contato_em)->toDateString()) }}" class="mt-2 w-full rounded border border-gray-300 p-3 text-sm text-gray-800 focus:border-primary focus:ring-primary">
-            </label>
-            <button type="submit" class="w-full rounded bg-gray-200 px-4 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-300">Salvar data</button>
-        </form>
-        @if($linha->aluno->proximo_contato_em)
+        @if(! $dataProximo)
+            <form method="POST" action="{{ route('admin.dashboard.agenda.store', $linha->aluno) }}" class="space-y-3">
+                @csrf
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Agendar acompanhamento</span>
+                    <input type="date" name="proximo_contato_em" value="{{ old('proximo_contato_em') }}" class="mt-2 w-full rounded border border-gray-300 p-3 text-sm text-gray-800 focus:border-primary focus:ring-primary">
+                </label>
+                <button type="submit" class="w-full rounded bg-gray-200 px-4 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-300">Salvar data</button>
+            </form>
+        @endif
+        @if($dataProximo)
             <form method="POST" action="{{ route('admin.dashboard.agenda.store', $linha->aluno) }}">
                 @csrf
                 <input type="hidden" name="limpar" value="1">
@@ -192,6 +200,25 @@
             </ul>
         </details>
     </div>
+
+    @if($dataProximo)
+        <dialog id="dialogo-remarcar-data" class="w-full max-w-md rounded border border-gray-200 bg-white p-6 shadow-lg backdrop:bg-black/40" aria-labelledby="dialogo-remarcar-titulo">
+            <form method="POST" action="{{ route('admin.dashboard.agenda.store', $linha->aluno) }}">
+                @csrf
+                <input type="hidden" name="remarcar" value="1">
+                <h4 id="dialogo-remarcar-titulo" class="text-base font-semibold text-gray-800">Remarcar próximo contato</h4>
+                <p class="mt-2 text-sm leading-6 text-gray-600">A data atual é {{ $linha->aluno->proximo_contato_em->format('d/m/Y') }}. Cancelar mantém essa data.</p>
+                <label class="mt-4 block">
+                    <span class="text-sm font-semibold text-gray-700">Nova data</span>
+                    <input type="date" name="proximo_contato_em" required data-data-original="{{ $dataProximo }}" value="{{ old('proximo_contato_em', $dataProximo) }}" class="mt-2 w-full rounded border border-gray-300 p-3 text-sm text-gray-800 focus:border-primary focus:ring-primary">
+                </label>
+                <div class="mt-5 flex flex-col gap-2">
+                    <button type="submit" class="rounded bg-primary px-4 py-3 text-sm font-medium text-white transition hover:bg-primary-light">Salvar nova data</button>
+                    <button type="button" id="cancelar-remarcar-data" class="rounded bg-gray-200 px-4 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-300">Cancelar</button>
+                </div>
+            </form>
+        </dialog>
+    @endif
 
     <dialog id="dialogo-itens-abordados" class="w-full max-w-md rounded border border-gray-200 bg-white p-6 shadow-lg backdrop:bg-black/40" aria-labelledby="dialogo-itens-titulo">
         <h4 id="dialogo-itens-titulo" class="text-base font-semibold text-gray-800">Todos os itens do acompanhamento foram abordados?</h4>
@@ -235,5 +262,28 @@
         nao.addEventListener('click', function () {
             dialogo.close();
         });
+    })();
+    (function () {
+        var abrir = document.getElementById('abrir-remarcar-data');
+        var dialogo = document.getElementById('dialogo-remarcar-data');
+        var cancelar = document.getElementById('cancelar-remarcar-data');
+        if (!abrir || !dialogo || !cancelar) {
+            return;
+        }
+        var input = dialogo.querySelector('[name="proximo_contato_em"]');
+        function restaurarDataAnterior() {
+            if (input) {
+                input.value = input.getAttribute('data-data-original') || '';
+            }
+        }
+        abrir.addEventListener('click', function () {
+            restaurarDataAnterior();
+            dialogo.showModal();
+        });
+        cancelar.addEventListener('click', function () {
+            restaurarDataAnterior();
+            dialogo.close();
+        });
+        dialogo.addEventListener('cancel', restaurarDataAnterior);
     })();
 </script>

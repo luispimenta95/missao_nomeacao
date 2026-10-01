@@ -167,9 +167,14 @@ class DashboardController extends Controller
         $aluno->proximo_contato_em = $dados['proximo_contato_em'];
         $aluno->save();
 
+        $data = Carbon::parse($dados['proximo_contato_em'])->format('d/m/Y');
+        $mensagem = $request->boolean('remarcar')
+            ? 'Próximo contato remarcado para '.$data.'.'
+            : 'Acompanhamento agendado.';
+
         return redirect()
             ->back()
-            ->with('success', 'Acompanhamento agendado.');
+            ->with('success', $mensagem);
     }
 
     /**
