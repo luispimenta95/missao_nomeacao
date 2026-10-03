@@ -11,6 +11,7 @@
         AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
         AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
         AcaoAcompanhamento::Ok, AcaoAcompanhamento::RestabelecerContato => 'bg-gray-100 text-gray-700',
+        AcaoAcompanhamento::AlunoNovato => 'bg-amber-100 text-amber-900',
     };
     $rotuloAcao = $linha->ficha->acao->rotulo();
     $temPonte = collect($linha->ficha->motivos)->contains(fn ($motivo) => $motivo->ponteProtocoloResgate);

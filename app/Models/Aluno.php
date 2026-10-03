@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use App\Enums\AcaoAcompanhamento;
+use App\Services\Acompanhamento\ContextoAcompanhamento;
+use Carbon\Carbon;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +14,31 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Aluno extends Model
 {
     use HasFactory;
+
+    public const DIAS_NOVATO = 15;
+
+    /**
+     * Faixas gravadas pelo relatório. Aluno novato não recebe esses valores.
+     *
+     * @var list<string>
+     */
+    public const COLUNAS_METRICAS = [
+        'last_performance',
+        'last_performance_codigo',
+        'last_question_volume',
+        'last_question_volume_codigo',
+        'last_accuracy_rate',
+        'last_accuracy_rate_codigo',
+        'last_subjects',
+        'prev_performance',
+        'prev_performance_codigo',
+        'prev_question_volume',
+        'prev_question_volume_codigo',
+        'prev_accuracy_rate',
+        'prev_accuracy_rate_codigo',
+        'metricas_periodo',
+        'assuntos_detalhe',
+    ];
 
     protected $table = 'alunos';
 
@@ -50,6 +78,30 @@ class Aluno extends Model
         'ultimo_contato_em' => 'datetime',
         'proximo_contato_em' => 'date',
     ];
+
+    /**
+     * Menos de 15 dias corridos desde o cadastro, no fuso da mentoria.
+     * No 15º dia o aluno deixa de ser novato.
+     */
+    public function ehNovato(?DateTimeInterface $hoje = null): bool
+    {
+        if ($this->created_at === null) {
+            return false;
+        }
+
+        $fuso = 'America/Sao_Paulo';
+        $cadastro = Carbon::parse($this->created_at)->timezone($fuso);
+        $referencia = Carbon::parse($hoje ?? now())->timezone($fuso);
+
+        return ContextoAcompanhamento::diasDesde($cadastro, $referencia) < self::DIAS_NOVATO;
+    }
+
+    public function limparMetricasDesempenho(): void
+    {
+        foreach (self::COLUNAS_METRICAS as $coluna) {
+            $this->{$coluna} = null;
+        }
+    }
 
     public function isTeacher(): bool
     {

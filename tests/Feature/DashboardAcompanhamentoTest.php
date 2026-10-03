@@ -776,6 +776,51 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertDontSee('Helena Em Dia');
     }
 
+    public function test_aluno_com_menos_de_15_dias_fica_novato_e_entra_no_filtro(): void
+    {
+        $user = User::factory()->create();
+        $this->aluno([
+            'nome' => 'Ana Novata',
+            'created_at' => Carbon::parse('2026-09-20 09:00:00'),
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+            'last_question_volume' => 'Volume crítico',
+            'last_question_volume_codigo' => 'volume_critico',
+            'last_accuracy_rate' => 'Crítico',
+            'last_accuracy_rate_codigo' => 'critico',
+        ]);
+        $this->aluno([
+            'nome' => 'Bruno Veterano',
+            'created_at' => Carbon::parse('2026-08-01 09:00:00'),
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+            'last_question_volume' => 'Volume suficiente',
+            'last_question_volume_codigo' => 'volume_suficiente',
+            'last_accuracy_rate' => 'Mediano',
+            'last_accuracy_rate_codigo' => 'mediano',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas']))
+            ->assertOk()
+            ->assertSee('Alunos novatos (1)')
+            ->assertSee('data-acao="aluno_novato"', false)
+            ->assertSee('Ana Novata')
+            ->assertSee('Menos de 15 dias: as métricas do relatório não são analisadas.');
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['acao' => 'aluno_novato', 'situacao' => 'todas']))
+            ->assertOk()
+            ->assertSee('Ana Novata')
+            ->assertDontSee('Bruno Veterano');
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['acao' => 'intervir', 'situacao' => 'todas']))
+            ->assertOk()
+            ->assertSee('Bruno Veterano')
+            ->assertDontSee('Ana Novata');
+    }
+
     public function test_inativo_sai_de_intervir_e_entra_em_restabelecer_contato(): void
     {
         $user = User::factory()->create();
@@ -828,7 +873,8 @@ class DashboardAcompanhamentoTest extends TestCase
      */
     private function aluno(array $dados): Aluno
     {
-        $criadoEm = $dados['created_at'] ?? Carbon::parse('2026-09-20 09:00:00');
+        // 15 dias antes do relógio do teste: fora de aluno novato e ainda sem a observação de tempo sem contato.
+        $criadoEm = $dados['created_at'] ?? Carbon::parse('2026-09-07 09:00:00');
         unset($dados['created_at'], $dados['updated_at']);
 
         $aluno = Aluno::create(array_merge([

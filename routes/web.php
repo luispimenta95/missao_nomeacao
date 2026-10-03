@@ -4,6 +4,7 @@ use App\Http\Controllers\AlunoController;
 use App\Http\Controllers\AnonymousVisitAdminController;
 use App\Http\Controllers\AnonymousVisitController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\BoasVindasAdminController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DesempenhoAdminController;
 use App\Http\Controllers\InscricaoAdminController;
@@ -82,6 +83,9 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::get('/desempenho', [DesempenhoAdminController::class, 'index'])->name('desempenho.index');
     Route::get('/desempenho/{desempenho}/edit', [DesempenhoAdminController::class, 'edit'])->name('desempenho.edit');
     Route::put('/desempenho/{desempenho}', [DesempenhoAdminController::class, 'update'])->name('desempenho.update');
+
+    Route::get('/boas-vindas', [BoasVindasAdminController::class, 'edit'])->name('boas-vindas.edit');
+    Route::put('/boas-vindas', [BoasVindasAdminController::class, 'update'])->name('boas-vindas.update');
 
     // Fonte e preview do PDF dos relatórios
     Route::get('/relatorios-pdf', [RelatorioPdfAdminController::class, 'index'])->name('relatorios-pdf.index');

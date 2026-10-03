@@ -2,6 +2,7 @@
 
 namespace App\Http\Util;
 
+use App\Mail\EmailBoasVindasNovato;
 use App\Mail\EmailInscricao;
 use App\Mail\EmailLead;
 use App\Mail\EmailRelatorioCoach;
@@ -81,6 +82,19 @@ class MailHelper
         ];
 
         self::enviarComCco($mailTo, new EmailRelatorioCoach($dadosEmail, $pdfPath));
+    }
+
+    /**
+     * E-mail de boas-vindas do aluno novato, sem PDF.
+     */
+    public static function emailBoasVindasNovato(string $texto, string $mailTo): void
+    {
+        self::enviarComCco($mailTo, new EmailBoasVindasNovato([
+            'to' => $mailTo,
+            'body' => [
+                'texto' => $texto,
+            ],
+        ]));
     }
 
     /**

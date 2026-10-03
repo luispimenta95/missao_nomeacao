@@ -211,6 +211,7 @@ class DashboardController extends Controller
                 && $linha->situacao === SituacaoAcompanhamento::Pendente)->count(),
             'evolucoes' => $linhas->filter(fn (LinhaPainel $linha) => $linha->ficha->acao === AcaoAcompanhamento::Parabenizar
                 && $linha->situacao === SituacaoAcompanhamento::Pendente)->count(),
+            'novatos' => $linhas->filter(fn (LinhaPainel $linha) => $linha->ficha->acao === AcaoAcompanhamento::AlunoNovato)->count(),
         ];
     }
 

@@ -42,11 +42,16 @@ final class MontadorPainelAcompanhamento
         $ctx = ContextoAcompanhamento::fromAluno($aluno, $hoje);
         $ficha = $this->fichaPorMetricas($ctx);
         $situacao = SituacaoAcompanhamento::Pendente;
+        $novato = $aluno->ehNovato($hoje);
 
-        // Contato registrado neste ciclo: a ação fica Ok até o agendamento
-        // vencer sem novo contato, ou até um relatório quinzenal novo limpar
-        // acao_resolvida e devolver a classificação pelas métricas.
-        if ($aluno->acao_resolvida !== null) {
+        // Cadastro com menos de 15 dias: a ação é Aluno novato e as faixas
+        // do relatório não disputam, mesmo que já tenham sido gravadas.
+        if ($novato) {
+            $ficha = $this->fichaNovato($aluno, $hoje);
+            if ($aluno->acao_resolvida !== null && ! $this->agendamentoVencidoSemContato($aluno, $hoje)) {
+                $situacao = SituacaoAcompanhamento::Concluida;
+            }
+        } elseif ($aluno->acao_resolvida !== null) {
             if ($this->agendamentoVencidoSemContato($aluno, $hoje)) {
                 $ficha = $this->fichaMarcarPresencaPorAgendamento($aluno, $ficha);
             } else {
@@ -61,7 +66,7 @@ final class MontadorPainelAcompanhamento
             );
         }
 
-        $assuntos = array_values(array_filter(
+        $assuntos = $novato ? [] : array_values(array_filter(
             $ctx->assuntos,
             static fn (array $assunto): bool => CatalogoFaixas::papel(EixoDesempenho::ASSUNTO, $assunto['faixa']) === PapelFaixa::Baixa
         ));
@@ -83,6 +88,27 @@ final class MontadorPainelAcompanhamento
     public function assinaturaDasMetricas(Aluno $aluno, DateTimeInterface $hoje): string
     {
         return $this->fichaPorMetricas(ContextoAcompanhamento::fromAluno($aluno, $hoje))->assinatura();
+    }
+
+    private function fichaNovato(Aluno $aluno, DateTimeInterface $hoje): FichaAcompanhamento
+    {
+        $dias = ContextoAcompanhamento::diasDesde($aluno->created_at, $hoje);
+        $quando = $dias === 0
+            ? 'Cadastro hoje'
+            : 'Cadastro há '.$dias.' '.($dias === 1 ? 'dia' : 'dias');
+
+        return new FichaAcompanhamento(
+            AcaoAcompanhamento::AlunoNovato,
+            [new MotivoAcompanhamento(
+                TipoMotivoAcompanhamento::Novato,
+                AcaoAcompanhamento::AlunoNovato,
+                $quando.'. Menos de '.Aluno::DIAS_NOVATO.' dias: as métricas do relatório não são analisadas.',
+                false,
+                null,
+                0,
+            )],
+            [],
+        );
     }
 
     private function fichaEmDia(ContextoAcompanhamento $ctx): FichaAcompanhamento

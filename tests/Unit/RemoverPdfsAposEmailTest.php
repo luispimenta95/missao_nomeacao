@@ -62,6 +62,7 @@ class RemoverPdfsAposEmailTest extends TestCase
             'email' => 'giovanna@example.com',
             'recebe_email' => true,
         ]);
+        $aluno->forceFill(['created_at' => '2026-08-01 09:00:00'])->save();
 
         $pdfConsolidado = $this->pasta.'/relatorio_consolidado_20260815_1200_Giovanna_1.pdf';
         $pdfAntigo = $this->pasta.'/relatorio_questoes_20260815_1200_Giovanna_1.pdf';
@@ -82,11 +83,12 @@ class RemoverPdfsAposEmailTest extends TestCase
     {
         Mail::fake();
 
-        Aluno::create([
+        $aluno = Aluno::create([
             'nome' => 'Giovanna',
             'email' => 'giovanna@example.com',
             'recebe_email' => false,
         ]);
+        $aluno->forceFill(['created_at' => '2026-08-01 09:00:00'])->save();
 
         $pdf = $this->pasta.'/relatorio_questoes_20260815_1200_Giovanna_1.pdf';
         file_put_contents($pdf, '%PDF-1.4 fake');

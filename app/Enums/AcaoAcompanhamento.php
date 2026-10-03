@@ -9,6 +9,7 @@ enum AcaoAcompanhamento: string
     case Parabenizar = 'parabenizar';
     case Ok = 'ok';
     case RestabelecerContato = 'restabelecer_contato';
+    case AlunoNovato = 'aluno_novato';
 
     public function rotulo(): string
     {
@@ -18,13 +19,14 @@ enum AcaoAcompanhamento: string
             self::Parabenizar => 'Parabenizar',
             self::Ok => 'Ok',
             self::RestabelecerContato => 'Restabelecer contato',
+            self::AlunoNovato => 'Aluno novato',
         };
     }
 
     /**
      * Intervir > Marcar presença > Parabenizar > Ok.
-     * Restabelecer contato fica fora dessa ordem: o montador atribui a ação
-     * quando o aluno está inativo, sem disputar com os motivos de desempenho.
+     * Restabelecer contato e Aluno novato ficam fora dessa ordem: o montador
+     * atribui essas ações sem disputar com os motivos de desempenho.
      */
     public function prioridade(): int
     {
@@ -32,7 +34,7 @@ enum AcaoAcompanhamento: string
             self::Intervir => 3,
             self::MarcarPresenca => 2,
             self::Parabenizar => 1,
-            self::Ok, self::RestabelecerContato => 0,
+            self::Ok, self::RestabelecerContato, self::AlunoNovato => 0,
         };
     }
 }
