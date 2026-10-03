@@ -166,16 +166,18 @@ class ResumoExecucaoRelatorioTest extends TestCase
     {
         Mail::fake();
 
-        Aluno::create([
+        $giovanna = Aluno::create([
             'nome' => 'Giovanna',
             'email' => 'giovanna@example.com',
             'recebe_email' => true,
         ]);
-        Aluno::create([
+        $isadora = Aluno::create([
             'nome' => 'Isadora Gomes Silva',
             'email' => 'isadora@example.com',
             'recebe_email' => true,
         ]);
+        $giovanna->forceFill(['created_at' => '2026-08-01 09:00:00'])->save();
+        $isadora->forceFill(['created_at' => '2026-08-01 09:00:00'])->save();
 
         file_put_contents($this->pasta.'/relatorio_consolidado_20261001_1030_Giovanna_2.pdf', '%PDF-1.4 fake');
 

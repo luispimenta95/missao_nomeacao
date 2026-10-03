@@ -13,6 +13,7 @@ enum TipoMotivoAcompanhamento: string
     case ContatoAgendado = 'contato_agendado';
     case Evolucao = 'evolucao';
     case Panorama = 'panorama';
+    case Novato = 'novato';
 
     public function acao(): AcaoAcompanhamento
     {
@@ -20,6 +21,7 @@ enum TipoMotivoAcompanhamento: string
             self::ConstanciaCritica, self::VolumeCritico => AcaoAcompanhamento::Intervir,
             self::Evolucao => AcaoAcompanhamento::Parabenizar,
             self::Panorama => AcaoAcompanhamento::Ok,
+            self::Novato => AcaoAcompanhamento::AlunoNovato,
             default => AcaoAcompanhamento::MarcarPresenca,
         };
     }

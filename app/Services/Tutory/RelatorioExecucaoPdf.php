@@ -38,6 +38,20 @@ class RelatorioExecucaoPdf
             $conclusao .= '<p>'.$e($paragrafo).'</p>';
         }
 
+        $novatos = '';
+        foreach ($resumo->envios as $envio) {
+            if ($envio['situacao'] !== ResumoExecucaoRelatorio::BOAS_VINDAS) {
+                continue;
+            }
+            $novatos .= '<tr><td>'.$e($envio['nome']).'</td><td>'.$e($envio['email']).'</td><td>E-mail de boas-vindas</td></tr>';
+        }
+        $blocoNovatos = $novatos === ''
+            ? ''
+            : '<h2>Alunos novatos</h2><p>Cadastro com menos de 15 dias: sem PDF e sem análise de métricas.</p>'
+                .'<table><thead><tr><th>Aluno</th><th>E-mail</th><th>Envio</th></tr></thead><tbody>'
+                .$novatos
+                .'</tbody></table>';
+
         $teste = $resumo->teste ? '<p class="meta">Modo teste: apenas a aluna Giovanna.</p>' : '';
 
         return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>
@@ -69,6 +83,7 @@ class RelatorioExecucaoPdf
             .'<table><thead><tr><th>Aluno</th><th>PDF</th><th>E-mail</th></tr></thead><tbody>'
             .$alunos
             .'</tbody></table>'
+            .$blocoNovatos
             .'<h2>Falhas / divergências na etapa de e-mail</h2>'
             .$divergencias
             .'<h2>Conclusão técnica</h2>'

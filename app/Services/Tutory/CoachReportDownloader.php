@@ -10,7 +10,8 @@
  *    GET /documentos/relatorios/{model}?key=...
  * 4. Monta UM PDF consolidado (Puppeteer se houver Node; senão PHP/Dompdf)
  * 5. Reprocessa falhas (até 3x) por aluno
- * 6. Lista alunos do banco → localiza o PDF consolidado → um e-mail com 1 anexo se recebe_email
+ * 6. Lista alunos do banco → aluno novato (< 15 dias) recebe só o e-mail de boas-vindas;
+ *    os demais: localiza o PDF consolidado → um e-mail com 1 anexo se recebe_email
  * 7. Envia o PDF resumido da execução para o endereço configurado
  */
 
@@ -18,6 +19,7 @@ namespace App\Services\Tutory;
 
 use App\Http\Util\MailHelper;
 use App\Models\Aluno;
+use App\Services\Alunos\TextoBoasVindasNovato;
 use App\Services\Desempenho\AvaliadorDesempenho;
 use DOMDocument;
 use DOMElement;
@@ -1673,11 +1675,18 @@ class CoachReportDownloader
         $periodoLabel = $dtIni.' a '.$dtFim.' (período '.$this->periodo.')';
 
         $enviados = 0;
+        $boasVindas = 0;
         $pulados = 0;
         $falhas = 0;
 
         foreach ($alunos as $aluno) {
             $this->log("[{$aluno->nome}] e-mail={$aluno->email} | recebe_email=".($aluno->recebe_email ? 'sim' : 'não'));
+
+            if ($aluno->ehNovato()) {
+                $this->enviarBoasVindasNovato($aluno, $boasVindas, $pulados, $falhas);
+
+                continue;
+            }
 
             $pdfs = $this->encontrarPdfsAluno($aluno->nome);
             if ($pdfs === []) {
@@ -1760,7 +1769,47 @@ class CoachReportDownloader
         }
 
         $this->log(str_repeat('=', 50));
-        $this->log("E-mails enviados: {$enviados} | pulados: {$pulados} | falhas: {$falhas}");
+        $this->log("E-mails enviados: {$enviados} | boas-vindas: {$boasVindas} | pulados: {$pulados} | falhas: {$falhas}");
+    }
+
+    private function enviarBoasVindasNovato(Aluno $aluno, int &$boasVindas, int &$pulados, int &$falhas): void
+    {
+        $this->log("[{$aluno->nome}] Aluno novato: métricas não analisadas e PDF não enviado.");
+
+        if (! $aluno->recebe_email) {
+            $this->log("[{$aluno->nome}] Boas-vindas não enviadas (recebe_email=false)");
+            $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::PULADO);
+            $pulados++;
+
+            return;
+        }
+
+        if (! filter_var($aluno->email, FILTER_VALIDATE_EMAIL)) {
+            $this->log("[{$aluno->nome}] E-mail inválido: {$aluno->email}");
+            $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::INVALIDO);
+            $falhas++;
+
+            return;
+        }
+
+        try {
+            MailHelper::emailBoasVindasNovato(
+                TextoBoasVindasNovato::paraAluno($aluno),
+                $aluno->email
+            );
+            $this->log("[{$aluno->nome}] Boas-vindas enviadas para {$aluno->email}".$this->sufixoCco($aluno->email));
+            $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::BOAS_VINDAS);
+            $boasVindas++;
+        } catch (Throwable $exc) {
+            $falhas++;
+            $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::FALHA);
+            $this->log("[{$aluno->nome}] Falha ao enviar boas-vindas: ".$exc->getMessage());
+            Log::warning('Falha ao enviar boas-vindas de aluno novato', [
+                'aluno_id' => $aluno->id,
+                'email' => $aluno->email,
+                'erro' => $exc->getMessage(),
+            ]);
+        }
     }
 
     private function sufixoCco(string $destinatario): string
@@ -3534,6 +3583,36 @@ HTML;
         return $caminho;
     }
 
+    /**
+     * Aluno com menos de 15 dias no cadastro local não gera PDF.
+     *
+     * @param  list<array{nome: string, id: string}>  $alunos
+     * @return list<array{nome: string, id: string}>
+     */
+    private function semAlunosNovatos(array $alunos): array
+    {
+        try {
+            $ficam = [];
+            foreach ($alunos as $aluno) {
+                $local = Aluno::encontrarPorTutoryId((string) ($aluno['id'] ?? ''))
+                    ?? Aluno::encontrarPorNome((string) ($aluno['nome'] ?? ''));
+                if ($local !== null && $local->ehNovato()) {
+                    $this->log("[{$local->nome}] Aluno novato: PDF não gerado (cadastro com menos de ".Aluno::DIAS_NOVATO.' dias).');
+
+                    continue;
+                }
+                $ficam[] = $aluno;
+            }
+
+            return $ficam;
+        } catch (QueryException|SQLiteDatabaseDoesNotExistException $exc) {
+            $this->log('Banco local indisponível ao identificar alunos novatos; a geração segue para todos.');
+            $this->log($exc->getMessage());
+
+            return $alunos;
+        }
+    }
+
     private function baixarTodos(): void
     {
         $inicio = $this->resumoExecucao->inicio ?? new \DateTimeImmutable('now');
@@ -3549,7 +3628,7 @@ HTML;
             $relatorios
         )));
 
-        $alunos = $this->coletarAlunosAtivos();
+        $alunos = $this->semAlunosNovatos($this->coletarAlunosAtivos());
         if ($this->teste) {
             $alvo = mb_strtolower(self::ALUNA_TESTE);
             $alunos = array_values(array_filter(

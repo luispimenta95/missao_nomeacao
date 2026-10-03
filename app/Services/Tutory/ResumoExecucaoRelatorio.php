@@ -21,6 +21,8 @@ class ResumoExecucaoRelatorio
 
     public const FALHA = 'falha';
 
+    public const BOAS_VINDAS = 'boas_vindas';
+
     public ?DateTimeImmutable $fim = null;
 
     public ?string $logArquivo = null;
@@ -282,6 +284,7 @@ class ResumoExecucaoRelatorio
     {
         return match ($situacao) {
             self::ENVIADO => 'Enviado',
+            self::BOAS_VINDAS => 'E-mail de boas-vindas',
             self::PULADO => 'Não enviado — recebe_email=false',
             self::INVALIDO => 'Não enviado — e-mail inválido',
             self::FALHA => 'Falha ao enviar',
