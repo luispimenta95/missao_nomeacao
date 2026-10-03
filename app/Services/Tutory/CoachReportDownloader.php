@@ -1650,7 +1650,8 @@ class CoachReportDownloader
                 $nomesAnexos[] = 'Relatório consolidado';
             }
 
-            $avaliacao = $this->avaliarDesempenhoDosPdfs($aluno->nome, $pdfs);
+            $chavePeriodo = $this->mesDoPeriodo()->format('Y-m').'-'.$this->periodo;
+            $avaliacao = $this->avaliarDesempenhoDosPdfs($aluno, $pdfs, $chavePeriodo);
             $blocos = $avaliacao['blocos'] ?? [];
             $resumo = $avaliacao['resumo'] ?? null;
             if ($blocos !== []) {
@@ -1659,7 +1660,6 @@ class CoachReportDownloader
                 $this->log("[{$aluno->nome}] Desempenho: sem blocos (métricas ausentes ou parâmetros não seedados)");
             }
 
-            $chavePeriodo = $this->mesDoPeriodo()->format('Y-m').'-'.$this->periodo;
             $aluno->aplicarAvaliacaoDesempenho($avaliacao, $chavePeriodo);
             $this->log(
                 "[{$aluno->nome}] métricas atualizadas:"
@@ -2166,10 +2166,10 @@ HTML;
      * @param  list<string>  $pdfs
      * @return array{blocos: list<array<string, mixed>>, metricas: array<string, mixed>, resumo: string|null}
      */
-    private function avaliarDesempenhoDosPdfs(string $nomeAluno, array $pdfs): array
+    private function avaliarDesempenhoDosPdfs(Aluno $aluno, array $pdfs, string $periodo): array
     {
         $avaliador = new AvaliadorDesempenho;
-        $dados = ['nome' => $nomeAluno];
+        $dados = ['nome' => $aluno->nome];
 
         foreach ($pdfs as $pdf) {
             $meta = $this->extrairMetaDoArquivoPdf(basename($pdf));
@@ -2204,7 +2204,7 @@ HTML;
             }
         }
 
-        return $avaliador->avaliarRelatorio($dados);
+        return $avaliador->avaliarRelatorio($dados, $aluno, $periodo);
     }
 
     /**

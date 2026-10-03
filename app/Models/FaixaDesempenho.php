@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FaixaDesempenho extends Model
 {
@@ -33,6 +34,26 @@ class FaixaDesempenho extends Model
     public function eixo(): BelongsTo
     {
         return $this->belongsTo(EixoDesempenho::class, 'eixo_desempenho_id');
+    }
+
+    public function textos(): HasMany
+    {
+        return $this->hasMany(TextoFaixaDesempenho::class, 'faixa_desempenho_id')->orderBy('ordem')->orderBy('id');
+    }
+
+    public function garantirTextoCanonico(): TextoFaixaDesempenho
+    {
+        $canonico = $this->textos()->where('canonico', true)->first();
+        if ($canonico !== null) {
+            return $canonico;
+        }
+
+        return $this->textos()->create([
+            'texto' => $this->texto_email,
+            'ordem' => 1,
+            'canonico' => true,
+            'ativo' => true,
+        ]);
     }
 
     public function contemValor(float $valor): bool

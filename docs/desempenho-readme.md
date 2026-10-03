@@ -1,6 +1,17 @@
 # Gestão de desempenho — parâmetros do texto
 
-No admin (`/admin/desempenho`), cada **faixa** tem um texto de e-mail. Os valores reais entram pelos placeholders abaixo.
+No admin (`/admin/desempenho`), cada **faixa** tem o texto de e-mail que já existia e pode receber outros. Os valores reais entram pelos placeholders abaixo.
+
+## Rotação
+
+O texto principal da faixa é mantido. Ele é o primeiro da lista e entra quando a faixa do aluno muda.
+
+No dia do relatório, a escolha olha a última faixa gravada no aluno e a faixa calculada naquele momento, eixo por eixo (constância, volume, percentual e assunto):
+
+- Se a faixa é a mesma, usa um texto dessa faixa que ainda não foi enviado na rodada atual. Quando todos já foram usados, a rodada recomeça pelo texto principal.
+- Se a faixa mudou, não consulta esse histórico: entra o texto principal da faixa nova, porque o texto já é outro.
+
+Cada uso fica em `usos_texto_desempenho`, com o id do texto, a faixa, o ciclo e o período (`AAAA-MM-N`). Repetir o mesmo período reaproveita o texto já escolhido. A migração marca, para cada aluno, o texto principal da última faixa como já usado, para a próxima quinzena na mesma faixa seguir para o próximo texto.
 
 ## Placeholders gerais
 
