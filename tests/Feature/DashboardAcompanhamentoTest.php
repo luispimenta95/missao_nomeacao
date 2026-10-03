@@ -821,6 +821,71 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertDontSee('Ana Novata');
     }
 
+    public function test_contato_com_aluno_novato_deixa_acao_ok_e_observacao_na_ficha(): void
+    {
+        $user = User::factory()->create();
+        $ana = $this->aluno([
+            'nome' => 'Ana Novata',
+            'created_at' => Carbon::parse('2026-09-20 09:00:00'),
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+            'last_question_volume' => 'Volume crítico',
+            'last_question_volume_codigo' => 'volume_critico',
+            'last_accuracy_rate' => 'Crítico',
+            'last_accuracy_rate_codigo' => 'critico',
+        ]);
+        $this->aluno([
+            'nome' => 'Lia Sem Contato',
+            'created_at' => Carbon::parse('2026-09-20 09:00:00'),
+            'last_performance' => 'Crítico',
+            'last_performance_codigo' => 'critico',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.dashboard.contatos.store', $ana), [
+                'observacao' => 'Primeiro contato de boas-vindas.',
+                'itens_abordados' => '1',
+            ])
+            ->assertRedirect(route('admin.dashboard.contatos.agendar', $ana));
+
+        $this->actingAs($user)
+            ->post(route('admin.dashboard.contatos.agendar.store', $ana), [
+                'decisao' => 'sim',
+                'proximo_contato_em' => '2026-09-25',
+            ])
+            ->assertRedirect(route('admin.dashboard', ['aluno' => $ana->id]));
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'concluidas', 'aluno' => $ana->id]))
+            ->assertOk()
+            ->assertSee('data-acao="ok"', false)
+            ->assertSee('data-acao-ficha="ok"', false)
+            ->assertSee('>Observação</dt>', false)
+            ->assertSee('Cadastro há 2 dias. Menos de 15 dias: as métricas do relatório não são analisadas.')
+            ->assertSee('Primeiro contato de boas-vindas.')
+            ->assertDontSee('data-acao="aluno_novato"', false)
+            ->assertDontSee('data-acao="intervir"', false);
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['acao' => 'aluno_novato', 'situacao' => 'todas']))
+            ->assertOk()
+            ->assertSee('Alunos novatos (1)')
+            ->assertSee('Lia Sem Contato')
+            ->assertDontSee('Ana Novata');
+
+        Carbon::setTestNow(Carbon::parse('2026-09-26 10:00:00', 'America/Sao_Paulo'));
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'busca' => 'Ana Novata', 'aluno' => $ana->id]))
+            ->assertOk()
+            ->assertSee('data-acao="marcar_presenca"', false)
+            ->assertSee('data-acao-ficha="marcar_presenca"', false)
+            ->assertSee('Nenhum contato registrado após a data agendada (25/09/2026)')
+            ->assertSee('Cadastro há 6 dias. Menos de 15 dias: as métricas do relatório não são analisadas.')
+            ->assertDontSee('data-acao="intervir"', false)
+            ->assertDontSee('data-acao="aluno_novato"', false);
+    }
+
     public function test_inativo_sai_de_intervir_e_entra_em_restabelecer_contato(): void
     {
         $user = User::factory()->create();
