@@ -43,6 +43,15 @@ class ResumoExecucaoRelatorio
      */
     public array $envios = [];
 
+    /**
+     * Alunos ativos com menos de 15 dias: entram no resumo, sem PDF e sem métrica.
+     *
+     * @var list<array{nome: string, email: string, situacao: string}>
+     */
+    public array $novatos = [];
+
+    public ?string $nota = null;
+
     public function __construct(
         public DateTimeImmutable $inicio,
         public string $periodoRotulo,
@@ -68,7 +77,15 @@ class ResumoExecucaoRelatorio
 
     public function ativos(): int
     {
-        return count($this->geracoes);
+        $nomes = [];
+        foreach ($this->geracoes as $geracao) {
+            $nomes[Aluno::normalizarNome($geracao['nome'])] = true;
+        }
+        foreach ($this->novatos as $novato) {
+            $nomes[Aluno::normalizarNome($novato['nome'])] = true;
+        }
+
+        return count($nomes);
     }
 
     public function pdfsGerados(): int
@@ -78,7 +95,39 @@ class ResumoExecucaoRelatorio
 
     public function falhasGeracao(): int
     {
-        return $this->ativos() - $this->pdfsGerados();
+        return count(array_filter($this->geracoes, static fn (array $g): bool => ! $g['sucesso']));
+    }
+
+    public function emailsBoasVindas(): int
+    {
+        return count(array_filter(
+            $this->novatos,
+            static fn (array $novato): bool => $novato['situacao'] === self::BOAS_VINDAS
+        ));
+    }
+
+    public function registrarNovato(string $nome, string $email = '', string $situacao = ''): void
+    {
+        $chave = Aluno::normalizarNome($nome);
+        foreach ($this->novatos as $indice => $novato) {
+            if (Aluno::normalizarNome($novato['nome']) !== $chave) {
+                continue;
+            }
+            if ($email !== '') {
+                $this->novatos[$indice]['email'] = $email;
+            }
+            if ($situacao !== '') {
+                $this->novatos[$indice]['situacao'] = $situacao;
+            }
+
+            return;
+        }
+
+        $this->novatos[] = [
+            'nome' => $nome,
+            'email' => $email,
+            'situacao' => $situacao,
+        ];
     }
 
     public function emailsEnviados(): int
@@ -103,15 +152,49 @@ class ResumoExecucaoRelatorio
      */
     public function indicadores(): array
     {
-        return [
+        $linhas = [
             ['indicador' => 'Alunos ativos encontrados', 'resultado' => $this->ativos()],
-            ['indicador' => 'PDFs consolidados gerados', 'resultado' => $this->pdfsGerados()],
-            ['indicador' => 'Falhas na geração dos PDFs', 'resultado' => $this->falhasGeracao()],
-            ['indicador' => 'E-mails enviados', 'resultado' => $this->emailsEnviados()],
-            ['indicador' => 'E-mails pulados (recebe_email=false)', 'resultado' => $this->emailsPulados()],
-            ['indicador' => 'Falhas / PDF não localizado no envio', 'resultado' => $this->falhasEnvio()],
-            ['indicador' => 'PDFs removidos após o envio', 'resultado' => $this->pdfsRemovidos],
         ];
+        if ($this->novatos !== []) {
+            $linhas[] = [
+                'indicador' => 'Alunos novatos (sem PDF e sem métricas)',
+                'resultado' => count($this->novatos),
+            ];
+        }
+        $linhas[] = ['indicador' => 'PDFs consolidados gerados', 'resultado' => $this->pdfsGerados()];
+        $linhas[] = ['indicador' => 'Falhas na geração dos PDFs', 'resultado' => $this->falhasGeracao()];
+        $linhas[] = ['indicador' => 'E-mails enviados', 'resultado' => $this->emailsEnviados()];
+        if ($this->novatos !== []) {
+            $linhas[] = ['indicador' => 'E-mails de boas-vindas', 'resultado' => $this->emailsBoasVindas()];
+        }
+        $linhas[] = ['indicador' => 'E-mails pulados (recebe_email=false)', 'resultado' => $this->emailsPulados()];
+        $linhas[] = ['indicador' => 'Falhas / PDF não localizado no envio', 'resultado' => $this->falhasEnvio()];
+        $linhas[] = ['indicador' => 'PDFs removidos após o envio', 'resultado' => $this->pdfsRemovidos];
+
+        return $linhas;
+    }
+
+    /**
+     * PDFs gerados e, em seguida, alunos novatos que ficaram fora da geração.
+     *
+     * @return list<array{nome: string, pdf: string, email: string}>
+     */
+    public function linhasDaExecucao(): array
+    {
+        $linhas = $this->linhasComPdf();
+        $novatos = $this->novatos;
+        usort($novatos, static fn (array $a, array $b): int => strcasecmp($a['nome'], $b['nome']));
+        foreach ($novatos as $novato) {
+            $linhas[] = [
+                'nome' => $novato['nome'],
+                'pdf' => 'Não gerado — aluno novato',
+                'email' => $novato['situacao'] === ''
+                    ? 'Sem envio registrado no log'
+                    : $this->rotuloEmail($novato['situacao']),
+            ];
+        }
+
+        return $linhas;
     }
 
     /**
@@ -252,13 +335,16 @@ class ResumoExecucaoRelatorio
         }
 
         $gerados = $this->pdfsGerados();
+        $previstos = count($this->geracoes);
         $total = $this->ativos();
         if ($total === 0) {
             $texto = 'Nenhum aluno ativo entrou nesta execução.';
+        } elseif ($previstos === 0) {
+            $texto = 'Nenhum PDF entrou na geração: os '.$total.' alunos ativos são novatos.';
         } elseif ($this->falhasGeracao() === 0) {
-            $texto = 'A geração dos relatórios funcionou integralmente: '.$gerados.' de '.$total.' PDFs foram gerados, sem falhas.';
+            $texto = 'A geração dos relatórios funcionou integralmente: '.$gerados.' de '.$previstos.' PDFs foram gerados, sem falhas.';
         } else {
-            $texto = 'A geração concluiu com '.$gerados.' de '.$total.' PDFs. Falhas na geração: '.$this->falhasGeracao().'.';
+            $texto = 'A geração concluiu com '.$gerados.' de '.$previstos.' PDFs. Falhas na geração: '.$this->falhasGeracao().'.';
         }
 
         if ($this->semPdf() !== [] || $this->contarEnvio(self::FALHA) > 0) {
@@ -276,6 +362,17 @@ class ResumoExecucaoRelatorio
         }
 
         $paragrafos[] = $texto;
+
+        if ($this->novatos !== []) {
+            $quantidade = count($this->novatos);
+            $nomes = array_map(static fn (array $novato): string => $novato['nome'], $this->novatos);
+            $substantivo = $quantidade === 1 ? 'aluno novato' : 'alunos novatos';
+            $verbo = $quantidade === 1 ? 'ficou' : 'ficaram';
+            $paragrafos[] = $this->porExtenso($quantidade, true).' '.$substantivo
+                .' (cadastro com menos de 15 dias) '.$verbo
+                .' fora da geração e da análise de métricas: '.$this->juntar($nomes).'. '
+                .'Boas-vindas enviadas: '.$this->emailsBoasVindas().'.';
+        }
 
         return $paragrafos;
     }
