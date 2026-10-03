@@ -44,18 +44,20 @@ final class MontadorPainelAcompanhamento
         $situacao = SituacaoAcompanhamento::Pendente;
         $novato = $aluno->ehNovato($hoje);
 
-        // Cadastro com menos de 15 dias: a ação é Aluno novato e as faixas
-        // do relatório não disputam, mesmo que já tenham sido gravadas.
-        if ($novato) {
+        // Cadastro com menos de 15 dias e sem contato neste ciclo: a ação é
+        // Aluno novato e as faixas do relatório não disputam. Com contato,
+        // segue o mesmo ciclo dos demais: Ok até a data agendada e Marcar
+        // presença se ela passar sem outro contato. A frase do cadastro
+        // permanece como observação na ficha.
+        if ($novato && $aluno->acao_resolvida === null) {
             $ficha = $this->fichaNovato($aluno, $hoje);
-            if ($aluno->acao_resolvida !== null && ! $this->agendamentoVencidoSemContato($aluno, $hoje)) {
-                $situacao = SituacaoAcompanhamento::Concluida;
-            }
         } elseif ($aluno->acao_resolvida !== null) {
+            // O novato não leva evolução nem motivo das faixas para o ciclo do contato.
+            $base = $novato ? new FichaAcompanhamento(AcaoAcompanhamento::Ok, [], []) : $ficha;
             if ($this->agendamentoVencidoSemContato($aluno, $hoje)) {
-                $ficha = $this->fichaMarcarPresencaPorAgendamento($aluno, $ficha);
+                $ficha = $this->fichaMarcarPresencaPorAgendamento($aluno, $base);
             } else {
-                $ficha = $this->fichaAcoesConcluidas($ficha);
+                $ficha = $this->fichaAcoesConcluidas($base);
                 $situacao = SituacaoAcompanhamento::Concluida;
             }
         } elseif (! $aluno->ativo) {
@@ -82,6 +84,9 @@ final class MontadorPainelAcompanhamento
             somenteAgenda: false,
             assuntos: $assuntos,
             observacaoTempoSemContato: $this->observacaoTempoSemContato($ctx),
+            observacaoNovato: $novato && $aluno->acao_resolvida !== null
+                ? $this->textoNovato($aluno, $hoje)
+                : null,
         );
     }
 
@@ -92,23 +97,28 @@ final class MontadorPainelAcompanhamento
 
     private function fichaNovato(Aluno $aluno, DateTimeInterface $hoje): FichaAcompanhamento
     {
-        $dias = ContextoAcompanhamento::diasDesde($aluno->created_at, $hoje);
-        $quando = $dias === 0
-            ? 'Cadastro hoje'
-            : 'Cadastro há '.$dias.' '.($dias === 1 ? 'dia' : 'dias');
-
         return new FichaAcompanhamento(
             AcaoAcompanhamento::AlunoNovato,
             [new MotivoAcompanhamento(
                 TipoMotivoAcompanhamento::Novato,
                 AcaoAcompanhamento::AlunoNovato,
-                $quando.'. Menos de '.Aluno::DIAS_NOVATO.' dias: as métricas do relatório não são analisadas.',
+                $this->textoNovato($aluno, $hoje),
                 false,
                 null,
                 0,
             )],
             [],
         );
+    }
+
+    private function textoNovato(Aluno $aluno, DateTimeInterface $hoje): string
+    {
+        $dias = ContextoAcompanhamento::diasDesde($aluno->created_at, $hoje);
+        $quando = $dias === 0
+            ? 'Cadastro hoje'
+            : 'Cadastro há '.$dias.' '.($dias === 1 ? 'dia' : 'dias');
+
+        return $quando.'. Menos de '.Aluno::DIAS_NOVATO.' dias: as métricas do relatório não são analisadas.';
     }
 
     private function fichaEmDia(ContextoAcompanhamento $ctx): FichaAcompanhamento

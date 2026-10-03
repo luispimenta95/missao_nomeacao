@@ -21,5 +21,6 @@ final class LinhaPainel
         public bool $somenteAgenda,
         public array $assuntos,
         public ?string $observacaoTempoSemContato = null,
+        public ?string $observacaoNovato = null,
     ) {}
 }
