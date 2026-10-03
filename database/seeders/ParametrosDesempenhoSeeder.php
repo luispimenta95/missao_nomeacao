@@ -179,7 +179,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                 );
 
                 foreach ($def['faixas'] as $faixaDef) {
-                    FaixaDesempenho::query()->updateOrCreate(
+                    $faixa = FaixaDesempenho::query()->updateOrCreate(
                         [
                             'eixo_desempenho_id' => $eixo->id,
                             'codigo' => $faixaDef['codigo'],
@@ -193,6 +193,7 @@ class ParametrosDesempenhoSeeder extends Seeder
                             'ativo' => true,
                         ]
                     );
+                    $faixa->garantirTextoCanonico();
                 }
             }
         });
