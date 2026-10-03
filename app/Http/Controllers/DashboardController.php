@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Enums\AcaoAcompanhamento;
 use App\Enums\DecisaoAgendamento;
+use App\Enums\FiltroParametroAcompanhamento;
 use App\Enums\FocoAcompanhamento;
 use App\Enums\LimiteAcompanhamento;
 use App\Enums\SituacaoAcompanhamento;
-use App\Enums\TipoMotivoAcompanhamento;
 use App\Models\Aluno;
 use App\Services\Acompanhamento\ConsultaDashboard;
 use App\Services\Acompanhamento\ContextoAcompanhamento;
@@ -207,7 +207,7 @@ class DashboardController extends Controller
             'intervencoes' => $linhas->filter(fn (LinhaPainel $linha) => $linha->ficha->acao === AcaoAcompanhamento::Intervir
                 && $linha->situacao === SituacaoAcompanhamento::Pendente)->count(),
             'agenda_hoje' => $linhas->filter(fn (LinhaPainel $linha) => $linha->proximoEhHoje)->count(),
-            'sem_contato_acao' => $linhas->filter(fn (LinhaPainel $linha) => $linha->ficha->tem(TipoMotivoAcompanhamento::SemContato)
+            'sem_contato_acao' => $linhas->filter(fn (LinhaPainel $linha) => $linha->observacaoTempoSemContato !== null
                 && $linha->situacao === SituacaoAcompanhamento::Pendente)->count(),
             'evolucoes' => $linhas->filter(fn (LinhaPainel $linha) => $linha->ficha->acao === AcaoAcompanhamento::Parabenizar
                 && $linha->situacao === SituacaoAcompanhamento::Pendente)->count(),
@@ -239,6 +239,9 @@ class DashboardController extends Controller
         if ($consulta->parametro !== null) {
             $parametro = $consulta->parametro;
             $base = $base->filter(function (LinhaPainel $linha) use ($parametro) {
+                if ($parametro === FiltroParametroAcompanhamento::Contato && $linha->observacaoTempoSemContato !== null) {
+                    return true;
+                }
                 foreach ($linha->ficha->motivos as $motivo) {
                     if ($motivo->filtro === $parametro) {
                         return true;
@@ -257,7 +260,7 @@ class DashboardController extends Controller
                         && $linha->situacao === SituacaoAcompanhamento::Pendente,
                     FocoAcompanhamento::AgendaHoje => $linha->proximoEhHoje,
                     FocoAcompanhamento::Agenda => $linha->aluno->proximo_contato_em !== null || $linha->somenteAgenda,
-                    FocoAcompanhamento::SemContato => $linha->ficha->tem(TipoMotivoAcompanhamento::SemContato),
+                    FocoAcompanhamento::SemContato => $linha->observacaoTempoSemContato !== null,
                     FocoAcompanhamento::Parabenizar => $linha->ficha->acao === AcaoAcompanhamento::Parabenizar
                         && $linha->situacao === SituacaoAcompanhamento::Pendente,
                 };

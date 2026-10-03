@@ -20,5 +20,6 @@ final class LinhaPainel
         public bool $proximoEhHoje,
         public bool $somenteAgenda,
         public array $assuntos,
+        public ?string $observacaoTempoSemContato = null,
     ) {}
 }
