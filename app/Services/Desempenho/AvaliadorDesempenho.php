@@ -2,14 +2,30 @@
 
 namespace App\Services\Desempenho;
 
+use App\Models\Aluno;
 use App\Models\EixoDesempenho;
 use App\Models\FaixaDesempenho;
 use App\Services\Tutory\RelatorioConsolidadoLayout;
 
 class AvaliadorDesempenho
 {
+    private ?Aluno $alunoRotacao = null;
+
+    private ?string $periodoRotacao = null;
+
+    private FaixaAnteriorDoAluno $faixaAnterior;
+
+    private SeletorTextoFaixa $seletorTexto;
+
+    public function __construct()
+    {
+        $this->faixaAnterior = new FaixaAnteriorDoAluno;
+        $this->seletorTexto = new SeletorTextoFaixa;
+    }
+
     /**
      * Avalia o relatório completo conforme os eixos do documento de parâmetros.
+     * Com aluno e período, escolhe o texto da faixa e grava o uso.
      *
      * @param  array{
      *   nome?: string,
@@ -21,13 +37,16 @@ class AvaliadorDesempenho
      *   assuntos?: list<array{disciplina?: string, assunto: string, percentual: float|int|null}>
      * }  $dados
      * @return array{
-     *   blocos: list<array{eixo: string, eixo_nome: string, faixa: string, faixa_nome: string, titulo: string, texto: string, meta?: array<string, mixed>}>,
+     *   blocos: list<array{eixo: string, eixo_nome: string, faixa: string, faixa_nome: string, titulo: string, texto: string, texto_faixa_id?: int|null, meta?: array<string, mixed>}>,
      *   metricas: array<string, mixed>,
      *   resumo: string|null
      * }
      */
-    public function avaliarRelatorio(array $dados): array
+    public function avaliarRelatorio(array $dados, ?Aluno $aluno = null, ?string $periodo = null): array
     {
+        $this->alunoRotacao = $aluno;
+        $this->periodoRotacao = $periodo;
+
         $nome = trim((string) ($dados['nome'] ?? 'Aluno'));
         $primeiroNome = $this->primeiroNome($nome);
 
@@ -235,7 +254,7 @@ class AvaliadorDesempenho
 
     /**
      * @param  array<string, string>  $vars
-     * @return array{eixo: string, eixo_nome: string, faixa: string, faixa_nome: string, titulo: string, texto: string}|null
+     * @return array{eixo: string, eixo_nome: string, faixa: string, faixa_nome: string, titulo: string, texto: string, texto_faixa_id: int|null}|null
      */
     private function avaliarEixo(string $eixoCodigo, float $valor, array $vars, bool $preserveNewlines = false): ?array
     {
@@ -254,13 +273,24 @@ class AvaliadorDesempenho
             return null;
         }
 
+        $mesmaFaixa = $this->alunoRotacao !== null
+            && $this->faixaAnterior->mesma($this->alunoRotacao, $eixoCodigo, $faixa->codigo);
+        $escolha = $this->seletorTexto->escolher(
+            $faixa,
+            $eixoCodigo,
+            $this->alunoRotacao,
+            $mesmaFaixa,
+            $this->periodoRotacao,
+        );
+
         return [
             'eixo' => $eixo->codigo,
             'eixo_nome' => $eixo->nome,
             'faixa' => $faixa->codigo,
             'faixa_nome' => $faixa->nome,
             'titulo' => $eixo->nome.': '.$faixa->nome,
-            'texto' => $this->aplicarPlaceholders($faixa->texto_email, $vars, $preserveNewlines),
+            'texto' => $this->aplicarPlaceholders($escolha['texto'], $vars, $preserveNewlines),
+            'texto_faixa_id' => $escolha['texto_faixa_id'],
         ];
     }
 
