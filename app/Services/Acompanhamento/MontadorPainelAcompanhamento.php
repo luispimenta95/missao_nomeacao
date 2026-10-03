@@ -4,6 +4,7 @@ namespace App\Services\Acompanhamento;
 
 use App\Enums\AcaoAcompanhamento;
 use App\Enums\FiltroParametroAcompanhamento;
+use App\Enums\LimiteAcompanhamento;
 use App\Enums\PapelFaixa;
 use App\Enums\ParametroAcompanhamento;
 use App\Enums\SituacaoAcompanhamento;
@@ -75,6 +76,7 @@ final class MontadorPainelAcompanhamento
             proximoEhHoje: $ctx->contatoProgramadoHoje,
             somenteAgenda: false,
             assuntos: $assuntos,
+            observacaoTempoSemContato: $this->observacaoTempoSemContato($ctx),
         );
     }
 
@@ -107,6 +109,15 @@ final class MontadorPainelAcompanhamento
             [$motivo],
             $this->classificador->evolucoes($ctx),
         );
+    }
+
+    private function observacaoTempoSemContato(ContextoAcompanhamento $ctx): ?string
+    {
+        if (! LimiteAcompanhamento::DiasSemContato->excedido($ctx->diasSemContato)) {
+            return null;
+        }
+
+        return $ctx->diasSemContato.' dias sem contato';
     }
 
     private function fichaPorMetricas(ContextoAcompanhamento $ctx): FichaAcompanhamento

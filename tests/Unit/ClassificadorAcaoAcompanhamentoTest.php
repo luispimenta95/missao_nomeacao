@@ -179,19 +179,34 @@ class ClassificadorAcaoAcompanhamentoTest extends TestCase
         $this->assertSame(AcaoAcompanhamento::Intervir, $ficha?->acao);
         $this->assertTrue($ficha?->tem(TipoMotivoAcompanhamento::VolumeCritico));
         $this->assertTrue($ficha?->tem(TipoMotivoAcompanhamento::DesempenhoBaixo));
-        $this->assertTrue($ficha?->tem(TipoMotivoAcompanhamento::SemContato));
+        $this->assertFalse($ficha?->tem(TipoMotivoAcompanhamento::SemContato));
         $this->assertTrue($ficha?->tem(TipoMotivoAcompanhamento::Evolucao));
         $this->assertSame(TipoMotivoAcompanhamento::VolumeCritico, $ficha?->motivos[0]->tipo);
     }
 
-    public function test_tempo_sem_contato_marca_presenca(): void
+    public function test_tempo_sem_contato_nao_define_a_acao(): void
+    {
+        $this->assertNull($this->classificador->classificar($this->contexto([
+            'diasSemContato' => 16,
+        ])));
+    }
+
+    public function test_evolucao_prevalece_sobre_o_tempo_sem_contato(): void
     {
         $ficha = $this->classificador->classificar($this->contexto([
-            'diasSemContato' => 16,
+            'constanciaAtual' => 'bom',
+            'constanciaAnterior' => 'brigando',
+            'constanciaAtualNome' => 'Bom',
+            'constanciaAnteriorNome' => 'Brigando com a constância',
+            'volumeAtual' => 'volume_suficiente',
+            'volumeAnterior' => 'volume_suficiente',
+            'desempenhoAtual' => 'mediano',
+            'desempenhoAnterior' => 'mediano',
+            'diasSemContato' => 18,
         ]));
 
-        $this->assertSame(AcaoAcompanhamento::MarcarPresenca, $ficha?->acao);
-        $this->assertSame('16 dias sem contato', $ficha?->motivoPrincipal()?->texto);
+        $this->assertSame(AcaoAcompanhamento::Parabenizar, $ficha?->acao);
+        $this->assertFalse($ficha?->tem(TipoMotivoAcompanhamento::SemContato));
     }
 
     public function test_quinze_dias_sem_contato_ainda_nao_disparam(): void
