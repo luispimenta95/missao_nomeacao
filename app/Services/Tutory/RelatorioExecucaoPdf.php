@@ -18,12 +18,15 @@ class RelatorioExecucaoPdf
         }
 
         $alunos = '';
-        foreach ($resumo->linhasComPdf() as $linha) {
+        foreach ($resumo->linhasDaExecucao() as $linha) {
             $alunos .= '<tr><td>'.$e($linha['nome']).'</td><td>'.$e($linha['pdf']).'</td><td>'.$e($linha['email']).'</td></tr>';
         }
         if ($alunos === '') {
-            $alunos = '<tr><td colspan="3">Nenhum PDF consolidado foi gerado nesta execução.</td></tr>';
+            $alunos = '<tr><td colspan="3">Nenhum aluno entrou nesta execução.</td></tr>';
         }
+        $tituloAlunos = $resumo->novatos === []
+            ? 'Alunos com PDF gerado e situação do e-mail'
+            : 'Alunos da execução e situação do e-mail';
 
         $divergencias = '';
         foreach ($resumo->divergencias() as $paragrafo) {
@@ -38,21 +41,10 @@ class RelatorioExecucaoPdf
             $conclusao .= '<p>'.$e($paragrafo).'</p>';
         }
 
-        $novatos = '';
-        foreach ($resumo->envios as $envio) {
-            if ($envio['situacao'] !== ResumoExecucaoRelatorio::BOAS_VINDAS) {
-                continue;
-            }
-            $novatos .= '<tr><td>'.$e($envio['nome']).'</td><td>'.$e($envio['email']).'</td><td>E-mail de boas-vindas</td></tr>';
-        }
-        $blocoNovatos = $novatos === ''
-            ? ''
-            : '<h2>Alunos novatos</h2><p>Cadastro com menos de 15 dias: sem PDF e sem análise de métricas.</p>'
-                .'<table><thead><tr><th>Aluno</th><th>E-mail</th><th>Envio</th></tr></thead><tbody>'
-                .$novatos
-                .'</tbody></table>';
-
         $teste = $resumo->teste ? '<p class="meta">Modo teste: apenas a aluna Giovanna.</p>' : '';
+        $nota = $resumo->nota !== null && $resumo->nota !== ''
+            ? '<p class="meta">'.$e($resumo->nota).'</p>'
+            : '';
 
         return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>
             @page { margin: 28px 32px; }
@@ -75,15 +67,15 @@ class RelatorioExecucaoPdf
             .' &nbsp; Duração: '.$e($resumo->duracao()).'</p>'
             .'<p class="meta">Fuso: '.$e($resumo->fuso).' &nbsp; PDF: '.$e($resumo->motor).'</p>'
             .$teste
+            .$nota
             .'<h2>Resumo</h2>'
             .'<table><thead><tr><th>Indicador</th><th>Resultado</th></tr></thead><tbody>'
             .$indicadores
             .'</tbody></table>'
-            .'<h2>Alunos com PDF gerado e situação do e-mail</h2>'
+            .'<h2>'.$e($tituloAlunos).'</h2>'
             .'<table><thead><tr><th>Aluno</th><th>PDF</th><th>E-mail</th></tr></thead><tbody>'
             .$alunos
             .'</tbody></table>'
-            .$blocoNovatos
             .'<h2>Falhas / divergências na etapa de e-mail</h2>'
             .$divergencias
             .'<h2>Conclusão técnica</h2>'
