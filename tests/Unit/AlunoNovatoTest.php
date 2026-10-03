@@ -98,6 +98,9 @@ class AlunoNovatoTest extends TestCase
         Mail::assertNotSent(EmailRelatorioCoach::class);
         $this->assertSame('Crítico', $aluno->fresh()->last_performance);
         $this->assertSame(ResumoExecucaoRelatorio::BOAS_VINDAS, $resumo->envios[0]['situacao'] ?? null);
+        $this->assertSame('Ana Novata', $resumo->novatos[0]['nome'] ?? null);
+        $this->assertSame(ResumoExecucaoRelatorio::BOAS_VINDAS, $resumo->novatos[0]['situacao'] ?? null);
+        $this->assertSame(1, $resumo->emailsBoasVindas());
         $this->assertFileDoesNotExist($pdf);
         @rmdir($pasta);
     }

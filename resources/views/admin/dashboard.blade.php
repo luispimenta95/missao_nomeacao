@@ -102,7 +102,7 @@ use App\Enums\FocoAcompanhamento;
         <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 px-5 py-5">
             <div>
                 <h2 class="text-lg font-bold text-gray-800">Ações de acompanhamento</h2>
-                <p class="mt-1 max-w-2xl text-sm text-gray-600">A ação segue as faixas do último relatório. O tempo sem contato não muda a ação: aparece como observação na ficha. Registrar um contato deixa a ação em Ok, qualquer que seja o status anterior. Ela só muda de novo se a data agendada passar sem outro contato (Marcar presença) ou se chegar um relatório quinzenal. Aluno inativo sem contato neste ciclo entra em Restabelecer contato. Cadastro com menos de 15 dias fica em Aluno novato: as métricas não entram nessa conta.</p>
+                <p class="mt-1 max-w-2xl text-sm text-gray-600">A ação segue as faixas do último relatório. O tempo sem contato não muda a ação: aparece como observação na ficha. Registrar um contato deixa a ação em Ok, qualquer que seja o status anterior. Ela só muda de novo se a data agendada passar sem outro contato (Marcar presença) ou se chegar um relatório quinzenal. Aluno inativo sem contato neste ciclo entra em Restabelecer contato. Cadastro com menos de 15 dias, sem contato neste ciclo, fica em Aluno novato: as métricas não entram nessa conta. O contato com o novato deixa a ação em Ok e a frase do cadastro fica como observação na ficha.</p>
             </div>
             @if($consulta->temFiltro())
                 <a href="{{ route('admin.dashboard') }}" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 transition hover:bg-gray-300">Limpar filtros</a>

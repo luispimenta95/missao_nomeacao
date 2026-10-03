@@ -129,10 +129,15 @@
                     <dt class="text-xs text-gray-500">Último contato</dt>
                     <dd class="font-medium text-gray-800">{{ $linha->ultimoContato }}</dd>
                 </div>
-                @if($linha->observacaoTempoSemContato)
+                @if($linha->observacaoNovato || $linha->observacaoTempoSemContato)
                     <div>
                         <dt class="text-xs text-gray-500">Observação</dt>
-                        <dd class="font-medium text-gray-800">{{ $linha->observacaoTempoSemContato }}</dd>
+                        @if($linha->observacaoNovato)
+                            <dd class="font-medium text-gray-800">{{ $linha->observacaoNovato }}</dd>
+                        @endif
+                        @if($linha->observacaoTempoSemContato)
+                            <dd class="font-medium text-gray-800">{{ $linha->observacaoTempoSemContato }}</dd>
+                        @endif
                     </div>
                 @endif
                 <div>
