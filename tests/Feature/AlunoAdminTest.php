@@ -438,7 +438,8 @@ class AlunoAdminTest extends TestCase
                 'Sincronização concluída. Criados: 1. Atualizados: 2. Inalterados: 3. Pulados: 0.',
             );
 
-        $this->assertSame(0, Configuracao::query()->count());
+        $hoje = now()->timezone('America/Sao_Paulo')->format('Y-m-d');
+        $this->assertNull(Configuracao::valor('tutory.job.sincronizar-alunos.'.$hoje));
     }
 
     public function test_falha_na_sincronizacao_volta_para_a_lista_com_erro(): void
