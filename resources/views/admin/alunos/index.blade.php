@@ -8,12 +8,19 @@
         <h1 class="text-3xl font-bold text-gray-800">Gerenciar Alunos</h1>
         <div class="flex items-center gap-3">
             <a href="{{ route('alunos.export', array_filter(['busca' => $busca])) }}" id="exportar-alunos-csv" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition">↓ Exportar CSV</a>
-            <a href="{{ route('alunos.create') }}" class="px-4 py-2 bg-primary hover:bg-primary-light text-white rounded transition">+ Novo Aluno</a>
+            <form method="POST" action="{{ route('alunos.sincronizar') }}" id="form-sincronizar-alunos">
+                @csrf
+                <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-light text-white rounded transition">Sincronizar alunos</button>
+            </form>
         </div>
     </div>
 
     @if(session('success'))
     <div class="p-4 bg-green-100 text-green-800 rounded mb-4">{{ session('success') }}</div>
+    @endif
+
+    @if($errors->any())
+    <div class="p-4 bg-red-100 text-red-800 rounded mb-4">{{ $errors->first() }}</div>
     @endif
 
     <div class="bg-white rounded shadow overflow-hidden">
@@ -48,6 +55,17 @@
 
 <script>
     (function() {
+        const formSync = document.getElementById('form-sincronizar-alunos');
+        if (formSync) {
+            formSync.addEventListener('submit', function () {
+                const botao = formSync.querySelector('button');
+                if (botao) {
+                    botao.disabled = true;
+                    botao.textContent = 'Sincronizando...';
+                }
+            });
+        }
+
         const campo = document.getElementById('busca-aluno');
         const lista = document.getElementById('lista-alunos');
         if (!campo || !lista) {

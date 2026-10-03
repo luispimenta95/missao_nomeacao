@@ -143,7 +143,7 @@ A Action do GitHub chama o mesmo comando só nos horários equivalentes em UTC. 
 | Periodo 2 | `tutory:baixar-relatorios --periodo=2 --se-pendente` | Dia **1**, **10:30**. Se não enviou, de hora em hora às **11:00–22:00** nos dias **1** e **2** |
 | Liberar períodos no admin | `tutory:liberar-periodos-pdf` | Dias **1** e **16**, **00:05** |
 
-`--se-pendente` grava em `configuracoes` e evita e-mail duplicado se o cron e a Action rodarem no mesmo período. A trava do sync (`tutory.job.sincronizar-alunos.YYYY-MM-DD`) vale só para o agendado; rodar `tutory:sincronizar-alunos` à mão não é bloqueado por ela.
+`--se-pendente` grava em `configuracoes` e evita e-mail duplicado se o cron e a Action rodarem no mesmo período. A trava do sync (`tutory.job.sincronizar-alunos.YYYY-MM-DD`) vale só para o agendado; rodar `tutory:sincronizar-alunos` à mão não é bloqueado por ela. O botão **Sincronizar alunos** em `/admin/alunos` executa o mesmo serviço, a qualquer momento, e também não grava essa trava nem altera o horário das 06:00.
 
 A Tutory sempre envia um cadastro chamado **Aluno teste**. O job ignora esse nome (maiúsculas/minúsculas e espaços extras não importam) e **não o cadastra** na tabela local.
 

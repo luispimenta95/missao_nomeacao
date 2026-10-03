@@ -72,6 +72,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
 
     // Alunos routes
     Route::get('/alunos', [AlunoController::class, 'index'])->name('alunos.index');
+    Route::post('/alunos/sincronizar', [AlunoController::class, 'sincronizar'])->name('alunos.sincronizar');
     Route::get('/alunos/export/csv', [AlunoController::class, 'export'])->name('alunos.export');
     Route::get('/alunos/create', [AlunoController::class, 'create'])->name('alunos.create');
     Route::post('/alunos', [AlunoController::class, 'store'])->name('alunos.store');

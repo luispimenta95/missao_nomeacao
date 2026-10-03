@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Aluno;
+use App\Services\Tutory\SincronizarAlunosTutory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class AlunoController extends Controller
 {
@@ -21,6 +24,46 @@ class AlunoController extends Controller
         }
 
         return view('admin.alunos.index', compact('alunos', 'busca'));
+    }
+
+    public function sincronizar()
+    {
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+
+        try {
+            $resultado = $this->sincronizador()->run();
+        } catch (Throwable $exc) {
+            Log::error('[tutory:sincronizar-alunos] '.$exc->getMessage());
+
+            return redirect()
+                ->route('alunos.index')
+                ->withErrors(['sincronizar' => 'Não foi possível sincronizar os alunos: '.$exc->getMessage()]);
+        }
+
+        return redirect()
+            ->route('alunos.index')
+            ->with('success', sprintf(
+                'Sincronização concluída. Criados: %d. Atualizados: %d. Inalterados: %d. Pulados: %d.',
+                $resultado['criados'],
+                $resultado['atualizados'],
+                $resultado['inalterados'],
+                $resultado['pulados'],
+            ));
+    }
+
+    /**
+     * O mesmo serviço do comando tutory:sincronizar-alunos, sem a trava do
+     * agendado. O logger padrão do serviço ecoa na saída; aqui o registro
+     * fica só no log.
+     */
+    private function sincronizador(): SincronizarAlunosTutory
+    {
+        if (app()->bound(SincronizarAlunosTutory::class)) {
+            return app(SincronizarAlunosTutory::class);
+        }
+
+        return new SincronizarAlunosTutory(logger: static function (): void {});
     }
 
     public function export(Request $request)
