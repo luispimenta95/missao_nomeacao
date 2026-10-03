@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Aluno;
+use App\Models\Configuracao;
 use App\Models\User;
+use App\Services\Tutory\SincronizarAlunosTutory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use RuntimeException;
 use Tests\TestCase;
 
 class AlunoAdminTest extends TestCase
@@ -399,6 +402,67 @@ class AlunoAdminTest extends TestCase
         $deploy = (string) file_get_contents(base_path('.github/workflows/deploy.yml'));
         $this->assertStringContainsString('instalar-cron-scheduler.sh', $deploy);
         $this->assertStringContainsString('garantir-cron-hostinger.sh', $deploy);
+    }
+
+    public function test_lista_troca_novo_aluno_pelo_botao_de_sincronizar(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('alunos.index'))
+            ->assertOk()
+            ->assertSee('Sincronizar alunos')
+            ->assertSee('Sincronizando...', false)
+            ->assertSee('action="'.route('alunos.sincronizar').'"', false)
+            ->assertDontSee('Novo Aluno');
+    }
+
+    public function test_sincronizar_alunos_roda_o_mesmo_servico_sem_travar_o_job(): void
+    {
+        $user = User::factory()->create();
+        $sync = $this->createMock(SincronizarAlunosTutory::class);
+        $sync->expects($this->once())->method('run')->willReturn([
+            'criados' => 1,
+            'atualizados' => 2,
+            'inalterados' => 3,
+            'pulados' => 0,
+            'total' => 6,
+        ]);
+        $this->app->instance(SincronizarAlunosTutory::class, $sync);
+
+        $this->actingAs($user)
+            ->post(route('alunos.sincronizar'))
+            ->assertRedirect(route('alunos.index'))
+            ->assertSessionHas(
+                'success',
+                'Sincronização concluída. Criados: 1. Atualizados: 2. Inalterados: 3. Pulados: 0.',
+            );
+
+        $hoje = now()->timezone('America/Sao_Paulo')->format('Y-m-d');
+        $this->assertNull(Configuracao::valor('tutory.job.sincronizar-alunos.'.$hoje));
+    }
+
+    public function test_falha_na_sincronizacao_volta_para_a_lista_com_erro(): void
+    {
+        $user = User::factory()->create();
+        $sync = $this->createMock(SincronizarAlunosTutory::class);
+        $sync->expects($this->once())->method('run')->willThrowException(new RuntimeException('Falha no login da Tutory'));
+        $this->app->instance(SincronizarAlunosTutory::class, $sync);
+
+        $this->actingAs($user)
+            ->post(route('alunos.sincronizar'))
+            ->assertRedirect(route('alunos.index'))
+            ->assertSessionHasErrors('sincronizar');
+
+        $this->actingAs($user)
+            ->get(route('alunos.index'))
+            ->assertOk()
+            ->assertSee('Não foi possível sincronizar os alunos: Falha no login da Tutory');
+    }
+
+    public function test_visitante_nao_sincroniza_alunos(): void
+    {
+        $this->post(route('alunos.sincronizar'))->assertRedirect(route('login'));
     }
 
     /**
