@@ -503,20 +503,68 @@ class DashboardAcompanhamentoTest extends TestCase
         $this->assertSame('2026-10-01', $aluno->fresh()->proximo_contato_em?->toDateString());
     }
 
-    public function test_mais_de_quinze_dias_sem_contato_entra_em_marcar_presenca(): void
+    public function test_tempo_sem_contato_nao_define_marcar_presenca_e_vira_observacao(): void
     {
         $user = User::factory()->create();
-        $this->aluno([
+        $semFaixa = $this->aluno([
             'nome' => 'Luíza Alves',
             'created_at' => Carbon::parse('2026-09-01 09:00:00'),
         ]);
+        $evoluiu = $this->aluno([
+            'nome' => 'Clara Evoluiu',
+            'created_at' => Carbon::parse('2026-09-01 09:00:00'),
+            'last_performance' => 'Bom',
+            'last_performance_codigo' => 'bom',
+            'prev_performance' => 'Brigando com a constância',
+            'prev_performance_codigo' => 'brigando',
+            'last_question_volume' => 'Volume suficiente',
+            'last_question_volume_codigo' => 'volume_suficiente',
+            'prev_question_volume' => 'Volume suficiente',
+            'prev_question_volume_codigo' => 'volume_suficiente',
+            'last_accuracy_rate' => 'Mediano',
+            'last_accuracy_rate_codigo' => 'mediano',
+            'prev_accuracy_rate' => 'Mediano',
+            'prev_accuracy_rate_codigo' => 'mediano',
+        ]);
 
         $this->actingAs($user)
-            ->get(route('admin.dashboard'))
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'aluno' => $semFaixa->id]))
             ->assertOk()
             ->assertSee('Luíza Alves')
+            ->assertSee('data-acao="ok"', false)
+            ->assertSee('data-acao-ficha="ok"', false)
+            ->assertSee('>Observação</dt>', false)
             ->assertSee('21 dias sem contato')
-            ->assertSee('data-acao="marcar_presenca"', false);
+            ->assertDontSee('data-acao="marcar_presenca"', false);
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'aluno' => $evoluiu->id]))
+            ->assertOk()
+            ->assertSee('data-acao="parabenizar"', false)
+            ->assertSee('data-acao-ficha="parabenizar"', false)
+            ->assertSee('Constância evoluiu: Brigando com a constância → Bom')
+            ->assertSee('21 dias sem contato')
+            ->assertDontSee('data-acao="marcar_presenca"', false);
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['foco' => 'sem_contato', 'situacao' => 'todas']))
+            ->assertOk()
+            ->assertSee('Luíza Alves')
+            ->assertSee('Clara Evoluiu');
+
+        $baixo = $this->aluno([
+            'nome' => 'Dora Baixa',
+            'created_at' => Carbon::parse('2026-09-01 09:00:00'),
+            'last_accuracy_rate' => 'Alerta',
+            'last_accuracy_rate_codigo' => 'alerta',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard', ['situacao' => 'todas', 'aluno' => $baixo->id]))
+            ->assertOk()
+            ->assertSee('data-acao-ficha="marcar_presenca"', false)
+            ->assertSee('Desempenho em questões: baixo')
+            ->assertSee('21 dias sem contato');
     }
 
     public function test_remarcar_data_grava_a_nova_e_o_cancelar_preserva_a_anterior(): void

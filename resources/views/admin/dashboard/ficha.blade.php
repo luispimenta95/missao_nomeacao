@@ -128,6 +128,12 @@
                     <dt class="text-xs text-gray-500">Último contato</dt>
                     <dd class="font-medium text-gray-800">{{ $linha->ultimoContato }}</dd>
                 </div>
+                @if($linha->observacaoTempoSemContato)
+                    <div>
+                        <dt class="text-xs text-gray-500">Observação</dt>
+                        <dd class="font-medium text-gray-800">{{ $linha->observacaoTempoSemContato }}</dd>
+                    </div>
+                @endif
                 <div>
                     <dt class="text-xs text-gray-500">Última observação</dt>
                     <dd class="text-gray-700">{{ $linha->aluno->ultima_observacao ?: 'Nenhuma observação' }}</dd>

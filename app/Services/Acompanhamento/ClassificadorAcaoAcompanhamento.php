@@ -4,7 +4,6 @@ namespace App\Services\Acompanhamento;
 
 use App\Enums\AcaoAcompanhamento;
 use App\Enums\FiltroParametroAcompanhamento;
-use App\Enums\LimiteAcompanhamento;
 use App\Enums\PapelFaixa;
 use App\Enums\ParametroAcompanhamento;
 use App\Enums\TendenciaFaixa;
@@ -59,15 +58,6 @@ final class ClassificadorAcaoAcompanhamento
                 FiltroParametroAcompanhamento::Assunto,
                 $ordem++,
                 ponteProtocoloResgate: true,
-            );
-        }
-
-        if (LimiteAcompanhamento::DiasSemContato->excedido($ctx->diasSemContato)) {
-            $motivos[] = $this->motivo(
-                TipoMotivoAcompanhamento::SemContato,
-                $ctx->diasSemContato.' dias sem contato',
-                FiltroParametroAcompanhamento::Contato,
-                $ordem++,
             );
         }
 
