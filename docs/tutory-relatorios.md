@@ -40,6 +40,7 @@ Performance por assunto aparece só uma vez, na implementação do relatório de
 4. Monta **um** PDF com **PHP/Dompdf + QuickChart** (padrão no Hostinger; Puppeteer só se `TUTORY_PDF_ENGINE=puppeteer`)
 5. Reprocessa falhas por aluno (até 3 tentativas)
 6. Lista alunos do **admin** (`alunos`) → localiza o PDF `relatorio_consolidado_*` → avalia o desempenho e grava as faixas no aluno (`last_performance` = constancy, `last_question_volume`, `last_accuracy_rate`, `last_subjects`) → envia **um único e-mail com 1 anexo** se `recebe_email=true` → **apaga todos os PDFs** da pasta de download (e os `.metricas.json` ao lado). Logs `log_download_*.txt` permanecem.
+7. Ao fim da execução, gera um PDF resumido (alunos, PDFs, envios e divergências de nome) e envia para `MAIL_RELATORIO_EXECUCAO_ADDRESS` (padrão `luispimenta.contato@gmail.com`), com o mesmo CCO dos outros e-mails. Horário e duração são os do log `log_download_*.txt` (a janela da geração). O arquivo fica em `storage/app/tutory-execucao/`, fora da pasta pública. Uma falha nesse envio não desfaz os relatórios já enviados aos alunos. `--se-pendente`, quando o período já foi enviado, encerra antes dessa etapa e não manda o resumo.
 
 O renderer individual `scripts/tutory-render-pdf.mjs` continua no repositório para uso pontual. **Não é necessário em produção sem Node.**
 

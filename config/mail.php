@@ -130,4 +130,16 @@ return [
         'address' => env('MAIL_BCC_ADDRESS', 'nayara@missaonomeacao.com.br'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Resumo da execução dos relatórios do Coach
+    |--------------------------------------------------------------------------
+    |
+    | Destino do PDF gerado ao fim de tutory:baixar-relatorios.
+    | Vazio não envia. O .env da Hostinger não é sobrescrito no deploy.
+    |
+    */
+
+    'relatorio_execucao_address' => env('MAIL_RELATORIO_EXECUCAO_ADDRESS', 'luispimenta.contato@gmail.com'),
+
 ];
