@@ -1779,6 +1779,7 @@ class CoachReportDownloader
         if (! $aluno->recebe_email) {
             $this->log("[{$aluno->nome}] Boas-vindas não enviadas (recebe_email=false)");
             $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::PULADO);
+            $this->registrarNovato($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::PULADO);
             $pulados++;
 
             return;
@@ -1787,6 +1788,7 @@ class CoachReportDownloader
         if (! filter_var($aluno->email, FILTER_VALIDATE_EMAIL)) {
             $this->log("[{$aluno->nome}] E-mail inválido: {$aluno->email}");
             $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::INVALIDO);
+            $this->registrarNovato($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::INVALIDO);
             $falhas++;
 
             return;
@@ -1799,10 +1801,12 @@ class CoachReportDownloader
             );
             $this->log("[{$aluno->nome}] Boas-vindas enviadas para {$aluno->email}".$this->sufixoCco($aluno->email));
             $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::BOAS_VINDAS);
+            $this->registrarNovato($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::BOAS_VINDAS);
             $boasVindas++;
         } catch (Throwable $exc) {
             $falhas++;
             $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::FALHA);
+            $this->registrarNovato($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::FALHA);
             $this->log("[{$aluno->nome}] Falha ao enviar boas-vindas: ".$exc->getMessage());
             Log::warning('Falha ao enviar boas-vindas de aluno novato', [
                 'aluno_id' => $aluno->id,
@@ -1878,6 +1882,11 @@ class CoachReportDownloader
             'email' => $email,
             'situacao' => $situacao,
         ];
+    }
+
+    private function registrarNovato(string $nome, string $email = '', string $situacao = ''): void
+    {
+        $this->resumoExecucao?->registrarNovato($nome, $email, $situacao);
     }
 
     /**
@@ -3598,6 +3607,7 @@ HTML;
                     ?? Aluno::encontrarPorNome((string) ($aluno['nome'] ?? ''));
                 if ($local !== null && $local->ehNovato()) {
                     $this->log("[{$local->nome}] Aluno novato: PDF não gerado (cadastro com menos de ".Aluno::DIAS_NOVATO.' dias).');
+                    $this->registrarNovato($local->nome);
 
                     continue;
                 }

@@ -236,6 +236,42 @@ class ResumoExecucaoRelatorioTest extends TestCase
         $this->assertInstanceOf(DateTimeImmutable::class, $resumo->fim);
     }
 
+    public function test_simulacao_de_03_10_coloca_novatos_na_tabela_e_nos_indicadores(): void
+    {
+        $resumo = $this->simulacao03Outubro();
+
+        $this->assertSame([
+            ['indicador' => 'Alunos ativos encontrados', 'resultado' => 20],
+            ['indicador' => 'Alunos novatos (sem PDF e sem métricas)', 'resultado' => 2],
+            ['indicador' => 'PDFs consolidados gerados', 'resultado' => 18],
+            ['indicador' => 'Falhas na geração dos PDFs', 'resultado' => 0],
+            ['indicador' => 'E-mails enviados', 'resultado' => 13],
+            ['indicador' => 'E-mails de boas-vindas', 'resultado' => 2],
+            ['indicador' => 'E-mails pulados (recebe_email=false)', 'resultado' => 4],
+            ['indicador' => 'Falhas / PDF não localizado no envio', 'resultado' => 3],
+            ['indicador' => 'PDFs removidos após o envio', 'resultado' => 18],
+        ], $resumo->indicadores());
+
+        $linhas = $resumo->linhasDaExecucao();
+        $porNome = [];
+        foreach ($linhas as $linha) {
+            $porNome[$linha['nome']] = $linha;
+        }
+        $this->assertSame('Não gerado — aluno novato', $porNome['Georgia']['pdf']);
+        $this->assertSame('E-mail de boas-vindas', $porNome['Georgia']['email']);
+        $this->assertSame('Não gerado — aluno novato', $porNome['Jhullya']['pdf']);
+        $this->assertSame('Enviado', $porNome['Giovanna']['email']);
+        $this->assertSame(20, count($linhas));
+
+        $html = (new RelatorioExecucaoPdf)->html($resumo);
+        $this->assertStringContainsString('Alunos da execução e situação do e-mail', $html);
+        $this->assertStringContainsString('Não gerado — aluno novato', $html);
+        $this->assertStringContainsString('Dois alunos novatos', $html);
+        $this->assertStringContainsString('Georgia e Jhullya', $html);
+        $this->assertStringContainsString('18 de 18 PDFs foram gerados, sem falhas.', $html);
+        $this->assertStringNotContainsString('Alunos novatos</h2>', $html);
+    }
+
     private function exemploDia01(): ResumoExecucaoRelatorio
     {
         $resumo = new ResumoExecucaoRelatorio(
@@ -271,6 +307,35 @@ class ResumoExecucaoRelatorioTest extends TestCase
         }
         foreach ($enviados as $nome) {
             $resumo->envios[] = ['nome' => $nome, 'email' => 'aluno@example.com', 'situacao' => ResumoExecucaoRelatorio::ENVIADO];
+        }
+
+        return $resumo;
+    }
+
+    /**
+     * Mesma lista de 01/10, como se o job rodasse em 03/10.
+     * Georgia e Jhullya entram só como premissa da simulação: cadastro fictício em 28/09.
+     */
+    private function simulacao03Outubro(): ResumoExecucaoRelatorio
+    {
+        $resumo = $this->exemploDia01();
+        $resumo->inicio = new DateTimeImmutable('2026-10-03 14:35:00');
+        $resumo->fim = new DateTimeImmutable('2026-10-03 14:38:22');
+        $resumo->logArquivo = 'log_download_20261003_143500.txt';
+        $resumo->pdfsRemovidos = 18;
+        $resumo->nota = 'Simulação de 03/10/2026 com a lista de 01/10. Georgia e Jhullya estão como novatas só neste exemplo (cadastro fictício em 28/09/2026).';
+
+        $novatas = ['Georgia', 'Jhullya'];
+        $resumo->geracoes = array_values(array_filter(
+            $resumo->geracoes,
+            static fn (array $geracao): bool => ! in_array($geracao['nome'], $novatas, true)
+        ));
+        $resumo->envios = array_values(array_filter(
+            $resumo->envios,
+            static fn (array $envio): bool => ! in_array($envio['nome'], $novatas, true)
+        ));
+        foreach ($novatas as $nome) {
+            $resumo->registrarNovato($nome, 'novata@example.com', ResumoExecucaoRelatorio::BOAS_VINDAS);
         }
 
         return $resumo;
