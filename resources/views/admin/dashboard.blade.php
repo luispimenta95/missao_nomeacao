@@ -102,7 +102,7 @@ use App\Enums\FocoAcompanhamento;
         <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 px-5 py-5">
             <div>
                 <h2 class="text-lg font-bold text-gray-800">Ações de acompanhamento</h2>
-                <p class="mt-1 max-w-2xl text-sm text-gray-600">A ação segue as faixas do último relatório. O tempo sem contato não muda a ação: aparece como observação na ficha. Registrar um contato deixa a ação em Ok, qualquer que seja o status anterior. Ela só muda de novo se a data agendada passar sem outro contato (Marcar presença) ou se chegar um relatório quinzenal. Aluno inativo sem contato neste ciclo entra em Restabelecer contato.</p>
+                <p class="mt-1 max-w-2xl text-sm text-gray-600">A ação segue as faixas do último relatório. O tempo sem contato não muda a ação: aparece como observação na ficha. Registrar um contato deixa a ação em Ok, qualquer que seja o status anterior. Ela só muda de novo se a data agendada passar sem outro contato (Marcar presença) ou se chegar um relatório quinzenal. Aluno inativo sem contato neste ciclo entra em Restabelecer contato. Cadastro com menos de 15 dias fica em Aluno novato: as métricas não entram nessa conta.</p>
             </div>
             @if($consulta->temFiltro())
                 <a href="{{ route('admin.dashboard') }}" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 transition hover:bg-gray-300">Limpar filtros</a>
@@ -117,6 +117,9 @@ use App\Enums\FocoAcompanhamento;
             @endforeach
             <a href="{{ $consulta->url(['status' => 'inativos', 'page' => null, 'aluno' => null]) }}" class="rounded px-4 py-2 text-sm font-medium transition {{ $consulta->status === 'inativos' ? 'bg-primary text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300' }}">
                 Inativos
+            </a>
+            <a href="{{ $consulta->url(['acao' => AcaoAcompanhamento::AlunoNovato->value, 'situacao' => 'todas', 'foco' => null, 'status' => null, 'page' => null, 'aluno' => null]) }}" class="rounded px-4 py-2 text-sm font-medium transition {{ $consulta->acao === AcaoAcompanhamento::AlunoNovato ? 'bg-primary text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300' }}">
+                Alunos novatos ({{ $resumo['novatos'] }})
             </a>
             @if($consulta->foco)
             <a href="{{ $consulta->url(['foco' => null, 'page' => null, 'aluno' => null]) }}" class="rounded bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
@@ -174,6 +177,7 @@ use App\Enums\FocoAcompanhamento;
                         AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
                         AcaoAcompanhamento::Parabenizar => 'bg-green-100 text-green-800',
                         AcaoAcompanhamento::Ok, AcaoAcompanhamento::RestabelecerContato => 'bg-gray-100 text-gray-700',
+                        AcaoAcompanhamento::AlunoNovato => 'bg-amber-100 text-amber-900',
                     };
                     $rotuloAcao = $linha->ficha->acao->rotulo();
                     $motivoPrincipal = $planoEncerrado ? 'Plano de estudos encerrado' : $linha->ficha->motivoPrincipal()?->texto;

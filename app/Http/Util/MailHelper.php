@@ -2,9 +2,11 @@
 
 namespace App\Http\Util;
 
+use App\Mail\EmailBoasVindasNovato;
 use App\Mail\EmailInscricao;
 use App\Mail\EmailLead;
 use App\Mail\EmailRelatorioCoach;
+use App\Mail\EmailRelatorioExecucao;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Mail;
 
@@ -80,6 +82,32 @@ class MailHelper
         ];
 
         self::enviarComCco($mailTo, new EmailRelatorioCoach($dadosEmail, $pdfPath));
+    }
+
+    /**
+     * E-mail de boas-vindas do aluno novato, sem PDF.
+     */
+    public static function emailBoasVindasNovato(string $texto, string $mailTo): void
+    {
+        self::enviarComCco($mailTo, new EmailBoasVindasNovato([
+            'to' => $mailTo,
+            'body' => [
+                'texto' => $texto,
+            ],
+        ]));
+    }
+
+    /**
+     * Envia o PDF resumido da execução dos relatórios do Coach.
+     *
+     * @param  array{data?: string, periodo?: string, inicio?: string, fim?: string, duracao?: string}  $dados
+     */
+    public static function emailRelatorioExecucao(array $dados, string $mailTo, string $pdfPath): void
+    {
+        self::enviarComCco($mailTo, new EmailRelatorioExecucao([
+            'to' => $mailTo,
+            'body' => $dados,
+        ], $pdfPath));
     }
 
     private static function enviarComCco(string $mailTo, Mailable $mailable): void

@@ -10,13 +10,16 @@
  *    GET /documentos/relatorios/{model}?key=...
  * 4. Monta UM PDF consolidado (Puppeteer se houver Node; senão PHP/Dompdf)
  * 5. Reprocessa falhas (até 3x) por aluno
- * 6. Lista alunos do banco → localiza o PDF consolidado → um e-mail com 1 anexo se recebe_email
+ * 6. Lista alunos do banco → aluno novato (< 15 dias) recebe só o e-mail de boas-vindas;
+ *    os demais: localiza o PDF consolidado → um e-mail com 1 anexo se recebe_email
+ * 7. Envia o PDF resumido da execução para o endereço configurado
  */
 
 namespace App\Services\Tutory;
 
 use App\Http\Util\MailHelper;
 use App\Models\Aluno;
+use App\Services\Alunos\TextoBoasVindasNovato;
 use App\Services\Desempenho\AvaliadorDesempenho;
 use DOMDocument;
 use DOMElement;
@@ -137,6 +140,8 @@ class CoachReportDownloader
     /** @var callable(string): void */
     private $logger;
 
+    private ?ResumoExecucaoRelatorio $resumoExecucao = null;
+
     public function __construct(
         string $periodo,
         ?callable $logger = null,
@@ -180,6 +185,16 @@ class CoachReportDownloader
     public function run(): int
     {
         $this->validarConfig();
+        [$dtIni, $dtFim] = $this->datasPeriodoBr();
+        $this->resumoExecucao = new ResumoExecucaoRelatorio(
+            inicio: new \DateTimeImmutable('now'),
+            periodoRotulo: $dtIni.' a '.$dtFim,
+            motor: $this->motivoSemPuppeteer() === null ? 'Puppeteer' : 'Dompdf',
+            chaveEnvio: 'tutory.envio.periodo.'.$this->periodo.'.'.$this->mesDoPeriodo()->format('Y-m'),
+            pasta: $this->pastaDownload,
+            teste: $this->teste,
+            fuso: (string) config('app.timezone', 'America/Sao_Paulo'),
+        );
 
         try {
             $this->login();
@@ -188,11 +203,39 @@ class CoachReportDownloader
 
             return 0;
         } catch (Throwable $exc) {
+            $this->resumoExecucao->erroFatal = $exc->getMessage();
             $this->log('ERRO FATAL:');
             $this->log((string) $exc);
             throw $exc;
         } finally {
             $this->limparCookie();
+            $this->enviarResumoDaExecucao();
+        }
+    }
+
+    private function enviarResumoDaExecucao(): void
+    {
+        if ($this->resumoExecucao === null) {
+            return;
+        }
+
+        if ($this->resumoExecucao->fim === null) {
+            $this->resumoExecucao->fim = new \DateTimeImmutable('now');
+        }
+
+        try {
+            $pdf = (new EnvioResumoExecucaoRelatorio)->enviar($this->resumoExecucao);
+            if ($pdf === null) {
+                $this->log('Resumo da execução não enviado: destinatário ausente.');
+
+                return;
+            }
+            $this->log('Resumo da execução enviado para '.config('mail.relatorio_execucao_address').' ('.$pdf.')');
+        } catch (Throwable $exc) {
+            $this->log('Falha ao enviar o resumo da execução: '.$exc->getMessage());
+            Log::warning('Falha ao enviar o resumo da execução dos relatórios', [
+                'erro' => $exc->getMessage(),
+            ]);
         }
     }
 
@@ -1591,6 +1634,9 @@ class CoachReportDownloader
         try {
             $this->enviarEmailsDosAlunosSemLimpar();
         } catch (QueryException|SQLiteDatabaseDoesNotExistException $exc) {
+            if ($this->resumoExecucao !== null) {
+                $this->resumoExecucao->bancoIndisponivel = true;
+            }
             $this->log('Banco local indisponível; e-mails não enviados.');
             $this->log($exc->getMessage());
             $this->log('PDFs preservados em '.$this->pastaDownload);
@@ -1629,16 +1675,24 @@ class CoachReportDownloader
         $periodoLabel = $dtIni.' a '.$dtFim.' (período '.$this->periodo.')';
 
         $enviados = 0;
+        $boasVindas = 0;
         $pulados = 0;
         $falhas = 0;
 
         foreach ($alunos as $aluno) {
             $this->log("[{$aluno->nome}] e-mail={$aluno->email} | recebe_email=".($aluno->recebe_email ? 'sim' : 'não'));
 
+            if ($aluno->ehNovato()) {
+                $this->enviarBoasVindasNovato($aluno, $boasVindas, $pulados, $falhas);
+
+                continue;
+            }
+
             $pdfs = $this->encontrarPdfsAluno($aluno->nome);
             if ($pdfs === []) {
                 $this->log("[{$aluno->nome}] Nenhum PDF encontrado em {$this->pastaDownload}");
                 $this->log("[{$aluno->nome}] Dica: o nome no admin deve coincidir com o do Tutory.");
+                $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::SEM_PDF);
                 $falhas++;
 
                 continue;
@@ -1671,6 +1725,7 @@ class CoachReportDownloader
 
             if (! $aluno->recebe_email) {
                 $this->log("[{$aluno->nome}] E-mail não enviado (recebe_email=false)");
+                $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::PULADO);
                 $pulados++;
 
                 continue;
@@ -1678,6 +1733,7 @@ class CoachReportDownloader
 
             if (! filter_var($aluno->email, FILTER_VALIDATE_EMAIL)) {
                 $this->log("[{$aluno->nome}] E-mail inválido: {$aluno->email}");
+                $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::INVALIDO);
                 $falhas++;
 
                 continue;
@@ -1698,9 +1754,11 @@ class CoachReportDownloader
                     $pdfs
                 );
                 $this->log("[{$aluno->nome}] E-mail enviado para {$aluno->email} com ".count($pdfs).' anexo(s)'.$this->sufixoCco($aluno->email));
+                $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::ENVIADO);
                 $enviados++;
             } catch (Throwable $exc) {
                 $falhas++;
+                $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::FALHA);
                 $this->log("[{$aluno->nome}] Falha ao enviar e-mail: ".$exc->getMessage());
                 Log::warning('Falha ao enviar relatório do coach', [
                     'aluno_id' => $aluno->id,
@@ -1711,7 +1769,47 @@ class CoachReportDownloader
         }
 
         $this->log(str_repeat('=', 50));
-        $this->log("E-mails enviados: {$enviados} | pulados: {$pulados} | falhas: {$falhas}");
+        $this->log("E-mails enviados: {$enviados} | boas-vindas: {$boasVindas} | pulados: {$pulados} | falhas: {$falhas}");
+    }
+
+    private function enviarBoasVindasNovato(Aluno $aluno, int &$boasVindas, int &$pulados, int &$falhas): void
+    {
+        $this->log("[{$aluno->nome}] Aluno novato: métricas não analisadas e PDF não enviado.");
+
+        if (! $aluno->recebe_email) {
+            $this->log("[{$aluno->nome}] Boas-vindas não enviadas (recebe_email=false)");
+            $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::PULADO);
+            $pulados++;
+
+            return;
+        }
+
+        if (! filter_var($aluno->email, FILTER_VALIDATE_EMAIL)) {
+            $this->log("[{$aluno->nome}] E-mail inválido: {$aluno->email}");
+            $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::INVALIDO);
+            $falhas++;
+
+            return;
+        }
+
+        try {
+            MailHelper::emailBoasVindasNovato(
+                TextoBoasVindasNovato::paraAluno($aluno),
+                $aluno->email
+            );
+            $this->log("[{$aluno->nome}] Boas-vindas enviadas para {$aluno->email}".$this->sufixoCco($aluno->email));
+            $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::BOAS_VINDAS);
+            $boasVindas++;
+        } catch (Throwable $exc) {
+            $falhas++;
+            $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::FALHA);
+            $this->log("[{$aluno->nome}] Falha ao enviar boas-vindas: ".$exc->getMessage());
+            Log::warning('Falha ao enviar boas-vindas de aluno novato', [
+                'aluno_id' => $aluno->id,
+                'email' => $aluno->email,
+                'erro' => $exc->getMessage(),
+            ]);
+        }
     }
 
     private function sufixoCco(string $destinatario): string
@@ -1760,9 +1858,26 @@ class CoachReportDownloader
             }
         }
 
+        if ($this->resumoExecucao !== null) {
+            $this->resumoExecucao->pdfsRemovidos = $removidos;
+        }
+
         $this->log($removidos === 0
             ? 'Nenhum PDF restante para remover em '.$this->pastaDownload
             : "PDFs removidos após o envio: {$removidos}");
+    }
+
+    private function registrarEnvio(string $nome, string $email, string $situacao): void
+    {
+        if ($this->resumoExecucao === null) {
+            return;
+        }
+
+        $this->resumoExecucao->envios[] = [
+            'nome' => $nome,
+            'email' => $email,
+            'situacao' => $situacao,
+        ];
     }
 
     /**
@@ -3468,9 +3583,39 @@ HTML;
         return $caminho;
     }
 
+    /**
+     * Aluno com menos de 15 dias no cadastro local não gera PDF.
+     *
+     * @param  list<array{nome: string, id: string}>  $alunos
+     * @return list<array{nome: string, id: string}>
+     */
+    private function semAlunosNovatos(array $alunos): array
+    {
+        try {
+            $ficam = [];
+            foreach ($alunos as $aluno) {
+                $local = Aluno::encontrarPorTutoryId((string) ($aluno['id'] ?? ''))
+                    ?? Aluno::encontrarPorNome((string) ($aluno['nome'] ?? ''));
+                if ($local !== null && $local->ehNovato()) {
+                    $this->log("[{$local->nome}] Aluno novato: PDF não gerado (cadastro com menos de ".Aluno::DIAS_NOVATO.' dias).');
+
+                    continue;
+                }
+                $ficam[] = $aluno;
+            }
+
+            return $ficam;
+        } catch (QueryException|SQLiteDatabaseDoesNotExistException $exc) {
+            $this->log('Banco local indisponível ao identificar alunos novatos; a geração segue para todos.');
+            $this->log($exc->getMessage());
+
+            return $alunos;
+        }
+    }
+
     private function baixarTodos(): void
     {
-        $inicio = new \DateTimeImmutable('now');
+        $inicio = $this->resumoExecucao->inicio ?? new \DateTimeImmutable('now');
         $relatorios = $this->relatorios();
         $this->log('Processo iniciado em: '.$inicio->format('d/m/Y H:i:s'));
         $motivo = $this->motivoSemPuppeteer();
@@ -3483,7 +3628,7 @@ HTML;
             $relatorios
         )));
 
-        $alunos = $this->coletarAlunosAtivos();
+        $alunos = $this->semAlunosNovatos($this->coletarAlunosAtivos());
         if ($this->teste) {
             $alvo = mb_strtolower(self::ALUNA_TESTE);
             $alunos = array_values(array_filter(
@@ -3499,7 +3644,11 @@ HTML;
 
         if ($alunos === []) {
             $fim = new \DateTimeImmutable('now');
+            if ($this->resumoExecucao !== null) {
+                $this->resumoExecucao->fim = $fim;
+            }
             $log = $this->gravarLogResumo($inicio, $fim, 0, [], [], []);
+            $this->registrarGeracao([], $log);
             $this->log("Nenhum aluno. Log: {$log}");
 
             return;
@@ -3570,7 +3719,11 @@ HTML;
         }
         $lista = array_map(static fn ($k) => $resultados[$k], $chaves);
         $fim = new \DateTimeImmutable('now');
+        if ($this->resumoExecucao !== null) {
+            $this->resumoExecucao->fim = $fim;
+        }
         $log = $this->gravarLogResumo($inicio, $fim, count($alunos), $pdfs, $falhas, $lista);
+        $this->registrarGeracao($lista, $log);
 
         $this->log(str_repeat('=', 50));
         $this->log('Início: '.$inicio->format('d/m/Y H:i:s'));
@@ -3586,6 +3739,25 @@ HTML;
         }
         $this->log("Arquivos em: {$this->pastaDownload}");
         $this->log("Log salvo em: {$log}");
+    }
+
+    /**
+     * @param  list<array{nome: string, sucesso: bool}>  $lista
+     */
+    private function registrarGeracao(array $lista, string $log): void
+    {
+        if ($this->resumoExecucao === null) {
+            return;
+        }
+
+        $this->resumoExecucao->geracoes = array_map(
+            static fn (array $item): array => [
+                'nome' => $item['nome'],
+                'sucesso' => (bool) $item['sucesso'],
+            ],
+            $lista
+        );
+        $this->resumoExecucao->logArquivo = basename($log);
     }
 
     /**
