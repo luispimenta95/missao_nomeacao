@@ -175,9 +175,9 @@ Credenciais da Tutory são `LOGIN_USER` e `LOGIN_PASSWORD`. Não hardcode senha 
 
 O Cloud Agent não sobe o `docker-compose.yml`. O banco do produto é SQLite (`database/database.sqlite`).
 
-O `install` do ambiente instala PHP 8.3 (cli, mbstring, xml, curl, zip, sqlite, bcmath, gd, intl), Composer e `poppler-utils` (`pdftotext`, exigido pelos testes de PDF). Em seguida roda `composer install --no-interaction --prefer-dist`, copia `.env.example` para `.env` se faltar e gera `APP_KEY`. No `.env` gerado, `APP_URL` fica `http://127.0.0.1:8000` e `MAIL_MAILER` fica `log` (não há SMTP local).
+O `install` do ambiente instala PHP 8.3 (cli, mbstring, xml, curl, zip, sqlite, bcmath, gd, intl), Composer e `poppler-utils` (`pdftotext`, exigido pelos testes de PDF). Em seguida roda `composer install --no-interaction --prefer-dist`, copia `.env.example` para `.env` se faltar, gera `APP_KEY`, cria o SQLite e executa `php artisan migrate --force` e `php artisan db:seed --force`. No `.env` gerado, `APP_URL` fica `http://127.0.0.1:8000` e `MAIL_MAILER` fica `log` (não há SMTP local).
 
-O `start` cria `database/database.sqlite` se faltar, roda `php artisan migrate --force` e `php artisan db:seed --force`, e sobe `php artisan serve --host=0.0.0.0 --port=8000`. Saúde: `GET /up`. Se a porta já responde, o script termina sem abrir outro processo. Os seeders usam `updateOrCreate`, então repetir o `start` não duplica turmas nem usuários.
+O `start` cria `database/database.sqlite` se faltar, reaplica `php artisan migrate --force` e `php artisan db:seed --force` (para pegar migration de branch), e sobe `php artisan serve --host=0.0.0.0 --port=8000`. Saúde: `GET /up`. Se a porta já responde, o script termina sem abrir outro processo. Os seeders usam `updateOrCreate`, então repetir o `start` não duplica turmas nem usuários.
 
 - Testes: `php artisan test` ou `composer test`. Estilo: `vendor/bin/pint --test`.
 - Landing, admin e `GET /api/turmas` usam Tailwind pelo CDN. Não rode `npm install`: o `package.json` instala Puppeteer, que permanece desligado.
